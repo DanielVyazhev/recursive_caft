@@ -503,6 +503,9 @@ def train_sft_by_complexity_split(
     )
 
     model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16)
+    
+    # Enable gradient checkpointing to save memory during training
+    model.gradient_checkpointing_enable()
 
     if use_lora:
         lora_config = _build_lora_config(model, lora_kwargs)

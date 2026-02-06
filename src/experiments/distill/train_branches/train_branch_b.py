@@ -14,7 +14,7 @@ if __name__ == "__main__":
         training_kwargs={
             "num_train_epochs": 3,
             "learning_rate": 1e-5,
-            **batch_size_config(global_batch_size=256, per_device_train_batch_size=16),
+            **batch_size_config(global_batch_size=256, per_device_train_batch_size=8),
             "warmup_steps": 50,
             "save_total_limit": None,  # Save all checkpoints for analysis
             "eval_strategy": "epoch",  # Evaluate every epoch
