@@ -16,6 +16,19 @@
 
 ## Status
 
+## Tasks
+
+Semyon:
+- PR with cleaned synth
+- PR with draft experiment: branch A, branch B 
+
+Daniel:
+- PR with CoT evals scipts - evals on 1,2,3,4,6,8,10,15,20
+- PR with distillation with reasoning tokens script
+
+Andrey:
+- Refactor infra to easily swap datasets
+- Find 2 new datasets and entropy splits
 
 
 ## Updates
