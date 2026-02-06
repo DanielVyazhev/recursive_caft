@@ -502,7 +502,7 @@ def train_sft_by_complexity_split(
         tokenizer=tokenizer, padding=True, pad_to_multiple_of=8, return_tensors="pt"
     )
 
-    model = AutoModelForCausalLM.from_pretrained(model_id)
+    model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16)
 
     if use_lora:
         lora_config = _build_lora_config(model, lora_kwargs)
