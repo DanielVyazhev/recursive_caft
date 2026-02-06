@@ -285,8 +285,8 @@ def print_summary_table(branches: Dict[str, pd.DataFrame]):
 
 
 if __name__ == "__main__":
-    output_dir = Path(__file__).parent / "../../../data/out/models"
-    save_dir = Path(__file__).parent / "../../../data/out/analysis/branches"
+    output_dir = Path(__file__).parent / "../../../../data/out/models"
+    save_dir = Path(__file__).parent / "../../../../data/out/analysis/branches"
     
     # Analyze all branches
     branches = analyze_branches(

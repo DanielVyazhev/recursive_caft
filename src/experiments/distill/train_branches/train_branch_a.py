@@ -7,10 +7,10 @@ from core.training.sft_by_complexity_split.sft_by_single_complexity_split import
 
 if __name__ == "__main__":
     train_sft_by_complexity_split(
-        out_path=str(Path(__file__).parent / "../../../data/out/models/branch_a"),
+        out_path=str(Path(__file__).parent / "../../../../data/out/models/branch_a"),
         model_id="Qwen/Qwen2.5-3B-Instruct",
-        train_df_path=str(Path(__file__).parent / "../../../data/out/sft_data/branch_a_train.parquet"),
-        test_df_paths=[str(Path(__file__).parent / "../../../data/out/sft_data/branches_eval.tsv")],
+        train_df_path=str(Path(__file__).parent / "../../../../data/out/sft_data/branch_a_train.parquet"),
+        test_df_paths=[str(Path(__file__).parent / "../../../../data/out/sft_data/branches_eval.tsv")],
         training_kwargs={
             "num_train_epochs": 3,
             "learning_rate": 1e-5,

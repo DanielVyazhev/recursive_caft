@@ -100,8 +100,8 @@ def save_branch_dataset(df, output_file, branch_name):
     logging.info(f"{branch_name}: Saved {len(df)} samples to {output_file}")
 
 if __name__ == "__main__":
-    base_path = Path(__file__).parent / "../../../data/out/distillation"
-    output_path = Path(__file__).parent / "../../../data/out/sft_data"
+    base_path = Path(__file__).parent / "../../../../data/out/distillation"
+    output_path = Path(__file__).parent / "../../../../data/out/sft_data"
     output_path.mkdir(parents=True, exist_ok=True)
     
     # Branch A
