@@ -11,6 +11,8 @@
 - How could we utilize knowledge the ground truth?
 - What is the most efficient way to do large model distillation? How much does the starting point matter?
 - Given that we find the part of the dataset that contributes the most to the final result, does it change with each epoch of training?
+- Could we utilize complexity of the teacher model to curate the dataset for the student model?
+- How can we find the theoretical explanation for empirical complexity windows?
 
 ## Status
 
@@ -18,5 +20,5 @@
 
 ## Updates
 
-1. TBD
+1. Could we tie EIG to entropy windows? See BED-LLM
 
