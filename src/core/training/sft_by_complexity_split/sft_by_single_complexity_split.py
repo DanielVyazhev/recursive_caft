@@ -48,29 +48,29 @@ class DataCollatorWithQuestionID(DataCollatorForTokenClassification):
     """Custom data collator that preserves question_id and cot flag as metadata."""
 
     def __call__(self, features: list[dict[str, Any]], return_tensors=None) -> dict[str, Any]:
-        # Extract metadata fields before calling parent collator
-        question_ids = [f.pop("question_id") for f in features]
-        # cot flag may not exist in all datasets (only in CoT eval datasets)
-        is_cot = [f.pop("cot", False) for f in features]
-        # distill flag for distillation branch eval
-        is_distill = [f.pop("distill", False) for f in features]
-        # complexity metadata (numeric)
-        complexities = [f.pop("complexity", 0) for f in features]
-        # category and subject metadata (strings - store separately)
-        categories = [f.pop("category", "") for f in features]
-        subjects = [f.pop("subject", "") for f in features]
+        # Check if this is eval dataset (has question_id) or train dataset (no question_id)
+        has_question_id = "question_id" in features[0] if features else False
+        
+        # Extract metadata fields before calling parent collator (only if they exist)
+        if has_question_id:
+            question_ids = [f.pop("question_id") for f in features]
+            is_cot = [f.pop("cot", False) for f in features]
+            is_distill = [f.pop("distill", False) for f in features]
+            complexities = [f.pop("complexity", 0) for f in features]
+            categories = [f.pop("category", "") for f in features]
+            subjects = [f.pop("subject", "") for f in features]
 
         # Let parent collator handle the tensor fields
         batch = super().__call__(features, return_tensors)
 
-        # Add metadata back as tensors (will be gathered by Trainer)
-        batch["question_id"] = torch.tensor(question_ids, dtype=torch.long)
-        batch["cot"] = torch.tensor(is_cot, dtype=torch.bool)
-        batch["distill"] = torch.tensor(is_distill, dtype=torch.bool)
-        batch["complexity"] = torch.tensor(complexities, dtype=torch.long)
-        # Store string metadata as lists (not tensors)
-        batch["category"] = categories
-        batch["subject"] = subjects
+        # Add metadata back (only for eval datasets)
+        if has_question_id:
+            batch["question_id"] = torch.tensor(question_ids, dtype=torch.long)
+            batch["cot"] = torch.tensor(is_cot, dtype=torch.bool)
+            batch["distill"] = torch.tensor(is_distill, dtype=torch.bool)
+            batch["complexity"] = torch.tensor(complexities, dtype=torch.long)
+            batch["category"] = categories
+            batch["subject"] = subjects
 
         return batch
 
