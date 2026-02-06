@@ -104,16 +104,32 @@ if __name__ == "__main__":
     output_path = Path(__file__).parent / "../../../data/out/sft_data"
     output_path.mkdir(parents=True, exist_ok=True)
     
-    logging.info("Preparing Branch A...")
-    df_a = prepare_branch_a_df(base_path / "mmlu_synth_gptoss_a_t0_8.parquet")
-    save_branch_dataset(df_a, output_path / "branch_a_train.parquet", "Branch A")
+    # Branch A
+    branch_a_file = base_path / "mmlu_synth_gptoss_a_t0_8.parquet"
+    if branch_a_file.exists():
+        logging.info("Preparing Branch A...")
+        df_a = prepare_branch_a_df(branch_a_file)
+        save_branch_dataset(df_a, output_path / "branch_a_train.parquet", "Branch A")
+    else:
+        logging.warning(f"Branch A data not found: {branch_a_file}")
     
-    logging.info("Preparing Branch B...")
-    df_b = prepare_branch_b_df(base_path / "mmlu_synth_gptoss_b_t0_8.parquet")
-    save_branch_dataset(df_b, output_path / "branch_b_train.parquet", "Branch B")
+    # Branch B
+    branch_b_file = base_path / "mmlu_synth_gptoss_b_t0_8.parquet"
+    if branch_b_file.exists():
+        logging.info("Preparing Branch B...")
+        df_b = prepare_branch_b_df(branch_b_file)
+        save_branch_dataset(df_b, output_path / "branch_b_train.parquet", "Branch B")
+    else:
+        logging.warning(f"Branch B data not found: {branch_b_file}")
     
-    logging.info("Preparing Branch C...")
-    df_c = prepare_branch_c_df(base_path / "mmlu_synth_gptoss_c_t0_8.parquet")
-    save_branch_dataset(df_c, output_path / "branch_c_train.parquet", "Branch C")
+    # Branch C
+    branch_c_file = base_path / "mmlu_synth_gptoss_c_t0_8.parquet"
+    if branch_c_file.exists():
+        logging.info("Preparing Branch C...")
+        df_c = prepare_branch_c_df(branch_c_file)
+        save_branch_dataset(df_c, output_path / "branch_c_train.parquet", "Branch C")
+    else:
+        logging.warning(f"Branch C data not found: {branch_c_file}")
     
-    logging.info("All branches prepared!")
+    logging.info("Data preparation complete!")
+    

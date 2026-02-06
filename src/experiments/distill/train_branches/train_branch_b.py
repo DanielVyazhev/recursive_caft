@@ -1,118 +1,27 @@
-import logging
-import ast
-import pandas as pd
-
-import torch
-from peft import LoraConfig, TaskType, get_peft_model
-from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
-from transformers.data.data_collator import DataCollatorForLanguageModeling
-
-from core.prompts.mmlu_branches_sft import branch_b_sys_prompt, branch_b_user_prompt
-
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-
-BASE_MODEL = "Qwen/Qwen2.5-3B-Instruct"
-DATA_FILE = "data/out/sft_data/branch_b_train.parquet"
-OUTPUT_DIR = "data/out/models/branch_b"
-EPOCHS = 3
-LR = 1e-5
-GLOBAL_BATCH_SIZE = 256
-PER_DEVICE_BATCH_SIZE = 16
-
-logging.info(f"Loading model: {BASE_MODEL}")
-tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, padding_side="left")
-tokenizer.pad_token = tokenizer.eos_token
-
-model = AutoModelForCausalLM.from_pretrained(
-    BASE_MODEL,
-    torch_dtype=torch.bfloat16,
-    device_map="auto"
+"""Training configuration for Branch B: Q + options + gold -> CoT explanation"""
+from pathlib import Path
+from core.training.sft_by_complexity_split.sft_by_single_complexity_split import (
+    train_sft_by_complexity_split,
+    batch_size_config,
 )
 
-lora_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
-    lora_dropout=0.05,
-    bias="none",
-    task_type=TaskType.CAUSAL_LM,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-    use_rslora=True,
-)
-model = get_peft_model(model, lora_config)
-model.print_trainable_parameters()
-
-logging.info(f"Loading data: {DATA_FILE}")
-df = pd.read_parquet(DATA_FILE)
-logging.info(f"Loaded {len(df)} samples")
-
-def get_sys_prompt(row):
-    return branch_b_sys_prompt(row["subject"] if row["subject"] else None)
-
-def get_user_prompt(row):
-    options = ast.literal_eval(row["options"])
-    return branch_b_user_prompt(row["question"], options, row["gold_letter"])
-
-def prepare_branch_b_dataset(tokenizer, df):
-    """Prepare Branch B dataset with explanation"""
-    df_copy = df.copy()
-    df_copy["sys_prompt"] = df_copy.apply(get_sys_prompt, axis=1)
-    df_copy["user_prompt"] = df_copy.apply(get_user_prompt, axis=1)
-    
-    def process_row(row):
-        messages = [
-            {"role": "system", "content": row["sys_prompt"]},
-            {"role": "user", "content": row["user_prompt"]},
-            {"role": "assistant", "content": row["thinking"]}
-        ]
-        tokenized = tokenizer.apply_chat_template(messages, tokenize=True, return_dict=True)
-        return {
-            "input_ids": tokenized["input_ids"],
-            "attention_mask": tokenized["attention_mask"],
-            "labels": tokenized["input_ids"].copy()
-        }
-    
-    from datasets import Dataset
-    dataset = Dataset.from_pandas(df_copy)
-    processed = dataset.map(process_row, num_proc=4, remove_columns=dataset.column_names)
-    return processed
-
-train_ds = prepare_branch_b_dataset(tokenizer, df)
-logging.info(f"Prepared {len(train_ds)} training samples")
-
-data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
-
-gradient_accumulation_steps = GLOBAL_BATCH_SIZE // PER_DEVICE_BATCH_SIZE
-logging.info(f"Batch config: per_device={PER_DEVICE_BATCH_SIZE}, grad_accum={gradient_accumulation_steps}, global={GLOBAL_BATCH_SIZE}")
-
-training_args = TrainingArguments(
-    output_dir=OUTPUT_DIR,
-    num_train_epochs=EPOCHS,
-    per_device_train_batch_size=PER_DEVICE_BATCH_SIZE,
-    gradient_accumulation_steps=gradient_accumulation_steps,
-    learning_rate=LR,
-    bf16=True,
-    logging_steps=10,
-    save_strategy="epoch",
-    save_total_limit=1,
-    lr_scheduler_type="linear",
-    warmup_steps=50,
-    seed=42,
-    data_seed=42,
-    remove_unused_columns=False,
-)
-
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_ds,
-    data_collator=data_collator,
-    processing_class=tokenizer,
-)
-
-logging.info("Starting training...")
-trainer.train()
-
-logging.info(f"Saving model to {OUTPUT_DIR}")
-model.save_pretrained(OUTPUT_DIR)
-tokenizer.save_pretrained(OUTPUT_DIR)
-logging.info("Done!")
+if __name__ == "__main__":
+    train_sft_by_complexity_split(
+        out_path=str(Path(__file__).parent / "../../../data/out/models/branch_b"),
+        model_id="Qwen/Qwen2.5-3B-Instruct",
+        train_df_path=str(Path(__file__).parent / "../../../data/out/sft_data/branch_b_train.parquet"),
+        test_df_paths=[str(Path(__file__).parent / "../../../data/out/sft_data/branches_eval.tsv")],
+        training_kwargs={
+            "num_train_epochs": 3,
+            "learning_rate": 1e-5,
+            **batch_size_config(global_batch_size=256, per_device_train_batch_size=16),
+            "warmup_steps": 50,
+            "save_total_limit": None,  # Save all checkpoints for analysis
+            "eval_strategy": "epoch",  # Evaluate every epoch
+            "logging_strategy": "steps",  # Log frequently
+            "logging_steps": 10,
+        },
+        use_lora=True,
+        lora_kwargs={"r": 16, "lora_alpha": 32, "lora_dropout": 0.05, "use_rslora": True},
+        distill_branch="B",
+    )
