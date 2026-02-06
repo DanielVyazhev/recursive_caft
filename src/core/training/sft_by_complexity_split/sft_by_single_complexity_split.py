@@ -52,6 +52,13 @@ class DataCollatorWithQuestionID(DataCollatorForTokenClassification):
         question_ids = [f.pop("question_id") for f in features]
         # cot flag may not exist in all datasets (only in CoT eval datasets)
         is_cot = [f.pop("cot", False) for f in features]
+        # distill flag for distillation branch eval
+        is_distill = [f.pop("distill", False) for f in features]
+        # complexity metadata (numeric)
+        complexities = [f.pop("complexity", 0) for f in features]
+        # category and subject metadata (strings - store separately)
+        categories = [f.pop("category", "") for f in features]
+        subjects = [f.pop("subject", "") for f in features]
 
         # Let parent collator handle the tensor fields
         batch = super().__call__(features, return_tensors)
@@ -59,6 +66,11 @@ class DataCollatorWithQuestionID(DataCollatorForTokenClassification):
         # Add metadata back as tensors (will be gathered by Trainer)
         batch["question_id"] = torch.tensor(question_ids, dtype=torch.long)
         batch["cot"] = torch.tensor(is_cot, dtype=torch.bool)
+        batch["distill"] = torch.tensor(is_distill, dtype=torch.bool)
+        batch["complexity"] = torch.tensor(complexities, dtype=torch.long)
+        # Store string metadata as lists (not tensors)
+        batch["category"] = categories
+        batch["subject"] = subjects
 
         return batch
 
