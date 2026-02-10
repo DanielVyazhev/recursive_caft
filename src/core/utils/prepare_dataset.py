@@ -1,11 +1,34 @@
 from datasets import Dataset
+import pandas as pd
 
 from core.prompts.mmlu_option_ids import option_ids
+from core.prompts import mmlu_cot_answer as cot_prompts
+from core.prompts.thinking_markers import THINKING_START, THINKING_END
 
 
-def prepare_dataset(tokenizer, get_sys_prompt, get_user_prompt, df, mask_input=False):
+def prepare_dataset(
+    tokenizer,
+    get_sys_prompt,
+    get_user_prompt,
+    df,
+    mask_input=False,
+    use_thinking=False,
+    use_cot=False,
+):
+    """
+    Prepare a training/eval dataset.
+    Answer wrapping modes:
+      - default:        single answer letter token, e.g. "a"
+      - use_cot=True:   answer wrapped in markers, e.g. "[[a]]"
+      - use_thinking=True: <think>reasoning</think>a
+    """
+    assert not (use_thinking and use_cot), "use_thinking and use_cot are mutually exclusive"
+
+    df = df.copy()
     df["sys_prompt"] = df.apply(get_sys_prompt, axis=1)
     df["user_prompt"] = df.apply(get_user_prompt, axis=1)
+
+    answer_marker = cot_prompts.answer_marker
 
     def process_row(row):
         tokenized = tokenizer.apply_chat_template(
@@ -18,10 +41,31 @@ def prepare_dataset(tokenizer, get_sys_prompt, get_user_prompt, df, mask_input=F
             return_dict=True,
         )
 
-        answer_id = tokenizer.encode(option_ids[int(row["answer_index"])], add_special_tokens=False)[0]
+        answer = str(row["answer"]).strip().lower()
 
-        input_ids = tokenized["input_ids"] + [answer_id]
-        attention_mask = tokenized["attention_mask"] + [1]
+        if use_thinking:
+            # <think>reasoning</think> + bare letter
+            target_parts = []
+            thinking_val = row.get("thinking", None)
+            if pd.notna(thinking_val):
+                thinking_str = str(thinking_val).strip()
+                if thinking_str:
+                    target_parts.append(f"{THINKING_START}{thinking_str}{THINKING_END}")
+            target_parts.append(answer)
+            target_text = " ".join(target_parts)
+            target_tokens = tokenizer.encode(target_text, add_special_tokens=False)
+
+        elif use_cot:
+            # answer wrapped in [[...]] markers
+            target_text = f"{answer_marker[0]}{answer}{answer_marker[1]}"
+            target_tokens = tokenizer.encode(target_text, add_special_tokens=False)
+
+        else:
+            # single token - bare letter
+            target_tokens = tokenizer.encode(answer, add_special_tokens=False)[:1]
+
+        input_ids = tokenized["input_ids"] + target_tokens
+        attention_mask = tokenized["attention_mask"] + [1] * len(target_tokens)
 
         labels = input_ids.copy()
 
@@ -31,7 +75,12 @@ def prepare_dataset(tokenizer, get_sys_prompt, get_user_prompt, df, mask_input=F
 
         question_id = row["question_id"]
 
-        return {"input_ids": input_ids, "attention_mask": attention_mask, "labels": labels, "question_id": question_id}
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels,
+            "question_id": question_id,
+        }
 
     dataset = Dataset.from_pandas(df)
 
@@ -44,7 +93,18 @@ def prepare_dataset(tokenizer, get_sys_prompt, get_user_prompt, df, mask_input=F
     return processed_ds
 
 
-def prepare_dataset_cot_eval(tokenizer, get_sys_prompt, get_user_prompt, df):
+def prepare_dataset_cot_eval(
+    tokenizer,
+    get_sys_prompt,
+    get_user_prompt,
+    df,
+    use_thinking=False,
+):
+    """
+    Prepare eval dataset for generative (CoT) evaluation.
+    Only input is tokenized; label is a single token for answer matching.
+    """
+    df = df.copy()
     df["sys_prompt"] = df.apply(get_sys_prompt, axis=1)
     df["user_prompt"] = df.apply(get_user_prompt, axis=1)
 
@@ -59,12 +119,12 @@ def prepare_dataset_cot_eval(tokenizer, get_sys_prompt, get_user_prompt, df):
             return_dict=True,
         )
 
-        answer_id = tokenizer.encode(option_ids[int(row["answer_index"])], add_special_tokens=False)[0]
+        answer = str(row["answer"]).strip().lower()
+        label_token_id = tokenizer.encode(answer, add_special_tokens=False)[0]
 
         input_ids = tokenized["input_ids"]
         attention_mask = tokenized["attention_mask"]
-
-        labels = [answer_id]
+        labels = [label_token_id]
 
         question_id = row["question_id"]
 

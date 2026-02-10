@@ -1,31 +1,41 @@
 import ast
+import os
 import json
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
+import math
 import torch
 from datasets import Dataset, concatenate_datasets
-from peft import LoraConfig, TaskType, get_peft_model
+from dataclasses import dataclass
+from typing import Any
 from transformers.data.data_collator import DataCollatorForTokenClassification
 from transformers.generation.configuration_utils import GenerationConfig
 from transformers.models.auto.modeling_auto import AutoModelForCausalLM
 from transformers.models.auto.tokenization_auto import AutoTokenizer
 from transformers.training_args_seq2seq import Seq2SeqTrainingArguments
 
+from peft import LoraConfig, get_peft_model, TaskType
+
 import core.prompts.mmlu_cot_answer as cot_prompts
 import core.prompts.mmlu_single_token_answer as prompts
-from core.training.callbacks.save_and_log_weights import SaveOnEpochEndAndLogWeightsCallback
 from core.training.sft_by_complexity_split.cot_eval_trainer import CoTEvalTrainer
+from core.training.callbacks.save_and_log_weights import SaveOnEpochEndAndLogWeightsCallback
+from core.training.callbacks.save_every_n_epoch import SaveEveryNEpochsCallback
+from core.training.callbacks.eval_every_n_epoch import EvalEveryNEpochsCallback
+
+from core.utils.device import DEVICE_MAP
 from core.utils.last_checkpoint_dir import get_last_checkpoint_dir
 from core.utils.prepare_dataset import prepare_dataset, prepare_dataset_cot_eval
 from core.utils.seed import set_seed
+from core.prompts.mmlu_option_ids import option_ids
+from core.prompts.thinking_markers import THINKING_START, THINKING_END
+from collections import Counter
 
-TRAIN_BATCH_SIZE = 16
+TRAIN_BATCH_SIZE = 4
 EVAL_BATCH_SIZE = 16
-LR = 1e-5
+LR = 2e-4
 EPOCHS = 20
 
 GLOBAL_BATCH_SIZE = 256
@@ -98,6 +108,19 @@ def get_user_prompt(row):
     return prompts.single_token_answer_prompt(question, options)
 
 
+def get_sys_prompt_thinking(row):
+    """System prompt for training with thinking/reasoning tokens."""
+    subject = row["base_cluster"]
+    return prompts.single_token_sys_prompt_with_thinking(subject)
+
+
+def get_user_prompt_thinking(row):
+    """User prompt — same format as single-token, model produces thinking + answer."""
+    question = row["question"]
+    options = ast.literal_eval(row["options"])
+    return prompts.single_token_answer_prompt(question, options)
+
+
 def get_sys_prompt_cot_eval(row):
     subject = row["base_cluster"]
     return cot_prompts.cot_sys_prompt(subject)
@@ -107,6 +130,19 @@ def get_user_prompt_cot_eval(row):
     question = row["question"]
     options = ast.literal_eval(row["options"])
     return cot_prompts.cot_answer_prompt(question, options)
+
+
+def get_sys_prompt_cot_eval_thinking(row):
+    """System prompt for CoT eval when model was trained with thinking tokens."""
+    subject = row["base_cluster"]
+    return prompts.single_token_sys_prompt_with_thinking(subject)
+
+
+def get_user_prompt_cot_eval_thinking(row):
+    """User prompt for CoT eval with thinking — same as training prompt."""
+    question = row["question"]
+    options = ast.literal_eval(row["options"])
+    return prompts.single_token_answer_prompt(question, options)
 
 
 # helper for default LoRA
@@ -130,10 +166,7 @@ def _build_lora_config(model, lora_kwargs: dict | None) -> LoraConfig:
         bias=lora_kwargs.get("bias", "none"),
         task_type=TaskType.CAUSAL_LM,
         target_modules=target_modules,
-        # Additionaly can be used:
-        # modules_to_save=lora_kwargs.get("modules_to_save"),
         use_rslora=lora_kwargs.get("use_rslora", True),
-        # init_lora_weights=lora_kwargs.get("init_lora_weights", True),
     )
 
 
@@ -145,7 +178,8 @@ def train_sft_by_complexity_split(
     training_kwargs,
     *,
     use_lora: bool = False,
-    lora_kwargs: dict | None = None,  # LoRA params
+    lora_kwargs: dict | None = None,
+    use_thinking: bool = False,
 ):
     if not directory_is_empty(out_path, EPOCHS):
         print("train_sft_by_complexity_split -> out_path not empty", out_path)
@@ -176,21 +210,29 @@ def train_sft_by_complexity_split(
         if is_cot_eval:
             # labels are padded from both left and right (weird, I know)
             labels = labels[..., inputs.shape[1] - 1]
-            predictions = predictions[:, inputs.shape[1] :]
+            predictions = predictions[:, inputs.shape[1]:]
             decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
             decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
             extracted_preds = []
             for p in decoded_preds:
-                ans_start = p.find(cot_prompts.answer_marker[0])
-                if ans_start != -1:
-                    ans_start += len(cot_prompts.answer_marker[0])
-                ans_end = p.find(cot_prompts.answer_marker[1])
+                extracted = ""
 
+                # First try: extract from [[...]] markers (standard CoT eval)
+                ans_marker = cot_prompts.answer_marker
+                ans_start = p.find(ans_marker[0])
+                ans_end = p.find(ans_marker[1])
                 if ans_start != -1 and ans_end != -1:
-                    extracted_preds.append(p[ans_start:ans_end])
+                    extracted = p[ans_start + len(ans_marker[0]):ans_end].strip()
                 else:
-                    extracted_preds.append("")
+                    # Second try: if thinking mode, take first non-whitespace
+                    think_end_pos = p.find(THINKING_END)
+                    if think_end_pos != -1:
+                        after_think = p[think_end_pos + len(THINKING_END):].strip()
+                        if after_think:
+                            extracted = after_think[0]
+
+                extracted_preds.append(extracted)
 
             matches = [p.lower() == l.lower() for p, l in zip(extracted_preds, decoded_labels)]
 
@@ -258,9 +300,28 @@ def train_sft_by_complexity_split(
     for test_df in test_dfs:
         print(test_df.head())
 
+    # Select prompt functions based on use_thinking mode
+    if use_thinking:
+        train_sys_prompt_fn = get_sys_prompt_thinking
+        train_user_prompt_fn = get_user_prompt_thinking
+        eval_cot_sys_prompt_fn = get_sys_prompt_cot_eval_thinking
+        eval_cot_user_prompt_fn = get_user_prompt_cot_eval_thinking
+    else:
+        train_sys_prompt_fn = get_sys_prompt
+        train_user_prompt_fn = get_user_prompt
+        eval_cot_sys_prompt_fn = get_sys_prompt_cot_eval
+        eval_cot_user_prompt_fn = get_user_prompt_cot_eval
+
     train_ds = prepare_dataset(
-        tokenizer=tokenizer, get_sys_prompt=get_sys_prompt, get_user_prompt=get_user_prompt, df=train_df
+        tokenizer=tokenizer,
+        get_sys_prompt=train_sys_prompt_fn,
+        get_user_prompt=train_user_prompt_fn,
+        df=train_df,
+        use_thinking=use_thinking,
     )
+    
+    print("DECODED TRAIN SAMPLE:", tokenizer.decode(train_ds[0]["input_ids"]))
+
     # tokenwise eval
     test_tokenwise_ds_dict: dict[str, Dataset] = {
         f"g{i}": prepare_dataset(
@@ -272,18 +333,19 @@ def train_sft_by_complexity_split(
         )
         for i, test_df in enumerate(test_dfs)
     }
-    # CoT eval
+    # CoT eval — use thinking-aware prompts when use_thinking is enabled
     test_cot_ds_dict: dict[str, Dataset] = {
         f"g{i}_cot": prepare_dataset_cot_eval(
             tokenizer=tokenizer,
-            get_sys_prompt=get_sys_prompt_cot_eval,
-            get_user_prompt=get_user_prompt_cot_eval,
+            get_sys_prompt=eval_cot_sys_prompt_fn,
+            get_user_prompt=eval_cot_user_prompt_fn,
             df=test_df,
+            use_thinking=use_thinking,
         )
         for i, test_df in enumerate(test_dfs)
     }
     # Combined eval dataset
-    test_combined_ds_dict = {**test_tokenwise_ds_dict, **test_cot_ds_dict}
+    test_combined_ds_dict = {**test_cot_ds_dict}  # **test_tokenwise_ds_dict, **test_cot_ds_dict
 
     print("Dataset samples")
     print(train_ds[0])
@@ -300,7 +362,6 @@ def train_sft_by_complexity_split(
     if use_lora:
         lora_config = _build_lora_config(model, lora_kwargs)
         model = get_peft_model(model, lora_config)
-        # Удобный лог о числе обучаемых параметров
         try:
             model.print_trainable_parameters()
         except Exception:
@@ -331,8 +392,8 @@ def train_sft_by_complexity_split(
         "report_to": "none",
         "save_strategy": "epoch",
         "overwrite_output_dir": True,
-        "save_total_limit": 1,
-        "save_only_model": True,  # with peft save only adapters
+        "save_total_limit": 4,
+        "save_only_model": True,
         "eval_on_start": True,
         "num_train_epochs": EPOCHS,
         "lr_scheduler_type": "linear",
@@ -364,6 +425,11 @@ def train_sft_by_complexity_split(
         )
     )
 
-    trainer.train()
+    trainer.add_callback(
+        SaveEveryNEpochsCallback(n_epochs=4)
+    )
+    trainer.add_callback(EvalEveryNEpochsCallback(schedule=[(1, 5, 1), (6, 10, 2), (11, 30, 5)]))
+
+    trainer.train(resume_from_checkpoint=True)
 
     return get_last_checkpoint_dir(out_path)

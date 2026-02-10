@@ -1,6 +1,8 @@
 from typing import List
 
 from core.prompts.mmlu_option_ids import fallback_option_id, option_ids
+from core.prompts.thinking_markers import THINKING_START, THINKING_END
+
 
 
 def single_token_sys_prompt(subject: str | None = None):
@@ -10,6 +12,17 @@ def single_token_sys_prompt(subject: str | None = None):
         sys_msg = "The following are multiple choice questions."
 
     sys_msg += " Choose a correct option letter. Answer with a single symbol. Do not print anything else."
+    return sys_msg
+
+def single_token_sys_prompt_with_thinking(subject: str | None = None):
+    if subject is not None:
+        sys_msg = f"The following are multiple choice questions about {subject}."
+    else:
+        sys_msg = "The following are multiple choice questions."
+    sys_msg += (
+        f" Think step by step inside {THINKING_START}...{THINKING_END} tags,"
+        f" then answer with the correct option letter only."
+    )
     return sys_msg
 
 
