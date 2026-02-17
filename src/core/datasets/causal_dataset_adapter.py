@@ -1,37 +1,23 @@
-from abc import abstractmethod
-
 import pandas as pd
 
-from core.datasets.base_dataset_adapter import BaseDatasetAdapter, TokenizedRow
+from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter, TokenizedRow
+from core.datasets.causal_dataset import CausalDataset
 
-
-class CausalDatasetAdapter(BaseDatasetAdapter):
-    @abstractmethod
-    def system_prompt(self, row: pd.Series) -> str: ...
-
-    @abstractmethod
-    def user_prompt(self, row: pd.Series) -> str: ...
-
-    @abstractmethod
-    def assistant_response(self, row: pd.Series) -> str: ...
-
-    @abstractmethod
-    def row_id(self, row: pd.Series) -> str: ...
-
-    def process_row(self, row: pd.Series) -> TokenizedRow:
+class CausalDatasetAdapter(AbstractDatasetAdapter[CausalDataset]):
+    def process_row(self, row: dict) -> TokenizedRow:
         input_messages = [
-            {"role": "system", "content": self.system_prompt(row)},
-            {"role": "user", "content": self.user_prompt(row)},
+            {"role": "system", "content": self.dataset.system_prompt(row)},
+            {"role": "user", "content": self.dataset.user_prompt(row)},
         ]
 
-        full = self.tokenizer.apply_chat_template(
-            input_messages + [{"role": "assistant", "content": self.assistant_response(row)}],
+        full = self.dataset.tokenizer.apply_chat_template(
+            input_messages + [{"role": "assistant", "content": self.dataset.assistant_response(row)}],
             tokenize=True,
             add_generation_prompt=False,
             return_dict=True,
         )
 
-        prefix = self.tokenizer.apply_chat_template(
+        prefix = self.dataset.tokenizer.apply_chat_template(
             input_messages,
             tokenize=True,
             add_generation_prompt=True,
@@ -47,7 +33,7 @@ class CausalDatasetAdapter(BaseDatasetAdapter):
         attention_mask = full["attention_mask"]
         labels = [-100] * prefix_len + input_ids[prefix_len:]
 
-        row_id = self.row_id(row)
+        row_id = self.dataset.row_id(row)
 
         return TokenizedRow(
             input_ids=input_ids,

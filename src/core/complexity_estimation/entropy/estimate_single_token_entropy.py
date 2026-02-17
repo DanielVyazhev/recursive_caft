@@ -1,134 +1,93 @@
+from core.complexity_estimation.entropy.logit_entropy import compute_entropy_from_logits
 import gc
 import os
+from typing import Callable, cast
 
 import pandas as pd
 import torch
-from datasets import Dataset
-from torch.utils.data import DataLoader
+from pydantic.config import ConfigDict
+from pydraconf.base_config import PydraConfig
 from tqdm import tqdm
-from transformers import DataCollatorWithPadding
-
-import core.prompts.mmlu_single_token_answer as mmlu_prompts
-from core.complexity_estimation.entropy.logit_entropy import compute_entropy_from_logits
-from core.utils.device import DEVICE, move_batch_to_device
-from core.utils.seed import set_seed
-from core.utils.validation import validate_mmlu_answer
-
-field_entropy_value = "entropy_value"
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-def add_single_token_entropy_cols(df):
-    if field_entropy_value not in df.columns:
-        df[field_entropy_value] = 0.0
+class EstimateDatasetConfig(PydraConfig):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    in_filename: str
+    out_filename: str
+    dump_every: int = 100
+    max_new_tokens: int = 1
+    get_sys_prompt: Callable[[pd.Series], str]
+    get_user_prompt: Callable[[pd.Series], str]
+    model_name: str
+    device: str
+    model_config_dict: dict
+    check_answer_correct: Callable[[pd.Series, str], bool]
 
 
-def process_single_token_entropy_response(df, row_idx, inputs, outputs, response_idx, response, model, tokenizer):
-    final_token_logits = outputs.scores[-1][response_idx]
-    entropy = compute_entropy_from_logits(final_token_logits)
 
-    df.at[row_idx, field_entropy_value] = entropy
+def estimate_dataset(config: EstimateDatasetConfig):
+    invalid_answers = 0
 
-    return response
+    in_filename = config.in_filename
+    file_type = os.path.splitext(config.in_filename)[1]
 
+    if os.path.exists(config.out_filename):
+        in_filename = config.out_filename
 
-def estimate_dataset(
-    in_filename,
-    out_filename,
-    model,
-    tokenizer,
-    get_subject_from_row,
-    get_question_from_row,
-    get_options_from_row,
-    check_answer_correct,
-    max_new_tokens=1,
-    get_sys_prompt=mmlu_prompts.single_token_sys_prompt,
-    get_user_prompt=mmlu_prompts.single_token_answer_prompt,
-    batch_size=16,
-    dump_every=1000,
-    add_columns=add_single_token_entropy_cols,
-    process_response=process_single_token_entropy_response,
-):
-    invalid_formatting = 0
-    correct_answers = 0
-
-    set_seed()
-
-    if os.path.exists(out_filename):
-        in_filename = out_filename
-
-    if in_filename.endswith(".csv"):
+    if file_type == ".jsonl":
+        df = pd.read_json(in_filename, lines=True)
+    else:
         df = pd.read_csv(
             in_filename,
             sep="\t",
             header=0,
         )
-    else:
-        df = pd.read_parquet(
-            in_filename,
-        )
 
-    model_name = model.config_class().model_type
-    print(model_name)
-
-    field_response = "entropy_response"
-    if field_response not in df.columns:
-        df[field_response] = ""
+    field_ans = "entropy_ans"
     field_ans_correct = "entropy_ans_correct"
+    field_entropy_value = "entropy_value"
+
     if field_ans_correct not in df.columns:
         df[field_ans_correct] = False
+    if field_entropy_value not in df.columns:
+        df[field_entropy_value] = 0.0
+    if field_ans not in df.columns:
+        df[field_ans] = ""
 
-    add_columns(df)
+    tokenizer = AutoTokenizer.from_pretrained(config.model_name)
 
-    tokenizer.padding_side = "left"
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
-    ds = Dataset.from_pandas(df)
+    model = AutoModelForCausalLM.from_pretrained(config.model_name, **config.model_config_dict).to(config.device)
 
-    print(f"\nDs len = {len(ds)}\n")
+    for index, row in tqdm(df.iterrows(), total=df.shape[0]):
+        if row[field_ans] != "":
+            continue
 
-    def preprocess_ds(row):
-        sys_prompt = get_sys_prompt(get_subject_from_row(row))
-        user_prompt = get_user_prompt(get_question_from_row(row), get_options_from_row(row))
+        gc.collect()
+        if config.device == "cuda":
+            torch.cuda.empty_cache()
+
+        # print(f"loop {index} -> start: {model.get_memory_footprint(return_buffers=True) / 10**9} GB")
+
+        sys_prompt = config.get_sys_prompt(row)
+        user_prompt = config.get_user_prompt(row)
+
+        # print(user_prompt)
         messages = [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt},
         ]
-        tokenized = tokenizer.apply_chat_template(
-            messages, tokenize=True, return_tensors="pt", return_dict=True, add_generation_prompt=True
-        )
-        for k in tokenized:
-            tokenized[k] = tokenized[k].squeeze(0)
-        return tokenized
+        formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
-    ds = ds.map(
-        preprocess_ds,
-        num_proc=4,
-        batched=False,
-        remove_columns=[col for col in ds.column_names if col not in ["input_ids", "attention_mask"]],
-    )
-
-    print("\nDs sample:\n")
-    print("\n\n".join(tokenizer.batch_decode(ds[:3]["input_ids"])))
-
-    data_collator = DataCollatorWithPadding(tokenizer)
-    dataloader = DataLoader(ds, batch_size=batch_size, shuffle=False, collate_fn=data_collator)
-
-    batch = next(iter(dataloader))
-
-    pbar = tqdm(dataloader)
-    for batch_idx, batch in enumerate(pbar):
-        last_row_in_batch_idx = batch_idx * batch_size + batch_size - 1
-        if df.at[last_row_in_batch_idx, field_response] != "":
-            continue
-
-        gc.collect()
-        if DEVICE == torch.device("cuda"):
-            torch.cuda.empty_cache()
-
-        batch = move_batch_to_device(batch, DEVICE)
+        inputs = tokenizer(formatted_prompt, return_tensors="pt").to(config.device)
 
         outputs = model.generate(
-            **batch,
-            max_new_tokens=max_new_tokens,
+            **inputs,
+            max_new_tokens=config.max_new_tokens,
             return_dict_in_generate=True,
             output_scores=True,
             temperature=None,
@@ -138,31 +97,46 @@ def estimate_dataset(
             num_beams=1,
             pad_token_id=tokenizer.eos_token_id,
         )
+        # print(f"loop {index} -> after generate: {model.get_memory_footprint(return_buffers=True) / 10**9} GB")
 
-        # They are all padded to the same length
-        input_length = batch["input_ids"].shape[1]
-        response_token_batch = outputs.sequences[:, input_length:]
-        response_batch = tokenizer.batch_decode(response_token_batch, skip_special_tokens=True)
+        input_length = inputs.input_ids.shape[1]
+        answer_raw = outputs.sequences[0, input_length:]
 
-        for response_idx, response in enumerate(response_batch):
-            row_idx = batch_idx * batch_size + response_idx
-            df.at[row_idx, field_response] = response
+        answer = tokenizer.decode(answer_raw, skip_special_tokens=True).strip()
 
-            answer = process_response(df, row_idx, batch, outputs, response_idx, response, model, tokenizer)
+        if index < 5:
+            print(f"Answer raw: {answer}\n\n\n")
 
-            if validate_mmlu_answer(answer):
-                is_correct = check_answer_correct(df.iloc[row_idx], answer)
-                df.at[row_idx, field_ans_correct] = is_correct
-                if is_correct:
-                    correct_answers += 1
+        # generated token position, batch_dim
+        final_token_logits = outputs.scores[-1][0]
+        entropy = compute_entropy_from_logits(final_token_logits)
+        df.at[index, field_entropy_value] = entropy
+
+        if index < 5:
+            print(f"Extracted answer: {answer}\nEntropy: {df.at[index, field_entropy_value]}\n\n\n")
+
+        try:
+            df.at[index, field_ans] = answer
+            df.at[index, field_ans_correct] = config.check_answer_correct(df.iloc[index], answer)
+        except Exception:
+            invalid_answers += 1
+
+        if index < 5:
+            print(f"Correct: {df.at[index, field_ans_correct]}\n\n\n")
+
+        if cast(int, index) % config.dump_every == 0:
+            if file_type == ".jsonl":
+                df.to_json(config.out_filename, lines=True, orient="records")
             else:
-                invalid_formatting += 1
+                df.to_csv(config.out_filename, sep="\t", index=False)
 
-        total = batch_idx * batch_size + len(response_batch)
-        if total % dump_every == 0:
-            df.to_parquet(out_filename, compression="gzip")
-        pbar.set_description(f"accuracy={correct_answers / total:.2f} / invalid formatting={invalid_formatting}")
+            print(
+                f"Processing dataset {config.out_filename}... Processed: {index}/{df.shape[0]}. Invalid answers: {invalid_answers}"
+            )
 
-    df.to_parquet(out_filename, compression="gzip")
-    print(f"Processed dataset {out_filename}. Total entries: {df.shape[0]}. Invalid formatting: {invalid_formatting}")
+    if file_type == ".jsonl":
+        df.to_json(config.out_filename, lines=True, orient="records")
+    else:
+        df.to_csv(config.out_filename, sep="\t", index=False)
+    print(f"Processed dataset {config.out_filename}. Total entries: {df.shape[0]}. Invalid answers: {invalid_answers}")
     return df
