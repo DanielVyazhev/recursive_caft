@@ -1,22 +1,23 @@
 import ast
 import string
+from typing import override
 
-import pandas as pd
-
-from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
+from core.datasets.qa_dataset import QADataset
 
 
-class MMLUSingleTokenResponseDatasetAdapter(CausalDatasetAdapter):
+class MMLUSingleTokenResponseDataset(QADataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.option_ids = list(string.ascii_lowercase)
 
-    def system_prompt(self, row: pd.Series) -> str:
+    @override
+    def system_prompt(self, row: dict) -> str:
         subject = row["subject"]
         return f"The following are multiple choice questions about {subject}. Choose a correct option letter. Answer with a single symbol. Do not print anything else."
 
-    def user_prompt(self, row: pd.Series) -> str:
+    @override
+    def user_prompt(self, row: dict) -> str:
         question = row["question"]
         options = ast.literal_eval(row["options"])
 
@@ -26,8 +27,17 @@ class MMLUSingleTokenResponseDatasetAdapter(CausalDatasetAdapter):
         user_prompt = f"Question: {question.strip()}\nOptions:\n{options_str}\n"
         return user_prompt
 
-    def assistant_response(self, row: pd.Series) -> str:
+    @override
+    def assistant_response(self, row: dict) -> str:
         return str(row["answer"]).strip().lower()
 
-    def row_id(self, row: pd.Series) -> str:
+    @override
+    def row_id(self, row: dict) -> str:
         return row["question_id"]
+
+    @override
+    def verify_assistant_response(self, row: dict, assistant_response: str) -> bool:
+        try:
+            return self.assistant_response(row) == assistant_response.strip().lower()
+        except:
+            return False

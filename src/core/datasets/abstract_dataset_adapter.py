@@ -1,0 +1,44 @@
+from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass
+
+from datasets import Dataset, load_dataset, load_from_disk
+
+from core.datasets.base_dataset import BaseDataset
+
+
+@dataclass
+class TokenizedRow:
+    input_ids: list[int]
+    attention_mask: list[int]
+    labels: list[int]
+    row_id: str
+
+
+class AbstractDatasetAdapter[D: BaseDataset](ABC):
+    def __init__(self, dataset: D):
+        self.dataset = dataset
+
+    @abstractmethod
+    def process_row(self, row: dict) -> TokenizedRow: ...
+
+    def _load_ds(self, path_override: str | None = None) -> Dataset:
+        if path_override is not None:
+            ds = load_from_disk(path_override)
+            return ds
+
+        ds = load_dataset(
+            "parquet",
+            data_files={"default": self.dataset.config.path},
+        )
+        return ds["default"]
+
+    def process_dataset(self, path_override: str | None = None) -> Dataset:
+        ds = self._load_ds(path_override)
+
+        processed_ds = ds.map(
+            lambda row: asdict(self.process_row(row)),
+            num_proc=4,
+            remove_columns=ds.column_names,
+        )
+
+        return processed_ds
