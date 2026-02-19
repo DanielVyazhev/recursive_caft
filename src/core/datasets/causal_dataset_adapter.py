@@ -1,7 +1,6 @@
-import pandas as pd
-
 from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter, TokenizedRow
 from core.datasets.causal_dataset import CausalDataset
+
 
 class CausalDatasetAdapter(AbstractDatasetAdapter[CausalDataset]):
     def process_row(self, row: dict) -> TokenizedRow:
@@ -36,6 +35,7 @@ class CausalDatasetAdapter(AbstractDatasetAdapter[CausalDataset]):
         row_id = self.dataset.row_id(row)
 
         return TokenizedRow(
+            **row,
             input_ids=input_ids,
             attention_mask=attention_mask,
             labels=labels,
