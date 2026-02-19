@@ -1,5 +1,7 @@
 from typing import override
 
+from pydantic import BaseModel
+from pydantic.fields import FieldInfo
 from transformers.generation.utils import GenerateDecoderOnlyOutput
 
 from core.complexity_estimation.complexity_estimator import BaseComplexityEstimator
@@ -7,15 +9,15 @@ from core.complexity_estimation.entropy.logit_entropy import compute_entropy_fro
 from core.datasets.abstract_dataset_adapter import TokenizedRow
 
 
-class SingleTokenEntropyEstimator(BaseComplexityEstimator):
-    def __init__(self, entropy_column_name: str = "entropy_value") -> None:
-        super().__init__()
-        self.entropy_column_name = entropy_column_name
+class SingleTokenEntropyEstimatorSchema(BaseModel):
+    entropy_value: float
 
+
+class SingleTokenEntropyEstimator(BaseComplexityEstimator[SingleTokenEntropyEstimatorSchema]):
+    @property
     @override
-    def prepare_dataset(self, dataset):
-        if self.entropy_column_name not in dataset.column_names:
-            dataset = dataset.add_column(self.entropy_column_name, [None] * len(dataset))
+    def schema(self) -> dict[str, FieldInfo]:
+        return SingleTokenEntropyEstimatorSchema.model_fields
 
     @override
     def estimate_row(
@@ -25,7 +27,7 @@ class SingleTokenEntropyEstimator(BaseComplexityEstimator):
         outputs: GenerateDecoderOnlyOutput,
         parsed_answer: str,
         answer_correctness: bool,
-    ):
+    ) -> SingleTokenEntropyEstimatorSchema:
         first_token_logits = outputs.scores[0][0]
         entropy = compute_entropy_from_logits(first_token_logits)
-        dataset_row[self.entropy_column_name] = entropy
+        return SingleTokenEntropyEstimatorSchema(entropy_value=entropy)

@@ -33,7 +33,9 @@ class ComplexityEstimationRunnerConfig(PydraConfig):
 
 
 class ComplexityEstimationRunner:
-    def __init__(self, config: ComplexityEstimationRunnerConfig, complexity_estimator: BaseComplexityEstimator):
+    def __init__(
+        self, config: ComplexityEstimationRunnerConfig, complexity_estimator: BaseComplexityEstimator[BaseModel]
+    ):
         self.config = config
         self.complexity_estimator = complexity_estimator
 
@@ -55,7 +57,9 @@ class ComplexityEstimationRunner:
             ds = ds.add_column(self.config.answer_field_name, [None] * len(ds))
             ds = ds.add_column(self.config.answer_correctness_field_name, [None] * len(ds))
 
-        self.complexity_estimator.prepare_dataset(ds)
+        for field_name, _field_type in self.complexity_estimator.schema:
+            if field_name not in ds.column_names:
+                ds = ds.add_column(field_name, [None] * len(ds))
 
         model = AutoModelForCausalLM.from_pretrained(self.config.model_id).to(device)
 
@@ -90,18 +94,21 @@ class ComplexityEstimationRunner:
 
             try:
                 parsed_answer, answer_correctness = dataset_adapter.dataset.verify_assistant_response(
-                    df.at[index], response
+                    df_row.to_dict(), response
                 )
 
                 df.at[index, self.config.answer_field_name] = parsed_answer
                 df.at[index, self.config.answer_correctness_field_name] = answer_correctness
 
-                self.complexity_estimator.estimate_row(df.at[index], row, outputs, parsed_answer, answer_correctness)
+                for field_name, field_value in self.complexity_estimator.estimate_row(
+                    df_row.to_dict(), row, outputs, parsed_answer, answer_correctness
+                ):
+                    df.at[index, field_name] = field_value
 
                 if new_processed_rows < 5:
                     print(f"Row {row.row_id}:")
                     print(f"Input: {row.model_dump()}")
-                    print(f"Processed: {df.at[index]}")
+                    print(f"Processed: {df.loc[index]}")
             except Exception as ex:
                 print(f"Error processing row {row.row_id}: {ex}")
                 invalid_answers += 1
