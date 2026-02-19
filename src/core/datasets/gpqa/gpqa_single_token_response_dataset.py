@@ -7,7 +7,7 @@ from transformers import PreTrainedTokenizer
 from core.datasets.qa_dataset import QADataset, QADatasetConfig
 
 
-class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
+class GPQASingleTokenResponseDataset(QADataset[QADatasetConfig]):
     def __init__(self, tokenizer: PreTrainedTokenizer, config: QADatasetConfig):
         super().__init__(tokenizer, config)
 
@@ -15,8 +15,7 @@ class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
 
     @override
     def system_prompt(self, row: dict) -> str:
-        subject = row["subject"]
-        return f"The following are multiple choice questions about {subject}. Choose a correct option letter. Answer with a single symbol. Do not print anything else."
+        return "The following are multiple choice questions. Choose a correct option letter. Answer with a single symbol. Do not print anything else."
 
     @override
     def user_prompt(self, row: dict) -> str:
