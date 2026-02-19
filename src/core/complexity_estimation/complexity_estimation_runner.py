@@ -96,7 +96,8 @@ class ComplexityEstimationRunner:
                     print(f"Row {row.row_id}:")
                     print(f"Input: {row.model_dump()}")
                     print(f"Processed: {ds[index]}")
-            except Exception:
+            except Exception as ex:
+                print(f"Error processing row {row.row_id}: {ex}")
                 invalid_answers += 1
 
             if processed_rows % self.config.save_every == 0:
