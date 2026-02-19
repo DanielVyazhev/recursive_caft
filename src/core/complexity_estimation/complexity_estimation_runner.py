@@ -1,5 +1,4 @@
 import os
-import shutil
 from pathlib import Path
 
 import torch
@@ -57,7 +56,7 @@ class ComplexityEstimationRunner:
             ds = ds.add_column(self.config.answer_field_name, [None] * len(ds))
             ds = ds.add_column(self.config.answer_correctness_field_name, [None] * len(ds))
 
-        for field_name, _field_type in self.complexity_estimator.schema:
+        for field_name in self.complexity_estimator.schema.keys():
             if field_name not in ds.column_names:
                 ds = ds.add_column(field_name, [None] * len(ds))
 
@@ -124,7 +123,7 @@ class ComplexityEstimationRunner:
         df.to_parquet(path=self.config.out_path, index=False)
 
         if os.path.exists(self.tmp_path()):
-            shutil.rmtree(self.tmp_path())
+            os.unlink(self.tmp_path())
 
         print(f"Processed dataset {self.config.out_path}. Total entries: {len(ds)}. Invalid answers: {invalid_answers}")
 
