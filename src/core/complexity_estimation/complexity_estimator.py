@@ -1,14 +1,16 @@
 from abc import ABC, abstractmethod
 
-from datasets import Dataset
+from pydantic import BaseModel
+from pydantic.fields import FieldInfo
 from transformers.generation.utils import GenerateDecoderOnlyOutput
 
 from core.datasets.abstract_dataset_adapter import TokenizedRow
 
 
-class BaseComplexityEstimator(ABC):
+class BaseComplexityEstimator[T: BaseModel](ABC):
+    @property
     @abstractmethod
-    def prepare_dataset(self, dataset: Dataset): ...
+    def schema(self) -> dict[str, FieldInfo]: ...
 
     @abstractmethod
     def estimate_row(
@@ -18,4 +20,4 @@ class BaseComplexityEstimator(ABC):
         outputs: GenerateDecoderOnlyOutput,
         parsed_answer: str,
         answer_correctness: bool,
-    ): ...
+    ) -> T: ...
