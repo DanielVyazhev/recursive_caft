@@ -11,7 +11,7 @@ class MMLUReasoningResponseDataset(MMLUSingleTokenResponseDataset):
         return f"{self.tokenizer.thinking_start_token}{reasoning_chain}{self.tokenizer.thinking_end_token}{answer}"
 
     @override
-    def verify_assistant_response(self, row: dict, assistant_response: str) -> bool:
+    def verify_assistant_response(self, row: dict, assistant_response: str) -> tuple[str, bool]:
         assert isinstance(self.tokenizer.thinking_end_token, str), (
             "Tokenizer must have a defined thinking_end_token to use MMLUReasoningResponseDataset"
         )
@@ -24,6 +24,6 @@ class MMLUReasoningResponseDataset(MMLUSingleTokenResponseDataset):
         )
 
         try:
-            return self.assistant_response(row) == extracted_answer
+            return extracted_answer, self.assistant_response(row) == extracted_answer
         except:
-            return False
+            return extracted_answer, False
