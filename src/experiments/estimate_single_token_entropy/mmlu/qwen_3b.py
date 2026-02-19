@@ -12,14 +12,13 @@ from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleToke
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.utils.device import DEVICE
 
-MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
+MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
-tokenizer.pad_token = tokenizer.eos_token
 
 ComplexityEstimationRunner(
     config=ComplexityEstimationRunnerConfig(
-        out_path=str(Path(__file__).parent.joinpath("../../../../data/out/single_token_entropy/mmlu_llama_3b.parquet")),
+        out_path=str(Path(__file__).parent.joinpath("../../../../data/out/single_token_entropy/mmlu_qwen_3b.parquet")),
         model_id=MODEL_NAME,
         answer_field_name="model_answer",
         answer_correctness_field_name="model_answer_correct",
