@@ -26,7 +26,6 @@ class SingleTokenEntropyEstimator(BaseComplexityEstimator):
         parsed_answer: str,
         answer_correctness: bool,
     ):
-        input_length = len(input.input_ids)
-        first_token_logits = outputs.scores[input_length][0]
+        first_token_logits = outputs.scores[0][0]
         entropy = compute_entropy_from_logits(first_token_logits)
         dataset_row[self.entropy_column_name] = entropy
