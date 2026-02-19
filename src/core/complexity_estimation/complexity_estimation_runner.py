@@ -39,12 +39,13 @@ class ComplexityEstimationRunner:
     def estimate(self, dataset_adapter: QADatasetAdapter, device: torch.device):
         invalid_answers = 0
         processed_rows = 0
+        new_processed_rows = 0
 
         if os.path.exists(self.config.out_path) and os.path.exists(self.tmp_path()):
             print(f"Output path {self.config.out_path} already exists. Resuming from temporary file.")
             ds = dataset_adapter.process_dataset(path_override=str(self.tmp_path()))
         else:
-            print(f"No temporary file found. Resuming from output file {self.config.out_path}.")
+            print(f"No temporary file found. Starting from output file {self.config.out_path}.")
             ds = dataset_adapter.process_dataset()
 
             ds = ds.add_column(self.config.answer_field_name, [None] * len(ds))
@@ -59,6 +60,8 @@ class ComplexityEstimationRunner:
 
             if row_dict[self.config.answer_field_name] is not None:
                 continue
+
+            new_processed_rows += 1
 
             row = TokenizedRow(**row_dict)
 
@@ -88,6 +91,11 @@ class ComplexityEstimationRunner:
                 ds[index][self.config.answer_correctness_field_name] = answer_correctness
 
                 self.complexity_estimator.estimate_row(ds[index], row, outputs, parsed_answer, answer_correctness)
+
+                if new_processed_rows < 5:
+                    print(f"Row {row.row_id}:")
+                    print(f"Input: {row.model_dump()}")
+                    print(f"Processed: {ds[index]}")
             except Exception:
                 invalid_answers += 1
 
