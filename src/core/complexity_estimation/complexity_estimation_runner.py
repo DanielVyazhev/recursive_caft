@@ -6,8 +6,9 @@ from pydantic import BaseModel
 from pydraconf.base_config import PydraConfig
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
-from transformers.generation import GenerateDecoderOnlyOutput
+from transformers.generation.utils import GenerateDecoderOnlyOutput
 
+from core.complexity_estimation.complexity_estimator import BaseComplexityEstimator
 from core.datasets.abstract_dataset_adapter import TokenizedRow
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 
@@ -31,23 +32,25 @@ class ComplexityEstimationRunnerConfig(PydraConfig):
 
 
 class ComplexityEstimationRunner:
-    def __init__(self, config: ComplexityEstimationRunnerConfig, dataset_adapter: QADatasetAdapter):
+    def __init__(self, config: ComplexityEstimationRunnerConfig, complexity_estimator: BaseComplexityEstimator):
         self.config = config
-        self.dataset_adapter = dataset_adapter
+        self.complexity_estimator = complexity_estimator
 
-    def estimate(self, device: torch.device):
+    def estimate(self, dataset_adapter: QADatasetAdapter, device: torch.device):
         invalid_answers = 0
         processed_rows = 0
 
         if os.path.exists(self.config.out_path) and os.path.exists(self.tmp_path()):
             print(f"Output path {self.config.out_path} already exists. Resuming from temporary file.")
-            ds = self.dataset_adapter.process_dataset(path_override=str(self.tmp_path()))
+            ds = dataset_adapter.process_dataset(path_override=str(self.tmp_path()))
         else:
             print(f"No temporary file found. Resuming from output file {self.config.out_path}.")
-            ds = self.dataset_adapter.process_dataset()
+            ds = dataset_adapter.process_dataset()
 
             ds = ds.add_column(self.config.answer_field_name, [None] * len(ds))
             ds = ds.add_column(self.config.answer_correctness_field_name, [None] * len(ds))
+
+        self.complexity_estimator.prepare_dataset(ds)
 
         model = AutoModelForCausalLM.from_pretrained(self.config.model_id).to(device)
 
@@ -69,19 +72,23 @@ class ComplexityEstimationRunner:
                 return_dict_in_generate=True,
                 output_scores=True,
                 **self.config.generate_config.model_dump(),
-                pad_token_id=self.config.dataset_adapter.dataset.tokenizer.pad_token_id,
+                pad_token_id=dataset_adapter.dataset.tokenizer.pad_token_id,
             )
 
             input_length = len(row.input_ids)
-            answer_raw = outputs.sequences[0, input_length:]
+            response_raw = outputs.sequences[0, input_length:]
 
-            answer = self.dataset_adapter.dataset.tokenizer.decode(answer_raw, skip_special_tokens=True).strip()
+            response = dataset_adapter.dataset.tokenizer.decode(response_raw, skip_special_tokens=True).strip()
 
             try:
-                ds[index][self.config.answer_field_name] = answer
-                ds[index][self.config.answer_correctness_field_name] = (
-                    self.dataset_adapter.dataset.verify_assistant_response(ds[index], answer)
+                parsed_answer, answer_correctness = dataset_adapter.dataset.verify_assistant_response(
+                    ds[index], response
                 )
+
+                ds[index][self.config.answer_field_name] = parsed_answer
+                ds[index][self.config.answer_correctness_field_name] = answer_correctness
+
+                self.complexity_estimator.estimate_row(ds[index], row, outputs, parsed_answer, answer_correctness)
             except Exception:
                 invalid_answers += 1
 

@@ -36,8 +36,10 @@ class MMLUSingleTokenResponseDataset(QADataset):
         return row["question_id"]
 
     @override
-    def verify_assistant_response(self, row: dict, assistant_response: str) -> bool:
+    def verify_assistant_response(self, row: dict, assistant_response: str) -> tuple[str, bool]:
+        parsed_answer = assistant_response.strip().lower()
+
         try:
-            return self.assistant_response(row) == assistant_response.strip().lower()
+            return parsed_answer, self.assistant_response(row) == parsed_answer
         except:
-            return False
+            return parsed_answer, False
