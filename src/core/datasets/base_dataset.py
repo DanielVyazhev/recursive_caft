@@ -8,8 +8,8 @@ class BaseDatasetConfig(PydraConfig):
     path: str
 
 
-class BaseDataset(ABC):
-    def __init__(self, tokenizer: PreTrainedTokenizer, config: BaseDatasetConfig):
+class BaseDataset[C: BaseDatasetConfig](ABC):
+    def __init__(self, tokenizer: PreTrainedTokenizer, config: C):
         self.tokenizer = tokenizer
         self.config = config
 

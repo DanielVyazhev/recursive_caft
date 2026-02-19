@@ -17,7 +17,7 @@ class MMLUReasoningResponseDataset(MMLUSingleTokenResponseDataset):
         )
         thinking_end_token_position = assistant_response.find(self.tokenizer.thinking_end_token)
         if thinking_end_token_position == -1:
-            return False
+            return "", False
 
         extracted_answer = (
             assistant_response[thinking_end_token_position + len(self.tokenizer.thinking_end_token) :].strip().lower()
