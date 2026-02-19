@@ -109,7 +109,8 @@ class ComplexityEstimationRunner:
         ds = ds.remove_columns(["input_ids", "attention_mask", "labels"])
         ds.to_parquet(self.config.out_path)
 
-        os.unlink(self.tmp_path())
+        if os.path.exists(self.tmp_path()):
+            os.unlink(self.tmp_path())
 
         print(f"Processed dataset {self.config.out_path}. Total entries: {len(ds)}. Invalid answers: {invalid_answers}")
 
