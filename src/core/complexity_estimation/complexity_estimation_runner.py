@@ -1,6 +1,6 @@
 import os
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 import torch
 from pydantic import BaseModel
@@ -46,7 +46,10 @@ class ComplexityEstimationRunner:
             print(f"Output path {self.config.out_path} already exists. Resuming from temporary file.")
             ds = dataset_adapter.process_dataset(path_override=str(self.tmp_path()))
         else:
-            print(f"No temporary file found. Starting from output file {self.config.out_path}.")
+            print(f"No temporary file found. Starting from scratch. Writing to output file {self.config.out_path}.")
+            if os.path.exists(self.config.out_path):
+                os.unlink(self.config.out_path)
+
             ds = dataset_adapter.process_dataset()
 
             ds = ds.add_column(self.config.answer_field_name, [None] * len(ds))
@@ -56,15 +59,17 @@ class ComplexityEstimationRunner:
 
         model = AutoModelForCausalLM.from_pretrained(self.config.model_id).to(device)
 
-        for index, row_dict in tqdm(enumerate(ds), total=len(ds)):
+        df = ds.to_pandas()
+
+        for index, df_row in tqdm(df.iterrows(), total=len(df)):
             processed_rows += 1
 
-            if row_dict[self.config.answer_field_name] is not None:
+            if df_row[self.config.answer_field_name] is not None:
                 continue
 
             new_processed_rows += 1
 
-            row = TokenizedRow(**row_dict)
+            row = TokenizedRow(**df_row.to_dict())
 
             input_ids = torch.tensor(row.input_ids).unsqueeze(0).to(device)
             attention_mask = torch.tensor(row.attention_mask).unsqueeze(0).to(device)
@@ -85,31 +90,31 @@ class ComplexityEstimationRunner:
 
             try:
                 parsed_answer, answer_correctness = dataset_adapter.dataset.verify_assistant_response(
-                    ds[index], response
+                    df.at[index], response
                 )
 
-                ds[index][self.config.answer_field_name] = parsed_answer
-                ds[index][self.config.answer_correctness_field_name] = answer_correctness
+                df.at[index, self.config.answer_field_name] = parsed_answer
+                df.at[index, self.config.answer_correctness_field_name] = answer_correctness
 
-                self.complexity_estimator.estimate_row(ds[index], row, outputs, parsed_answer, answer_correctness)
+                self.complexity_estimator.estimate_row(df.at[index], row, outputs, parsed_answer, answer_correctness)
 
                 if new_processed_rows < 5:
                     print(f"Row {row.row_id}:")
                     print(f"Input: {row.model_dump()}")
-                    print(f"Processed: {ds[index]}")
+                    print(f"Processed: {df.at[index]}")
             except Exception as ex:
                 print(f"Error processing row {row.row_id}: {ex}")
                 invalid_answers += 1
 
             if processed_rows % self.config.save_every == 0:
-                ds.save_to_disk(self.tmp_path())
+                df.to_parquet(path=self.tmp_path(), compression=None, index=False)
 
                 print(
-                    f"Processing dataset {self.config.out_path}... Processed: {processed_rows}/{len(ds)}. Invalid answers: {invalid_answers}"
+                    f"Processing dataset {self.config.out_path}... Processed: {processed_rows}/{len(df)}. Invalid answers: {invalid_answers}"
                 )
 
-        ds = ds.remove_columns(["input_ids", "attention_mask", "labels"])
-        ds.to_parquet(self.config.out_path)
+        df = df.drop(columns=["input_ids", "attention_mask", "labels"], errors="ignore")
+        df.to_parquet(path=self.config.out_path, index=False)
 
         if os.path.exists(self.tmp_path()):
             shutil.rmtree(self.tmp_path())
