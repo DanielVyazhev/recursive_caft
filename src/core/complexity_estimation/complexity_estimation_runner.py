@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import shutil
 
 import torch
 from pydantic import BaseModel
@@ -111,9 +112,9 @@ class ComplexityEstimationRunner:
         ds.to_parquet(self.config.out_path)
 
         if os.path.exists(self.tmp_path()):
-            os.unlink(self.tmp_path())
+            shutil.rmtree(self.tmp_path())
 
         print(f"Processed dataset {self.config.out_path}. Total entries: {len(ds)}. Invalid answers: {invalid_answers}")
 
     def tmp_path(self) -> Path:
-        return Path(self.config.out_path).with_suffix(".tmp")
+        return Path(self.config.out_path).with_suffix(".tmp").resolve()
