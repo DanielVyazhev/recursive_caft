@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
 
 from datasets import Dataset, load_dataset, load_from_disk
+from pydantic import BaseModel
 
 from core.datasets.base_dataset import BaseDataset
 
 
-@dataclass
-class TokenizedRow:
+class TokenizedRow(BaseModel):
+    model_config = {"extra": "allow"}
+
     input_ids: list[int]
     attention_mask: list[int]
     labels: list[int]
@@ -36,7 +37,7 @@ class AbstractDatasetAdapter[D: BaseDataset](ABC):
         ds = self._load_ds(path_override)
 
         processed_ds = ds.map(
-            lambda row: asdict(self.process_row(row)),
+            lambda row: self.process_row(row).model_dump(),
             num_proc=4,
             remove_columns=ds.column_names,
         )

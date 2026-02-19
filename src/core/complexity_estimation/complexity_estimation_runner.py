@@ -3,7 +3,7 @@ from pathlib import Path
 
 import torch
 from pydantic import BaseModel
-from pydraconf.base_config import PydraConfig
+from pydraconf import PydraConfig
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 from transformers.generation.utils import GenerateDecoderOnlyOutput
@@ -68,7 +68,6 @@ class ComplexityEstimationRunner:
             outputs: GenerateDecoderOnlyOutput = model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                max_new_tokens=self.config.max_new_tokens,
                 return_dict_in_generate=True,
                 output_scores=True,
                 **self.config.generate_config.model_dump(),
@@ -99,6 +98,7 @@ class ComplexityEstimationRunner:
                     f"Processing dataset {self.config.out_path}... Processed: {processed_rows}/{len(ds)}. Invalid answers: {invalid_answers}"
                 )
 
+        ds = ds.remove_columns(["input_ids", "attention_mask", "labels"])
         ds.to_parquet(self.config.out_path)
 
         print(f"Processed dataset {self.config.out_path}. Total entries: {len(ds)}. Invalid answers: {invalid_answers}")

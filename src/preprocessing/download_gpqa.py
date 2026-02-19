@@ -51,7 +51,7 @@ def main():
                 "options": str(options),
                 "answer": OPTION_LETTERS[answer_index],
                 "answer_index": answer_index,
-                "question_id": idx,
+                "question_id": str(idx),
             }
         )
 
