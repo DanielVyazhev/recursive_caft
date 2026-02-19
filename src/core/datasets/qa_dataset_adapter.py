@@ -20,6 +20,7 @@ class QADatasetAdapter(AbstractDatasetAdapter[QADataset]):
         row_id = self.dataset.row_id(row)
 
         return TokenizedRow(
+            **row,
             input_ids=input_ids,
             attention_mask=attention_mask,
             labels=[],
