@@ -18,7 +18,7 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 
 ComplexityEstimationRunner(
     config=ComplexityEstimationRunnerConfig(
-        out_path=str(Path().parent.joinpath("../../../../data/out/single_token_entropy/gpqa_qwen_3b.parquet")),
+        out_path=str(Path(__file__).parent.joinpath("../../../../data/out/single_token_entropy/gpqa_qwen_3b.parquet")),
         model_id=MODEL_NAME,
         answer_field_name="model_answer",
         answer_correctness_field_name="model_answer_correct",
@@ -29,7 +29,7 @@ ComplexityEstimationRunner(
 ).estimate(
     QADatasetAdapter(
         GPQASingleTokenResponseDataset(
-            tokenizer, QADatasetConfig(path=str(Path().parent.joinpath("../../../../data/source/gpqa.parquet")))
+            tokenizer, QADatasetConfig(path=str(Path(__file__).parent.joinpath("../../../../data/source/gpqa.parquet")))
         )
     ),
     DEVICE,
