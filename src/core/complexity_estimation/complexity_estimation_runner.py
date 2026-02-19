@@ -119,7 +119,7 @@ class ComplexityEstimationRunner:
                     f"Processing dataset {self.config.out_path}... Processed: {processed_rows}/{len(df)}. Invalid answers: {invalid_answers}"
                 )
 
-        df = df.drop(columns=["input_ids", "attention_mask", "labels"], errors="ignore")
+        df = df.drop(columns=["input_ids", "attention_mask", "labels", "row_id"], errors="ignore")
         df.to_parquet(path=self.config.out_path, index=False)
 
         if os.path.exists(self.tmp_path()):

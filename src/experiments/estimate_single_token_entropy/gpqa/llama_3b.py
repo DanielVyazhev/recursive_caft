@@ -15,6 +15,7 @@ from core.utils.device import DEVICE
 MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+tokenizer.pad_token = tokenizer.eos_token
 
 ComplexityEstimationRunner(
     config=ComplexityEstimationRunnerConfig(
