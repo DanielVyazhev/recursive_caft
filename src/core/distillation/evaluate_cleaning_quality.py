@@ -14,24 +14,27 @@ def select_samples(branch_a_file: Path, branch_b_file: Path, n_fewshot: int = 3,
     df_a = pd.read_parquet(branch_a_file)
     df_b = pd.read_parquet(branch_b_file)
     
-    correct_a = []
-    for _, row in df_a.iterrows():
-        out = row.get('output', {})
-        inp = row.get('input', {})
-        if isinstance(out, dict) and not out.get('error') and out.get('answer') == inp.get('gold'):
-            correct_a.append(row)
+    df_a['question_id'] = df_a['input'].apply(lambda x: str(x.get('question_id')) if isinstance(x, dict) and x.get('question_id') is not None else None)
+    df_a['answer'] = df_a['output'].apply(lambda x: x.get('answer') if isinstance(x, dict) else None)
+    df_a['error'] = df_a['output'].apply(lambda x: x.get('error') if isinstance(x, dict) else None)
+    df_a['gold'] = df_a['input'].apply(lambda x: x.get('gold') if isinstance(x, dict) else None)
+    df_a['thinking_a'] = df_a['output'].apply(lambda x: x.get('thinking', '') if isinstance(x, dict) else '')
     
-    matched = []
-    for row_a in correct_a:
-        q_id = row_a['input'].get('question_id')
-        for _, row_b in df_b.iterrows():
-            if row_b['input'].get('question_id') == q_id:
-                matched.append({
-                    'question_id': q_id,
-                    'original': row_a['output'].get('thinking', ''),
-                    'cleaned': row_b['output'].get('thinking', '')
-                })
-                break
+    df_b['question_id'] = df_b['input'].apply(lambda x: str(x.get('question_id')) if isinstance(x, dict) and x.get('question_id') is not None else None)
+    df_b['thinking_b'] = df_b['output'].apply(lambda x: x.get('thinking', '') if isinstance(x, dict) else '')
+    
+    correct_a = df_a[(df_a['error'].isna() | (df_a['error'] == False)) & (df_a['answer'] == df_a['gold'])].copy()
+    
+    merged = correct_a.merge(df_b[['question_id', 'thinking_b']], on='question_id', how='inner')
+    
+    matched = [
+        {
+            'question_id': row['question_id'],
+            'original': row['thinking_a'],
+            'cleaned': row['thinking_b']
+        }
+        for _, row in merged.iterrows()
+    ]
     
     return matched[:n_fewshot], matched[n_fewshot:n_fewshot+n_test]
 
@@ -43,7 +46,9 @@ def evaluate_batch(samples: list, model_name: str, output_file: Path, batch_size
         gpu_memory_utilization=0.9,
         trust_remote_code=True,
         dtype="bfloat16",
-        max_model_len=8192
+        max_model_len=32768,
+        disable_custom_all_reduce=True,
+        enforce_eager=True
     )
     
     sampling_params = SamplingParams(
@@ -110,7 +115,7 @@ def compute_stats(results_file: Path):
     criteria = ['logical_preservation', 'noise_removal']
     print("\nScores (mean ± std):")
     for c in criteria:
-        vals = [s[c] for s in scores_list if c in s]
+        vals = [s[c] for s in scores_list if c in s and s[c] is not None]
         if vals:
             print(f"{c}: {sum(vals)/len(vals):.2f} ± {(sum((x-sum(vals)/len(vals))**2 for x in vals)/len(vals))**0.5:.2f}")
     

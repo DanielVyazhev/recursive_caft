@@ -11,10 +11,9 @@ if __name__ == "__main__":
         input_file=data_dir / "mmlu_synth_gptoss_c_t0_8.parquet",
         output_file=data_dir / "mmlu_synth_gptoss_c_t0_8_cleaned_32b.parquet",
         model_name="Qwen/Qwen2.5-32B-Instruct",
-        batch_size=24,
+        batch_size=12,
         temperature=0.1,
-        gpu_memory_utilization=0.95,
         max_model_len=20480,
         max_thinking_chars=35000,
-        checkpoint_every_n_batches=8
+        checkpoint_every_n_batches=4
     )

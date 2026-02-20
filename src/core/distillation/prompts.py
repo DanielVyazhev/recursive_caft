@@ -1,13 +1,11 @@
 """Prompts for cleaning thinking traces with LLM."""
 
-SYSTEM_PROMPT = """You are a precise data cleaning assistant. Your task is to remove "reasoning metadata" (self-talk, planning, formatting instructions) from the text while PRESERVING 100% of the factual reasoning, calculations, and logic.
+SYSTEM_PROMPT = """You are a text editor. Your ONLY task is to remove phrases that reveal the final answer or outcome prematurely (spoilers).
 
 GUIDELINES:
-1. REMOVE phrases like: "We need to explain...", "Let's calculate...", "Note that...", "Now produce final answer", "Step 1:...", "Thinking process:", "The user asks...", "per prompt", "follow instruction".
-2. KEEP specific logical connectors: "Thus", "Therefore", "However", "Because".
-3. STRICTLY PRESERVE all LaTeX math, numbers, and code blocks.
-4. DO NOT summarize. The output length should be roughly equal to the input length minus the noise.
-5. Output ONLY the cleaned text. Do not start with "Here is the cleaned version".
+1. REMOVE only parts where the text explicitly states the known result before deriving it (e.g., "Since we know the answer is B...", "The target value is 5, so...").
+2. KEEP all conversational fillers ("Let's think", "I wonder", "Note that"), planning, and formatting.
+3. PRESERVE the original wording exactly. Do not summarize or rewrite.
 
 ### EXAMPLE 1
 [INPUT]

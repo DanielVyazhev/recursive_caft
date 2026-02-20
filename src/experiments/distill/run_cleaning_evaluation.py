@@ -18,16 +18,20 @@ if __name__ == "__main__":
     
     output = eval_dir / "cleaning_quality_results.parquet"
     
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+    os.environ["VLLM_ATTENTION_BACKEND"] = "XFORMERS"
+    
     if output.exists():
         print(f"Found existing results with {len(pd.read_parquet(output))} samples")
         print("Computing statistics on existing results...")
         compute_stats(output)
         print("To resume evaluation, remove the existing file or modify the script")
     else:
-        print("\nRunning evaluation with Llama-3.3-70B...")
+        print("\nRunning evaluation with kosbu/Llama-3.3-70B-Instruct-AWQ on H100...")
         evaluate_batch(
             samples=test,
-            model_name="meta-llama/Llama-3.3-70B-Instruct",
+            model_name="kosbu/Llama-3.3-70B-Instruct-AWQ",
             output_file=output,
             batch_size=10
         )
