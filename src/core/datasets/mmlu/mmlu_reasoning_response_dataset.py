@@ -1,0 +1,29 @@
+from typing import override
+
+from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset
+
+
+class MMLUReasoningResponseDataset(MMLUSingleTokenResponseDataset):
+    @override
+    def assistant_response(self, row: dict) -> str:
+        reasoning_chain = row["thinking"].strip()
+        answer = str(row["answer"]).strip().lower()
+        return f"{self.tokenizer.thinking_start_token}{reasoning_chain}{self.tokenizer.thinking_end_token}{answer}"
+
+    @override
+    def verify_assistant_response(self, row: dict, assistant_response: str) -> tuple[str, bool]:
+        assert isinstance(self.tokenizer.thinking_end_token, str), (
+            "Tokenizer must have a defined thinking_end_token to use MMLUReasoningResponseDataset"
+        )
+        thinking_end_token_position = assistant_response.find(self.tokenizer.thinking_end_token)
+        if thinking_end_token_position == -1:
+            return "", False
+
+        extracted_answer = (
+            assistant_response[thinking_end_token_position + len(self.tokenizer.thinking_end_token) :].strip().lower()
+        )
+
+        try:
+            return extracted_answer, self.assistant_response(row) == extracted_answer
+        except:
+            return extracted_answer, False
