@@ -10,19 +10,18 @@ from core.complexity_estimation.complexity_estimation_runner import (
 from core.complexity_estimation.entropy.single_token_entropy_estimator import SingleTokenEntropyEstimator
 from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset, QADatasetConfig
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
-from core.utils.device import DEVICE
+from core.utils.device import DEVICE_MAP
 
-MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
+MODEL_NAME = "Qwen/Qwen2.5-72B-Instruct"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
-tokenizer.pad_token = tokenizer.eos_token
-
-
-model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, trust_remote_code=True).to(DEVICE)
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME, trust_remote_code=True, device_map=DEVICE_MAP, torch_dtype="auto"
+)
 
 ComplexityEstimationRunner(
     config=ComplexityEstimationRunnerConfig(
-        out_path=str(Path(__file__).parent.joinpath("../../../../data/out/single_token_entropy/mmlu_llama_3b.parquet")),
+        out_path=str(Path(__file__).parent.joinpath("../../../../data/out/single_token_entropy/mmlu_qwen_72b.parquet")),
         answer_field_name="model_answer",
         answer_correctness_field_name="model_answer_correct",
         generate_config=ModelGenerateConfig(max_new_tokens=1),
