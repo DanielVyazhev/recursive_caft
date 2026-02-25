@@ -5,8 +5,8 @@ import torch
 from pydantic import BaseModel
 from pydraconf import PydraConfig
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM
 from transformers.generation.utils import GenerateDecoderOnlyOutput
+from transformers.modeling_utils import PreTrainedModel
 
 from core.complexity_estimation.complexity_estimator import BaseComplexityEstimator
 from core.datasets.abstract_dataset_adapter import TokenizedRow
@@ -24,7 +24,6 @@ class ModelGenerateConfig(BaseModel):
 
 class ComplexityEstimationRunnerConfig(PydraConfig):
     out_path: str
-    model_id: str
     answer_field_name: str
     answer_correctness_field_name: str
     generate_config: ModelGenerateConfig
@@ -33,12 +32,18 @@ class ComplexityEstimationRunnerConfig(PydraConfig):
 
 class ComplexityEstimationRunner:
     def __init__(
-        self, config: ComplexityEstimationRunnerConfig, complexity_estimator: BaseComplexityEstimator[BaseModel]
+        self,
+        config: ComplexityEstimationRunnerConfig,
+        complexity_estimator: BaseComplexityEstimator[BaseModel],
     ):
         self.config = config
         self.complexity_estimator = complexity_estimator
 
-    def estimate(self, dataset_adapter: QADatasetAdapter, device: torch.device):
+    def estimate(
+        self,
+        dataset_adapter: QADatasetAdapter,
+        model: PreTrainedModel,
+    ):
         invalid_answers = 0
         processed_rows = 0
         new_processed_rows = 0
@@ -60,8 +65,6 @@ class ComplexityEstimationRunner:
             if field_name not in ds.column_names:
                 ds = ds.add_column(field_name, [None] * len(ds))
 
-        model = AutoModelForCausalLM.from_pretrained(self.config.model_id).to(device)
-
         df = ds.to_pandas()
 
         for index, df_row in tqdm(df.iterrows(), total=len(df)):
@@ -74,8 +77,8 @@ class ComplexityEstimationRunner:
 
             row = TokenizedRow(**df_row.to_dict())
 
-            input_ids = torch.tensor(row.input_ids).unsqueeze(0).to(device)
-            attention_mask = torch.tensor(row.attention_mask).unsqueeze(0).to(device)
+            input_ids = torch.tensor(row.input_ids).unsqueeze(0).to(model.device)
+            attention_mask = torch.tensor(row.attention_mask).unsqueeze(0).to(model.device)
 
             outputs: GenerateDecoderOnlyOutput = model.generate(
                 input_ids=input_ids,
