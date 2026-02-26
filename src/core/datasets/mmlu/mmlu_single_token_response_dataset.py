@@ -15,7 +15,7 @@ class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
 
     @override
     def system_prompt(self, row: dict) -> str:
-        subject = row["subject"]
+        subject = row["base_cluster"]
         return f"The following are multiple choice questions about {subject}. Choose a correct option letter. Answer with a single symbol. Do not print anything else."
 
     @override
