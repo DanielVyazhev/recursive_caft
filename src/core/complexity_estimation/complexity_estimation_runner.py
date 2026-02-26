@@ -103,7 +103,12 @@ class ComplexityEstimationRunner:
                 df.at[index, self.config.answer_correctness_field_name] = answer_correctness
 
                 for field_name, field_value in self.complexity_estimator.estimate_row(
-                    df_row.to_dict(), row, outputs, parsed_answer, answer_correctness
+                    df_row.to_dict(),
+                    row,
+                    outputs,
+                    parsed_answer,
+                    answer_correctness,
+                    tokenizer=dataset_adapter.dataset.tokenizer,
                 ):
                     df.at[index, field_name] = field_value
 

@@ -6,7 +6,7 @@ from transformers import PreTrainedTokenizer
 from core.datasets.qa_dataset import QADataset, QADatasetConfig
 
 
-class GSM8KSingleTokenResponseDataset(QADataset[QADatasetConfig]):
+class GSM8KDirectResponseDataset(QADataset[QADatasetConfig]):
     def __init__(self, tokenizer: PreTrainedTokenizer, config: QADatasetConfig):
         super().__init__(tokenizer, config)
 
