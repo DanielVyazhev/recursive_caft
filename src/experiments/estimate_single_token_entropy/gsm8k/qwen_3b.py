@@ -7,8 +7,8 @@ from core.complexity_estimation.complexity_estimation_runner import (
     ComplexityEstimationRunnerConfig,
     ModelGenerateConfig,
 )
-from core.complexity_estimation.entropy.single_token_entropy_estimator import SingleTokenEntropyEstimator
-from core.datasets.gsm8k.gsm8k_single_token_response_dataset import GSM8KSingleTokenResponseDataset, QADatasetConfig
+from core.complexity_estimation.entropy.multi_token_entropy_estimator import MultiTokenEntropyEstimator
+from core.datasets.gsm8k.gsm8k_direct_response_dataset import GSM8KDirectResponseDataset, QADatasetConfig
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.utils.device import DEVICE
 
@@ -25,10 +25,10 @@ ComplexityEstimationRunner(
         generate_config=ModelGenerateConfig(max_new_tokens=10),
         save_every=100,
     ),
-    complexity_estimator=SingleTokenEntropyEstimator(),
+    complexity_estimator=MultiTokenEntropyEstimator(),
 ).estimate(
     QADatasetAdapter(
-        GSM8KSingleTokenResponseDataset(
+        GSM8KDirectResponseDataset(
             tokenizer,
             QADatasetConfig(
                 path=str(Path(__file__).parent.joinpath("../../../../data/source/gsm8k/gsm8k_train.parquet"))

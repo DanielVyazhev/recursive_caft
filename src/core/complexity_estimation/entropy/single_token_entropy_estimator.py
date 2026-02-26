@@ -3,6 +3,7 @@ from typing import override
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from transformers.generation.utils import GenerateDecoderOnlyOutput
+from transformers.tokenization_utils import PreTrainedTokenizer
 
 from core.complexity_estimation.complexity_estimator import BaseComplexityEstimator
 from core.complexity_estimation.entropy.logit_entropy import compute_entropy_from_logits
@@ -27,7 +28,8 @@ class SingleTokenEntropyEstimator(BaseComplexityEstimator[SingleTokenEntropyEsti
         outputs: GenerateDecoderOnlyOutput,
         parsed_answer: str,
         answer_correctness: bool,
+        tokenizer: PreTrainedTokenizer,
     ) -> SingleTokenEntropyEstimatorSchema:
         first_token_logits = outputs.scores[0][0]
         entropy = compute_entropy_from_logits(first_token_logits)
-        return SingleTokenEntropyEstimatorSchema(entropy_value=entropy)
+        return SingleTokenEntropyEstimatorSchema(entropy_value=entropy.item())
