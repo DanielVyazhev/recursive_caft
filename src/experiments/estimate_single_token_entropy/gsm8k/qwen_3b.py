@@ -22,7 +22,7 @@ ComplexityEstimationRunner(
         out_path=str(Path(__file__).parent.joinpath("../../../../data/out/single_token_entropy/gsm8k_qwen_3b.parquet")),
         answer_field_name="model_answer",
         answer_correctness_field_name="model_answer_correct",
-        generate_config=ModelGenerateConfig(max_new_tokens=1),
+        generate_config=ModelGenerateConfig(max_new_tokens=10),
         save_every=100,
     ),
     complexity_estimator=SingleTokenEntropyEstimator(),
