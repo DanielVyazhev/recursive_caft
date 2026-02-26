@@ -15,6 +15,8 @@ from core.utils.device import DEVICE_MAP
 MODEL_NAME = "mistralai/Mistral-Small-24B-Instruct-2501"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+tokenizer.pad_token = tokenizer.eos_token
+
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME, trust_remote_code=True, device_map=DEVICE_MAP, torch_dtype="auto"
 )
