@@ -12,7 +12,7 @@ from core.datasets.gpqa.gpqa_single_token_response_dataset import GPQASingleToke
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.utils.device import DEVICE_MAP
 
-MODEL_NAME = "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
+MODEL_NAME = "mistralai/Mistral-Small-24B-Instruct-2501"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
