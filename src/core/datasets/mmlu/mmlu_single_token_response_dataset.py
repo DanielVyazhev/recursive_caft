@@ -35,7 +35,7 @@ class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
 
     @override
     def row_id(self, row: dict) -> str:
-        return row["question_id"]
+        return str(row["question_id"])
 
     @override
     def verify_assistant_response(self, row: dict, assistant_response: str) -> tuple[str, bool]:
