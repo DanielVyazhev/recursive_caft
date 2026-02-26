@@ -38,7 +38,7 @@ class MultiTokenEntropyEstimator(BaseComplexityEstimator[MultiTokenEntropyEstima
         tokenizer: PreTrainedTokenizer,
     ) -> MultiTokenEntropyEstimatorSchema:
         # (token_length, vocab_size)
-        all_token_logits = torch.cat([outputs.scores[i][0] for i in range(len(outputs.scores))], dim=0)
+        all_token_logits = torch.stack([outputs.scores[i][0] for i in range(len(outputs.scores))], dim=0)
         entropy = compute_entropy_from_logits(all_token_logits)
         entropy_values = [e.item() for e in entropy]
         return MultiTokenEntropyEstimatorSchema(
