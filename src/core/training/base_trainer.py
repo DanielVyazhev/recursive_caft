@@ -115,7 +115,8 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         logger.info("Dataset samples")
         logger.info("Train")
         logger.info(f"Input: {self.tokenizer.decode(train_ds[0]['input_ids'])}")
-        logger.info(f"Labels: {self.tokenizer.decode(train_ds[0]['labels'])}")
+        labels = [tok for tok in train_ds[0]['labels'] if tok != -100]
+        logger.info(f"Labels: {self.tokenizer.decode(labels)}")
 
         return train_ds
 
