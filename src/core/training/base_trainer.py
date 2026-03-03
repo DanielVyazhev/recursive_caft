@@ -76,9 +76,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         if not self._tokenizer:
             self._tokenizer = AutoTokenizer.from_pretrained(self.config.model_id)
 
-        assert isinstance(self._tokenizer, PreTrainedTokenizer), (
-            "Tokenizer must be a PreTrainedTokenizer, but got {}".format(type(self._tokenizer))
-        )
+        assert self._tokenizer is not None, "Tokenizer should be initialized"
 
         if self._tokenizer.pad_token is None:
             logger.warning("Tokenizer has no pad token, setting it to eos token")
