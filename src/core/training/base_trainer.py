@@ -134,7 +134,9 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         if self.config.save_schedule is not None:
             trainer.add_callback(SaveByScheduleCallback(schedule=self.config.save_schedule))
 
-        trainer.train(resume_from_checkpoint=True)
+        has_checkpoint = get_last_checkpoint_dir(self.config.out_path) is not None
+        logger.info(f"Has checkpoint: {has_checkpoint}")
+        trainer.train(resume_from_checkpoint=has_checkpoint)
 
     def _directory_is_empty(self, directory: str, expected_epochs: int) -> bool:
         p = Path(directory)
