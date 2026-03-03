@@ -1,4 +1,3 @@
-import ast
 import string
 from typing import override
 
@@ -7,7 +6,7 @@ from transformers import PreTrainedTokenizer
 from core.datasets.qa_dataset import QADataset, QADatasetConfig
 
 
-class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
+class GSM8KDirectResponseDataset(QADataset[QADatasetConfig]):
     def __init__(self, tokenizer: PreTrainedTokenizer, config: QADatasetConfig):
         super().__init__(tokenizer, config)
 
@@ -15,19 +14,12 @@ class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
 
     @override
     def system_prompt(self, row: dict) -> str:
-        subject = row["base_cluster"]
-        return f"The following are multiple choice questions about {subject}. Choose a correct option letter. Answer with a single symbol. Do not print anything else."
+        return "The following are grade school math word problems. Please, return your answer as a single number (without extra/special symbols) and nothing else."
 
     @override
     def user_prompt(self, row: dict) -> str:
         question = row["question"]
-        options = ast.literal_eval(row["options"])
-
-        options_str = "\n".join(
-            [f"{option_id}. {answer}".strip() for option_id, answer in zip(self.option_ids, options)]
-        )
-        user_prompt = f"Question: {question.strip()}\nOptions:\n{options_str}\n"
-        return user_prompt
+        return question.strip()
 
     @override
     def assistant_response(self, row: dict) -> str:
@@ -35,7 +27,7 @@ class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
 
     @override
     def row_id(self, row: dict) -> str:
-        return str(row["question_id"])
+        return row["question_id"]
 
     @override
     def verify_assistant_response(self, row: dict, assistant_response: str) -> tuple[str, bool]:
