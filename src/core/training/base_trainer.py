@@ -102,7 +102,9 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
     @property
     def training_args(self):
         return Seq2SeqTrainingArguments(
-            **self.config.training_args.model_dump(),
+            **self.config.training_args.model_dump(
+                exclude={"effective_train_batch_size", "per_device_train_batch_size", "gradient_accumulation_steps"}
+            ),
             **self._batch_size_config(
                 self.config.training_args.effective_train_batch_size,
                 self.config.training_args.per_device_train_batch_size,
@@ -115,7 +117,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         logger.info("Dataset samples")
         logger.info("Train")
         logger.info(f"Input: {self.tokenizer.decode(train_ds[0]['input_ids'])}")
-        labels = [tok for tok in train_ds[0]['labels'] if tok != -100]
+        labels = [tok for tok in train_ds[0]["labels"] if tok != -100]
         logger.info(f"Labels: {self.tokenizer.decode(labels)}")
 
         return train_ds
