@@ -1,7 +1,7 @@
 import json
 import subprocess
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel
 from pydraconf import PydraConfig
@@ -14,7 +14,7 @@ from transformers import (
 )
 from transformers.trainer_seq2seq import Seq2SeqTrainer
 
-from core.datasets.base_dataset_adapter import BaseDatasetAdapter
+from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter
 from core.training.callbacks.save_by_schedule import SaveByScheduleCallback
 from core.utils.last_checkpoint_dir import get_last_checkpoint_dir
 from core.utils.logger import logger
@@ -23,7 +23,7 @@ from core.utils.seed import set_seed
 
 class BaseTrainingArgs(BaseModel):
     num_train_epochs: int
-    effective_train_batch_size: int
+    effective_train_batch_size: int = 256
     per_device_train_batch_size: int
 
     # Sane defaults for SFT fine-tuning
@@ -47,16 +47,15 @@ class BaseTrainingArgs(BaseModel):
 class BaseTrainerConfig[TTrainingArgs: BaseTrainingArgs = BaseTrainingArgs](PydraConfig):
     out_path: str
     model_id: str
-    train_dataset: BaseDatasetAdapter
+    train_dataset: AbstractDatasetAdapter
     training_args: TTrainingArgs
     save_schedule: list[int] | None = None
 
 
 class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
-    def __init__(self, config: TConfig):
+    def __init__(self, config: TConfig, tokenizer: PreTrainedTokenizer | None = None):
         self.config = config
-        self._tokenizer: PreTrainedTokenizer | None = None
-        self._model: AutoModelForCausalLM | None = None
+        self._tokenizer: PreTrainedTokenizer | None = tokenizer
 
     def train(self):
         if not self._directory_is_empty(self.config.out_path, self.config.training_args.num_train_epochs):
@@ -77,6 +76,10 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         if not self._tokenizer:
             self._tokenizer = AutoTokenizer.from_pretrained(self.config.model_id)
 
+        assert isinstance(self._tokenizer, PreTrainedTokenizer), (
+            "Tokenizer must be a PreTrainedTokenizer, but got {}".format(type(self._tokenizer))
+        )
+
         if self._tokenizer.pad_token is None:
             logger.warning("Tokenizer has no pad token, setting it to eos token")
             self._tokenizer.pad_token = self._tokenizer.eos_token
@@ -87,6 +90,8 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
     def model(self):
         if not self._model:
             self._model = AutoModelForCausalLM.from_pretrained(self.config.model_id)
+
+        assert self._model is not None, "Model should be initialized"
         return self._model
 
     @property
@@ -107,7 +112,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         )
 
     def _prepare_data(self):
-        train_ds = self.config.train_dataset.process_dataset(self.tokenizer)
+        train_ds = self.config.train_dataset.process_dataset()
         logger.info("Dataset samples")
         logger.info("Train")
         logger.info(f"Input: {self.tokenizer.decode(train_ds[0]['input_ids'])}")

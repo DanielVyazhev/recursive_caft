@@ -9,6 +9,7 @@ from core.training.base_trainer import BaseTrainer, BaseTrainerConfig, BaseTrain
 
 class LoRATrainingArgs(BaseTrainingArgs):
     # Sane overrides for LoRA SFT fine-tuning
+    effective_train_batch_size: int = 64
     learning_rate: float = 1e-4
     warmup_ratio: float = 0.06
     weight_decay: float = 0.0
@@ -42,8 +43,8 @@ class LoRATrainerConfig(BaseTrainerConfig[LoRATrainingArgs]):
 
 
 class LoRATrainer(BaseTrainer[LoRATrainerConfig]):
-    @override
     @property
+    @override
     def model(self):
         if not self._model:
             model = AutoModelForCausalLM.from_pretrained(self.config.model_id)
