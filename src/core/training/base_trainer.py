@@ -56,6 +56,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
     def __init__(self, config: TConfig, tokenizer: PreTrainedTokenizer | None = None):
         self.config = config
         self._tokenizer: PreTrainedTokenizer | None = tokenizer
+        self._model: AutoModelForCausalLM | None = None
 
     def train(self):
         if not self._directory_is_empty(self.config.out_path, self.config.training_args.num_train_epochs):
