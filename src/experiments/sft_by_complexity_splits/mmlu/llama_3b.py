@@ -2,8 +2,8 @@ from pathlib import Path
 
 from transformers import AutoTokenizer
 
+from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
 from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset, QADatasetConfig
-from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.training.lora_trainer import LoRATrainer, LoRATrainerConfig, LoRATrainingArgs
 
 MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
@@ -13,13 +13,17 @@ tokenizer.pad_token = tokenizer.eos_token
 
 trainer = LoRATrainer(
     config=LoRATrainerConfig(
-        out_path=Path(__file__).parent.joinpath("../../../../artifacts/sft_by_complexity_splits/llama_3b").as_posix(),
+        out_path=Path(__file__)
+        .parent.joinpath("../../../../artifacts/sft_by_complexity_splits/mmlu/llama_3b/group0")
+        .as_posix(),
         model_id=MODEL_NAME,
-        train_dataset=QADatasetAdapter(
+        train_dataset=CausalDatasetAdapter(
             dataset=MMLUSingleTokenResponseDataset(
                 config=QADatasetConfig(
                     path=Path(__file__)
-                    .parent.joinpath("../../../../data/out/splits/single_token_entropy/qwen_3b/group0_train.parquet")
+                    .parent.joinpath(
+                        "../../../../data/out/splits/single_token_entropy/mmlu/llama_3b/group0_train.parquet"
+                    )
                     .as_posix()
                 ),
                 tokenizer=tokenizer,

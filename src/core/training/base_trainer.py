@@ -56,6 +56,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
     def __init__(self, config: TConfig, tokenizer: PreTrainedTokenizer | None = None):
         self.config = config
         self._tokenizer: PreTrainedTokenizer | None = tokenizer
+        self._model: AutoModelForCausalLM | None = None
 
     def train(self):
         if not self._directory_is_empty(self.config.out_path, self.config.training_args.num_train_epochs):
@@ -76,9 +77,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         if not self._tokenizer:
             self._tokenizer = AutoTokenizer.from_pretrained(self.config.model_id)
 
-        assert isinstance(self._tokenizer, PreTrainedTokenizer), (
-            "Tokenizer must be a PreTrainedTokenizer, but got {}".format(type(self._tokenizer))
-        )
+        assert self._tokenizer is not None, "Tokenizer should be initialized"
 
         if self._tokenizer.pad_token is None:
             logger.warning("Tokenizer has no pad token, setting it to eos token")
@@ -103,7 +102,9 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
     @property
     def training_args(self):
         return Seq2SeqTrainingArguments(
-            **self.config.training_args.model_dump(),
+            **self.config.training_args.model_dump(
+                exclude={"effective_train_batch_size", "per_device_train_batch_size", "gradient_accumulation_steps"}
+            ),
             **self._batch_size_config(
                 self.config.training_args.effective_train_batch_size,
                 self.config.training_args.per_device_train_batch_size,
@@ -116,7 +117,8 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         logger.info("Dataset samples")
         logger.info("Train")
         logger.info(f"Input: {self.tokenizer.decode(train_ds[0]['input_ids'])}")
-        logger.info(f"Labels: {self.tokenizer.decode(train_ds[0]['labels'])}")
+        labels = [tok for tok in train_ds[0]["labels"] if tok != -100]
+        logger.info(f"Labels: {self.tokenizer.decode(labels)}")
 
         return train_ds
 
@@ -132,7 +134,9 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         if self.config.save_schedule is not None:
             trainer.add_callback(SaveByScheduleCallback(schedule=self.config.save_schedule))
 
-        trainer.train(resume_from_checkpoint=True)
+        has_checkpoint = get_last_checkpoint_dir(self.config.out_path) is not None
+        logger.info(f"Has checkpoint: {has_checkpoint}")
+        trainer.train(resume_from_checkpoint=has_checkpoint)
 
     def _directory_is_empty(self, directory: str, expected_epochs: int) -> bool:
         p = Path(directory)
