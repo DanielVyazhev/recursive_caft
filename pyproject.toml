@@ -28,6 +28,11 @@ dependencies = [
     "vllm>=0.7.4",
 ]
 
+[project.optional-dependencies]
+gpu = [
+    "flash-attn>=2.8.3",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -37,8 +42,12 @@ packages = [
   "src/core"
 ]
 
+[tool.uv.extra-build-dependencies]
+flash-attn = ["torch"]
+
 [dependency-groups]
 dev = [
     "huggingface-hub[cli]>=0.29.3",
     "ipykernel>=6.29.5",
+    "pytest>=9.0.2",
 ]
