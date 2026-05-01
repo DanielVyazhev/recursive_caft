@@ -15,7 +15,7 @@ from core.evaluation.multi_checkpoint_evaluator import (
 from core.training.lora_trainer import LoRATrainer, LoRATrainerConfig, LoRATrainingArgs
 from core.training.thinking_tokens import setup_thinking_tokens
 
-MODEL_NAME = Path(__file__).resolve().parents[4].joinpath("artifacts/base_models_v0/qwen_3b").as_posix()
+MODEL_NAME = Path(__file__).parent.joinpath("../../../../../artifacts/base_models_v0/qwen_3b").as_posix()
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 tokenizer.pad_token = tokenizer.eos_token
