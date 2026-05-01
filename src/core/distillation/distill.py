@@ -1,113 +1,180 @@
 import os
-from concurrent import futures
+import queue
+import threading
+import time
+from pathlib import Path
 
 import pandas as pd
+from pydraconf import PydraConfig
 from tqdm import tqdm
 
-from core.prompts.mmlu_cot_answer import answer_marker, cot_answer_prompt, cot_sys_prompt
-from core.utils.chunker import chunker
+from core.datasets.qa_dataset import QADataset, QADatasetConfig
 from core.utils.openrouter import openrouter
-from core.utils.validation import validate_mmlu_answer
 
-chunk_size = 30
+pool_size = 30
+REQUEST_BUDGET_S = 180.0
+
+
+def _worker(input_q: queue.Queue, output_q: queue.Queue):
+    while True:
+        item = input_q.get()
+        if item is None:
+            input_q.task_done()
+            break
+        try:
+            result = call_remote_llm(item)
+        except Exception as e:
+            print(f"Worker error: {e}")
+            result = None
+        output_q.put(result)
+        input_q.task_done()
 
 
 def call_remote_llm(args):
     try:
-        sys_prompt, user_prompt, index, model, max_tokens = args
+        sys_prompt, user_prompt, index, model, max_tokens, timeout = args
 
         messages = [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt},
         ]
 
-        completion = openrouter.chat.completions.create(
-            model=model, messages=messages, max_tokens=max_tokens, logprobs=True
+        t0 = time.monotonic()
+        stream = openrouter.chat.completions.create(  # pyright: ignore[reportCallIssue]
+            model=model,
+            messages=messages,
+            stream=True,
+            extra_body={
+                "reasoning": {"enabled": True, "max_tokens": max_tokens},
+            },
         )
-        return index, completion.choices[0].message.content
-    except:
+
+        content_parts = []
+        reasoning_parts = []
+        for chunk in stream:
+            if time.monotonic() - t0 > timeout:
+                stream.close()
+                raise TimeoutError(f"Exceeded {timeout}s wall-clock budget for index {index}")
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta.content:
+                content_parts.append(delta.content)
+            reasoning_piece = getattr(delta, "reasoning", None)
+            if reasoning_piece:
+                reasoning_parts.append(reasoning_piece)
+
+        content = "".join(content_parts)
+        reasoning = "".join(reasoning_parts) if reasoning_parts else None
+
+        return DistillationResult(index=index, answer=content, reasoning=reasoning)
+    except Exception as e:
+        print(f"Error occurred: {e}")
         return None
 
 
+class DistillationConfig(PydraConfig):
+    out_filename: str
+    model: str
+    dataset: QADataset[QADatasetConfig]
+    dump_every: int = 100
+    max_tokens: int = 8192
+    timeout: float = REQUEST_BUDGET_S
+    regenerate_incorrect: bool = False
+    field_reasoning: str = "distill_reasoning"
+    field_ans: str = "distill_answer"
+    field_ans_correct: str = "distill_ans_correct"
+
+
+class DistillationResult(PydraConfig):
+    index: int
+    answer: str
+    reasoning: str | None
+
+
+class DistillationResultWriter:
+    def write_to_df(self, df: pd.DataFrame, config: DistillationConfig, result: DistillationResult):
+        df.at[result.index, config.field_ans] = result.answer
+        df.at[result.index, config.field_reasoning] = result.reasoning
+        df.at[result.index, config.field_ans_correct] = config.dataset.verify_assistant_response(
+            df.iloc[result.index].to_dict(), result.answer
+        )[1]
+
+
 def distill_on_dataset(
-    in_filename,
-    out_filename,
-    get_subject_from_row,
-    get_question_from_row,
-    get_options_from_row,
-    check_answer_correct,
-    dump_every=10,
-    max_tokens=2048,
-    model="deepseek/deepseek-chat-v3-0324",
-    get_sys_prompt=cot_sys_prompt,
-    get_user_prompt=cot_answer_prompt,
+    config: DistillationConfig,
+    distillation_result_writer: DistillationResultWriter = DistillationResultWriter(),
 ):
     invalid_answers = 0
+    cnt = 0
 
-    field_response = "distill_response"
-    field_ans = "distill_answer"
-    field_ans_correct = "distill_ans_correct"
+    tmp_path = Path(config.out_filename).with_suffix(".tmp.parquet")
 
-    if os.path.exists(out_filename):
-        df = pd.read_csv(out_filename, sep="\t", dtype={field_response: "str", field_ans: "str"}, keep_default_na=False)
+    if os.path.exists(tmp_path):
+        df = pd.read_parquet(tmp_path)
+    elif os.path.exists(config.out_filename):
+        df = pd.read_parquet(config.out_filename)
     else:
-        df = pd.read_csv(
-            in_filename,
-            sep="\t",
-        )
+        df = pd.read_parquet(config.dataset.processed_path)
 
-    # print(df.dtypes)
+    if config.field_ans_correct not in df.columns:
+        df[config.field_ans_correct] = False
+    if config.field_reasoning not in df.columns:
+        df[config.field_reasoning] = ""
+    if config.field_ans not in df.columns:
+        df[config.field_ans] = ""
 
-    if field_ans_correct not in df.columns:
-        df[field_ans_correct] = False
-    if field_response not in df.columns:
-        df[field_response] = ""
-    if field_ans not in df.columns:
-        df[field_ans] = ""
+    input_q: queue.Queue = queue.Queue()
+    output_q: queue.Queue = queue.Queue()
 
-    with futures.ThreadPoolExecutor(max_workers=chunk_size) as pool:
-        for chunk_idx, chunk in tqdm(enumerate(chunker(df, chunk_size)), total=int(df.shape[0] / chunk_size)):
-            args_list = []
+    expected = 0
+    for index, row in df.iterrows():
+        row_dict = row.to_dict()
 
-            for index, row in chunk.iterrows():
-                if df.at[index, field_response] != "":
-                    continue
+        if not config.regenerate_incorrect and row_dict[config.field_reasoning] != "":
+            continue
 
-                sys_prompt = get_sys_prompt(get_subject_from_row(row))
-                user_prompt = get_user_prompt(get_question_from_row(row), get_options_from_row(row))
-                args_list.append((sys_prompt, user_prompt, index, model, max_tokens))
+        if config.regenerate_incorrect and row_dict[config.field_ans_correct]:
+            continue
 
-            results = list(pool.map(call_remote_llm, args_list))
+        sys_prompt = config.dataset.system_prompt(row_dict)
+        user_prompt = config.dataset.user_prompt(row_dict)
+        input_q.put((sys_prompt, user_prompt, index, config.model, config.max_tokens, config.timeout))
+        expected += 1
 
-            for result in results:
-                if result is None:
-                    invalid_answers += 1
-                    continue
+    for _ in range(pool_size):
+        input_q.put(None)
 
-                index, response = result
+    threads = [threading.Thread(target=_worker, args=(input_q, output_q), daemon=True) for _ in range(pool_size)]
+    for t in threads:
+        t.start()
 
-                df.at[index, field_response] = response
+    with tqdm(total=expected) as pbar:
+        for _ in range(expected):
+            result = output_q.get()
+            pbar.update(1)
 
-                answer_marker_start = response.find(answer_marker[0])
-                answer_marker_end = response.find(answer_marker[1])
+            if result is None:
+                invalid_answers += 1
+                continue
 
-                extracted_answer = ""
-                if answer_marker_end != -1 and answer_marker_start != -1:
-                    extracted_answer = response[answer_marker_start + len(answer_marker[0]) : answer_marker_end]
+            cnt += 1
+            distillation_result_writer.write_to_df(df, config, result)
 
-                if validate_mmlu_answer(extracted_answer):
-                    df.at[index, field_ans] = extracted_answer
-                    df.at[index, field_ans_correct] = check_answer_correct(df.iloc[index], extracted_answer)
-                else:
-                    invalid_answers += 1
+            if cnt < 5:
+                print(
+                    f"response: {df.at[result.index, config.field_reasoning]}\nextracted_answer: {df.at[result.index, config.field_ans]}\ncorrect:{df.at[result.index, config.field_ans_correct]}\n\n"
+                )
 
-                # print(
-                #     f"response: {response}\nextracted_answer: {extracted_answer}\ncorrect:{df.at[index, field_ans_correct]}\n\n"
-                # )
+            if cnt % config.dump_every == 0:
+                df.to_parquet(tmp_path, compression=None, index=False)
 
-            if chunk_idx % dump_every == 0:
-                df.to_csv(out_filename, sep="\t", index=False)
+    for t in threads:
+        t.join()
 
-    df.to_csv(out_filename, sep="\t", index=False)
-    print(f"Processed dataset {out_filename}. Total entries: {df.shape[0]}. Invalid answers: {invalid_answers}")
+    df.to_parquet(config.out_filename, index=False)
+    if os.path.exists(tmp_path):
+        os.unlink(tmp_path)
+
+    print(f"Processed dataset {config.out_filename}. Total entries: {df.shape[0]}. Invalid answers: {invalid_answers}")
     return df
