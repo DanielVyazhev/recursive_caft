@@ -105,10 +105,7 @@ class Evaluator:
             end = min(start + CHUNK_SIZE, total)
             chunk_prompts = prompts[start:end]
 
-            logger.info(
-                f"Chunk {chunk_idx + 1}/{num_chunks}: prompts [{start}:{end}] "
-                f"({len(chunk_prompts)} samples)"
-            )
+            logger.info(f"Chunk {chunk_idx + 1}/{num_chunks}: prompts [{start}:{end}] ({len(chunk_prompts)} samples)")
 
             generator = BatchGenerator(
                 model=model,
@@ -125,7 +122,7 @@ class Evaluator:
 
             for offset, gen_ids in enumerate(gen_result.sequences):
                 row = ds[start + offset]
-                response = tokenizer.decode(gen_ids, skip_special_tokens=True).strip()
+                response = tokenizer.decode(gen_ids, skip_special_tokens=False).strip()
 
                 try:
                     parsed_answer, is_correct = qa_dataset.verify_assistant_response(row, response)
@@ -161,9 +158,7 @@ class Evaluator:
             )
 
         accuracy = correct / total if total > 0 else 0.0
-        result = EvaluationResult(
-            accuracy=accuracy, total=total, correct=correct, num_truncated=num_truncated
-        )
+        result = EvaluationResult(accuracy=accuracy, total=total, correct=correct, num_truncated=num_truncated)
 
         logger.info(f"Evaluation complete: accuracy={accuracy:.4f} ({correct}/{total})")
 
