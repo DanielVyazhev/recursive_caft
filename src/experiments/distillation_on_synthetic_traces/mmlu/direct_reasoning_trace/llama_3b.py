@@ -14,7 +14,7 @@ from core.evaluation.multi_checkpoint_evaluator import (
 from core.training.lora_trainer import LoRATrainer, LoRATrainerConfig, LoRATrainingArgs
 from core.training.thinking_tokens import setup_thinking_tokens
 
-MODEL_NAME = Path(__file__).parent.joinpath("../../../../../artifacts/base_models_v0/qwen_3b").as_posix()
+MODEL_NAME = Path(__file__).parent.joinpath("../../../../../artifacts/base_models_v0/llama_3b").as_posix()
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 if tokenizer.pad_token is None:
@@ -23,7 +23,7 @@ setup_thinking_tokens(tokenizer)
 
 OUT_PATH = (
     Path(__file__)
-    .parent.joinpath("../../../../../artifacts/distillation_on_synthetic_traces/mmlu/direct_reasoning_trace/qwen_3b")
+    .parent.joinpath("../../../../../artifacts/distillation_on_synthetic_traces/mmlu/direct_reasoning_trace/llama_3b")
     .as_posix()
 )
 
@@ -66,7 +66,7 @@ cot_evaluator = MultiCheckpointEvaluator(
                 tokenizer=tokenizer,
             )
         ),
-        base_model_id=MODEL_NAME,
+        # base_model_id=MODEL_NAME,
         generation=GenerationConfig(max_new_tokens=8500, max_batch_size=8),
         summary_filename="summary_reasoning_evals.json",
     ),
