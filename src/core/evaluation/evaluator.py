@@ -24,6 +24,7 @@ CHUNK_SIZE = 1024
 
 class GenerationConfig(BaseModel):
     max_new_tokens: int
+    max_thinking_tokens: int | None = None
     max_batch_size: int
     temperature: float = 0.0
     top_p: float = 1.0
@@ -99,6 +100,19 @@ class Evaluator:
         num_truncated = 0
         all_results: list[dict] = []
 
+        thinking_end_token_id: int | None = None
+        if self.config.generation.max_thinking_tokens is not None:
+            end_token = getattr(tokenizer, "thinking_end_token", None)
+            assert end_token is not None, (
+                "max_thinking_tokens set but tokenizer has no thinking_end_token; "
+                "call setup_thinking_tokens(tokenizer) in the experiment script."
+            )
+            resolved = tokenizer.convert_tokens_to_ids(end_token)
+            assert isinstance(resolved, int) and resolved >= 0, (
+                f"</think> did not resolve to a single int id: got {resolved!r}"
+            )
+            thinking_end_token_id = resolved
+
         num_chunks = (total + CHUNK_SIZE - 1) // CHUNK_SIZE
         for chunk_idx in range(num_chunks):
             start = chunk_idx * CHUNK_SIZE
@@ -115,6 +129,8 @@ class Evaluator:
                 temperature=self.config.generation.temperature,
                 top_p=self.config.generation.top_p,
                 top_k=self.config.generation.top_k,
+                max_thinking_tokens=self.config.generation.max_thinking_tokens,
+                thinking_end_token_id=thinking_end_token_id,
             )
 
             gen_result = generator.generate(chunk_prompts)
@@ -123,6 +139,7 @@ class Evaluator:
             for offset, gen_ids in enumerate(gen_result.sequences):
                 row = ds[start + offset]
                 response = tokenizer.decode(gen_ids, skip_special_tokens=False).strip()
+                is_truncated = gen_result.truncated[offset]
 
                 try:
                     parsed_answer, is_correct = qa_dataset.verify_assistant_response(row, response)
@@ -140,6 +157,7 @@ class Evaluator:
                         "response": response,
                         "parsed_answer": parsed_answer,
                         "is_correct": is_correct,
+                        "is_truncated": is_truncated,
                     }
                 )
 
