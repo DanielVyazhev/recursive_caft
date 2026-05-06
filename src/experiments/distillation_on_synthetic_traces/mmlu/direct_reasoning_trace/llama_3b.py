@@ -64,7 +64,8 @@ cot_evaluator = MultiCheckpointEvaluator(
                     dataset_id="mmlu_random_test",
                 ),
                 tokenizer=tokenizer,
-            )
+            ),
+            add_thinking_start_token=True,
         ),
         # base_model_id=MODEL_NAME,
         generation=GenerationConfig(max_new_tokens=8500, max_batch_size=8),
