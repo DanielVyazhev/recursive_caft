@@ -280,6 +280,147 @@ class TestCorrectnessVsHFGenerate:
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Thinking-cap tests
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestMaxThinkingTokens:
+    """`max_thinking_tokens` enforces a per-slot cap on the thinking phase.
+
+    When the cap is hit, the just-sampled token is replaced in-place by
+    `thinking_end_token_id`; total budget stays at `max_new_tokens`.
+    """
+
+    def test_cap_fires_when_end_token_unreached(self, model_and_tokenizer):
+        """If the model never naturally emits </think>, the cap forces it
+        in at position == max_thinking_tokens."""
+        model, tokenizer = model_and_tokenizer
+        prompt = tokenizer.encode("Hello")
+
+        # Pick a token id that the tiny model is very unlikely to emit;
+        # any vocab id works since we're driving the cap, not detection.
+        # Use a high-frequency-but-unlikely-here id by reserving a sentinel.
+        sentinel_end_id = tokenizer.encode("</think>", add_special_tokens=False)
+        if not sentinel_end_id:
+            sentinel_end_id = [tokenizer.vocab_size - 1]
+        end_id = sentinel_end_id[0]
+
+        max_thinking = 5
+        max_new = 12
+
+        gen = BatchGenerator(
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=max_new,
+            max_batch_size=1,
+            max_thinking_tokens=max_thinking,
+            thinking_end_token_id=end_id,
+        )
+        [result] = gen.generate([prompt]).sequences
+
+        assert len(result) <= max_new
+        # The cap fires at len(generated_ids) == max_thinking, and that token
+        # is replaced by end_id. So result[max_thinking - 1] must be end_id.
+        assert result[max_thinking - 1] == end_id, (
+            f"Expected </think>={end_id} at position {max_thinking - 1}, got {result[max_thinking - 1]} "
+            f"(full result: {result})"
+        )
+
+    def test_natural_end_token_disables_cap(self, model_and_tokenizer):
+        """If the model emits </think> early, in_thinking flips to False and
+        the cap never fires — subsequent tokens are answer-phase."""
+        model, tokenizer = model_and_tokenizer
+        prompt = tokenizer.encode("Hello")
+
+        # Run once with no cap to learn what the model emits.
+        gen_ref = BatchGenerator(
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=10,
+            max_batch_size=1,
+        )
+        [reference] = gen_ref.generate([prompt]).sequences
+
+        # Pick the model's first generated token as the synthetic </think>.
+        # That guarantees the natural-emit branch fires on step 1.
+        end_id = reference[0]
+
+        gen = BatchGenerator(
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=10,
+            max_batch_size=1,
+            max_thinking_tokens=3,
+            thinking_end_token_id=end_id,
+        )
+        [result] = gen.generate([prompt]).sequences
+
+        # Token 0 is </think>; subsequent tokens should match the unrestricted
+        # reference (cap is disabled after natural emit, no override).
+        assert result[0] == end_id
+        assert result == reference, (
+            f"After natural </think> at step 0, generation should match reference.\n"
+            f"  got:      {result}\n  expected: {reference}"
+        )
+
+    def test_cap_disabled_matches_reference(self, model_and_tokenizer):
+        """max_thinking_tokens=None → behavior identical to existing path."""
+        model, tokenizer = model_and_tokenizer
+        prompt = tokenizer.encode("Hello world")
+
+        gen = BatchGenerator(
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=MAX_NEW_TOKENS,
+            max_batch_size=1,
+            max_thinking_tokens=None,
+            thinking_end_token_id=None,
+        )
+        [result] = gen.generate([prompt]).sequences
+
+        expected = _hf_generate_greedy(model, tokenizer, prompt, MAX_NEW_TOKENS)
+        assert result == expected
+
+    def test_cap_with_batched_prompts(self, model_and_tokenizer):
+        """Per-slot cap fires independently across a batch."""
+        model, tokenizer = model_and_tokenizer
+        prompts = [
+            tokenizer.encode("First"),
+            tokenizer.encode("Second prompt"),
+            tokenizer.encode("Third"),
+        ]
+
+        sentinel_end_id = tokenizer.encode("</think>", add_special_tokens=False)
+        if not sentinel_end_id:
+            sentinel_end_id = [tokenizer.vocab_size - 1]
+        end_id = sentinel_end_id[0]
+
+        max_thinking = 4
+        max_new = 10
+
+        gen = BatchGenerator(
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=max_new,
+            max_batch_size=4,
+            max_thinking_tokens=max_thinking,
+            thinking_end_token_id=end_id,
+        )
+        results = gen.generate(prompts).sequences
+
+        for i, result in enumerate(results):
+            assert len(result) <= max_new
+            # If the model didn't naturally emit end_id earlier, the cap
+            # forces it at position max_thinking - 1. Either way, end_id
+            # must appear at or before that position.
+            head = result[:max_thinking]
+            assert end_id in head, (
+                f"Prompt {i}: expected </think>={end_id} within first {max_thinking} tokens, "
+                f"got {result}"
+            )
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Performance tests
 # ──────────────────────────────────────────────────────────────────────
 

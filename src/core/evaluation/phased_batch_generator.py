@@ -10,12 +10,15 @@ from tqdm import tqdm
 from transformers import DynamicCache, PreTrainedModel, PreTrainedTokenizer
 from transformers.cache_utils import _static_cache_update
 
+from core.utils.logger import logger
+
 
 @dataclass
 class GenerationResult:
     sequences: list[list[int]]
     num_truncated: int
     total: int
+    truncated: list[bool] = field(default_factory=list)
 
 
 @dataclass
@@ -25,6 +28,7 @@ class _Slot:
     prompt_len: int
     generated_ids: list[int] = field(default_factory=list)
     seq_position: int = 0  # total tokens seen = prompt_len + len(generated_ids)
+    in_thinking: bool = False
 
 
 @dataclass
@@ -171,6 +175,8 @@ class BatchGenerator:
         temperature: float = 0.0,
         top_p: float = 1.0,
         top_k: int = -1,
+        max_thinking_tokens: int | None = None,
+        thinking_end_token_id: int | None = None,
     ):
         self.model = model
         # Use uncompiled model for prefill, compiled for decode — mirrors HF generate().
@@ -186,6 +192,17 @@ class BatchGenerator:
         self.temperature = temperature
         self.top_p = top_p
         self.top_k = top_k
+        self.max_thinking_tokens = max_thinking_tokens
+        self.thinking_end_token_id = thinking_end_token_id
+        self._enforce_thinking_cap = max_thinking_tokens is not None and thinking_end_token_id is not None
+        if (max_thinking_tokens is None) != (thinking_end_token_id is None):
+            logger.warning(
+                "BatchGenerator: max_thinking_tokens and thinking_end_token_id must both be set "
+                "to enforce a thinking cap; got max_thinking_tokens=%r, thinking_end_token_id=%r. "
+                "Cap will not be enforced.",
+                max_thinking_tokens,
+                thinking_end_token_id,
+            )
 
         self.pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
         self.eos_token_id = tokenizer.eos_token_id
@@ -330,6 +347,7 @@ class BatchGenerator:
             GenerationResult with generated sequences and truncation stats.
         """
         results: list[list[int] | None] = [None] * len(prompts)
+        truncated_flags: list[bool] = [False] * len(prompts)
         pbar = tqdm(total=len(prompts), desc="Generating")
         max_prompt_len = max(len(p) for p in prompts)
         max_total = max_prompt_len + self.max_new_tokens
@@ -341,7 +359,12 @@ class BatchGenerator:
         prefill_start = time.perf_counter()
         total_prefill_tokens = 0
         for i, prompt_ids in enumerate(tqdm(prompts, desc="Prefilling", leave=False)):
-            slot = _Slot(index=i, prompt_ids=prompt_ids, prompt_len=len(prompt_ids))
+            slot = _Slot(
+                index=i,
+                prompt_ids=prompt_ids,
+                prompt_len=len(prompt_ids),
+                in_thinking=self._enforce_thinking_cap,
+            )
             self._cache = prefill_cache
             self._valid_lens = [0]
             self._prefill(slot, prompt_ids, 0)
@@ -384,7 +407,14 @@ class BatchGenerator:
 
             is_last = total_threshold >= max_total
             trunc += self._run_phase(
-                slot_queue, results, total_threshold, promote_queue, pbar, total_threshold + 1, is_last
+                slot_queue,
+                results,
+                truncated_flags,
+                total_threshold,
+                promote_queue,
+                pbar,
+                total_threshold + 1,
+                is_last,
             )
 
             self._cache = None
@@ -399,12 +429,18 @@ class BatchGenerator:
 
         pbar.close()
         sequences = [r if r is not None else [] for r in results]
-        return GenerationResult(sequences=sequences, num_truncated=trunc, total=len(prompts))
+        return GenerationResult(
+            sequences=sequences,
+            num_truncated=trunc,
+            total=len(prompts),
+            truncated=truncated_flags,
+        )
 
     def _run_phase(
         self,
         slot_queue: deque[_StagedSlot],
         results: list[list[int] | None],
+        truncated_flags: list[bool],
         total_threshold: int,
         promote_queue: deque[_StagedSlot],
         pbar: tqdm,
@@ -539,6 +575,7 @@ class BatchGenerator:
                     if last_token == self.eos_token_id or len(slot.generated_ids) >= self.max_new_tokens:
                         if last_token != self.eos_token_id:
                             num_truncated += 1
+                            truncated_flags[slot.index] = True
                         results[slot.index] = slot.generated_ids
                         finished.add(batch_idx)
                         pbar.update(1)
@@ -659,6 +696,17 @@ class BatchGenerator:
         for i, slot in zip(batch_indices, slots):
             next_token = self._sample_token(outputs.logits[i : i + 1, -1, :])
             slot.generated_ids.append(next_token.item())
+            if self._enforce_thinking_cap and slot.in_thinking:
+                if slot.generated_ids[-1] == self.thinking_end_token_id:
+                    slot.in_thinking = False
+                elif len(slot.generated_ids) >= self.max_thinking_tokens:
+                    # Force end-of-thinking. Replace the just-sampled token with
+                    # </think> so total budget stays at max_new_tokens. KV at this
+                    # position reflects the originally sampled token; next forward
+                    # pass attends to a 1-token-stale K/V row. Acceptable for
+                    # research-mode forced decoding (cf. speculative decoding).
+                    slot.generated_ids[-1] = self.thinking_end_token_id
+                    slot.in_thinking = False
             slot.seq_position += 1
             self._valid_lens[i] += 1
 
