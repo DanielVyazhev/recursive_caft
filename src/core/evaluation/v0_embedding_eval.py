@@ -122,26 +122,23 @@ def _check_pre_existing_rows_match(v0_dir: Path, base_model_id: str) -> dict:
     v0_weight = v0_model.get_input_embeddings().weight.detach().cpu()
     base_weight = base_model.get_input_embeddings().weight.detach().cpu()
 
-    # For tight-vocab models v0 has +num_added rows vs base; for padded-vocab
-    # models (Phi-4-mini) the row count matches. Mask out the new-token ids and
-    # compare the remainder — valid in both cases.
+    # v0 may have padded rows beyond the base vocab (we round up to a
+    # multiple of 64 in setup_thinking_tokens for inductor stride alignment).
+    # Compare only the rows present in BOTH tensors and not in new_ids; ignore
+    # any padded tail rows above base_rows.
     v0_rows, base_rows = v0_weight.shape[0], base_weight.shape[0]
-    num_new = v0_rows - base_rows
-    assert num_new in (0, len(new_ids)), (
-        f"Unexpected v0 vs base embedding row delta: v0={v0_rows}, base={base_rows}, "
-        f"expected delta 0 or {len(new_ids)}"
+    num_extra = v0_rows - base_rows
+    assert num_extra >= 0 and v0_rows >= max(new_ids) + 1, (
+        f"Unexpected v0 row count: v0={v0_rows}, base={base_rows}, new_ids={new_ids}"
     )
 
-    v0_keep = torch.ones(v0_rows, dtype=torch.bool)
-    v0_keep[torch.tensor(new_ids)] = False
-    v0_existing = v0_weight[v0_keep]
-
-    if num_new == 0:
-        base_keep = torch.ones(base_rows, dtype=torch.bool)
-        base_keep[torch.tensor(new_ids)] = False
-        base_existing = base_weight[base_keep]
-    else:
-        base_existing = base_weight
+    common_rows = min(v0_rows, base_rows)
+    keep = torch.ones(common_rows, dtype=torch.bool)
+    new_ids_in_common = [i for i in new_ids if i < common_rows]
+    if new_ids_in_common:
+        keep[torch.tensor(new_ids_in_common)] = False
+    v0_existing = v0_weight[:common_rows][keep]
+    base_existing = base_weight[:common_rows][keep]
 
     identical = torch.equal(v0_existing, base_existing)
     max_abs_delta = (v0_existing - base_existing).abs().max().item() if not identical else 0.0
@@ -152,7 +149,7 @@ def _check_pre_existing_rows_match(v0_dir: Path, base_model_id: str) -> dict:
         f"Pre-existing embedding rows differ between v0 and base (max abs delta {max_abs_delta}). "
         "Row-scoped backprop or save/load round-trip corrupted the embedding table."
     )
-    return {"identical": True, "new_ids": new_ids, "row_delta": num_new, "max_abs_delta": max_abs_delta}
+    return {"identical": True, "new_ids": new_ids, "row_delta": num_extra, "max_abs_delta": max_abs_delta}
 
 
 def _run_mmlu_eval(

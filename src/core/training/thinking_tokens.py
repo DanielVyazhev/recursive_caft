@@ -32,19 +32,16 @@ def setup_thinking_tokens(
     tokenizer.thinking_end_token = THINKING_END
 
     if model is not None:
-        # Keep the resize decision independent of num_added on THIS call: an
-        # upstream script may have already registered the tokens on the
-        # tokenizer (num_added==0 here) while the freshly loaded model still
-        # has the original vocab size, so we must resize based on the current
-        # tokenizer-vs-model delta. Padded-vocab models like Phi-4-mini fit
-        # the new ids without a resize — but their padded rows still contain
-        # near-zero garbage, so we always mean-init the new-id rows.
-        in_weight: torch.Tensor = model.get_input_embeddings().weight.data  # type: ignore[assignment]
-        emb_rows = in_weight.shape[0]
-        max_new_id = max(new_token_ids(tokenizer))
-        if max_new_id >= emb_rows:
-            model.resize_token_embeddings(len(tokenizer))
-        mean_init_new_rows(model, new_token_ids(tokenizer))
+        # pad_to_multiple_of=64 keeps the lm_head logits stride aligned with
+        # what HF's CE / SDPA backward kernels assume. Without it, a tight
+        # vocab like Llama-3.2's 128256 + 2 thinking tokens = 128258 trips
+        # an inductor compiled-backward stride assert during loss.backward().
+        # Padded-vocab models like Phi-4-mini (200064) are unaffected — 64
+        # already divides their row count, so resize is a no-op there.
+        new_ids = new_token_ids(tokenizer)
+        target_len = max(len(tokenizer), max(new_ids) + 1)
+        model.resize_token_embeddings(target_len, pad_to_multiple_of=64)
+        mean_init_new_rows(model, new_ids)
 
     return tokenizer, num_added
 
