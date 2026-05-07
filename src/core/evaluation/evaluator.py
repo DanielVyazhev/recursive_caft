@@ -102,14 +102,10 @@ class Evaluator:
 
         thinking_end_token_id: int | None = None
         if self.config.generation.max_thinking_tokens is not None:
-            end_token = getattr(tokenizer, "thinking_end_token", None)
-            assert end_token is not None, (
-                "max_thinking_tokens set but tokenizer has no thinking_end_token; "
-                "call setup_thinking_tokens(tokenizer) in the experiment script."
-            )
-            resolved = tokenizer.convert_tokens_to_ids(end_token)
+            resolved = getattr(tokenizer, "thinking_end_token_id", None)
             assert isinstance(resolved, int) and resolved >= 0, (
-                f"</think> did not resolve to a single int id: got {resolved!r}"
+                "max_thinking_tokens set but tokenizer has no thinking_end_token_id; "
+                "call setup_thinking_tokens(tokenizer) in the experiment script."
             )
             thinking_end_token_id = resolved
 
@@ -233,6 +229,8 @@ class Evaluator:
     def _load_lora_model(self, model_path: Path, adapter_config: Path):
         from peft import PeftModel
 
+        from core.training.callbacks.save_thinking_token_rows import ROWS_FILENAME
+
         with open(adapter_config) as f:
             config = json.load(f)
 
@@ -247,6 +245,25 @@ class Evaluator:
             torch_dtype=torch.bfloat16,
             attn_implementation=self.config.generation.attn_implementation,
         )
+
+        rows_path = model_path / ROWS_FILENAME
+        if rows_path.exists():
+            payload = torch.load(rows_path, map_location="cpu", weights_only=True)
+            new_ids = payload["new_ids"]
+            in_rows = payload["input_rows"]
+            in_w = base_model.get_input_embeddings().weight
+            with torch.no_grad():
+                ids_t = torch.tensor(new_ids, dtype=torch.long, device=in_w.device)
+                in_w.data[ids_t] = in_rows.to(dtype=in_w.dtype, device=in_w.device)
+                if "output_rows" in payload:
+                    out_layer = base_model.get_output_embeddings()
+                    assert out_layer is not None, (
+                        f"{rows_path} has output_rows but base model has no output embedding layer"
+                    )
+                    out_w = out_layer.weight
+                    out_w.data[ids_t] = payload["output_rows"].to(dtype=out_w.dtype, device=out_w.device)
+            logger.info(f"Loaded {len(new_ids)} thinking-token rows from {rows_path}")
+
         model = PeftModel.from_pretrained(base_model, str(model_path))
         if not self.tokenizer:
             self.tokenizer = AutoTokenizer.from_pretrained(base_model_id)

@@ -27,14 +27,13 @@ class QADatasetAdapter(BaseDatasetAdapter[QADataset]):
         attention_mask = tokenized["attention_mask"]
 
         if self.add_thinking_start_token:
-            assert isinstance(self.dataset.tokenizer.thinking_start_token, str)
-
-            thinking_token_ids = self.dataset.tokenizer.encode(
-                self.dataset.tokenizer.thinking_start_token,
-                add_special_tokens=False,
+            tid = self.dataset.tokenizer.thinking_start_token_id
+            assert isinstance(tid, int) and tid >= 0, (
+                "add_thinking_start_token=True but tokenizer has no thinking_start_token_id; "
+                "call setup_thinking_tokens(tokenizer) in the experiment script."
             )
-            input_ids = input_ids + thinking_token_ids
-            attention_mask = attention_mask + [1] * len(thinking_token_ids)
+            input_ids = input_ids + [tid]
+            attention_mask = attention_mask + [1]
 
         row_id = self.dataset.row_id(row)
 
