@@ -17,13 +17,14 @@ class MMLUReasoningResponseDataset(MMLUSingleTokenResponseDataset):
         )
         thinking_end_token_position = assistant_response.find(self.tokenizer.thinking_end_token)
         if thinking_end_token_position == -1:
-            return "", False
+            return super().verify_assistant_response(row, assistant_response)
 
-        extracted_answer = (
-            assistant_response[thinking_end_token_position + len(self.tokenizer.thinking_end_token) :].strip().lower()
-        )
+        raw = assistant_response[thinking_end_token_position + len(self.tokenizer.thinking_end_token) :]
+        for tok in self.tokenizer.all_special_tokens:
+            raw = raw.replace(tok, "")
+        extracted_answer = raw.strip().lower()
 
         try:
-            return extracted_answer, self.assistant_response(row) == extracted_answer
+            return super().verify_assistant_response(row, extracted_answer)
         except:
             return extracted_answer, False

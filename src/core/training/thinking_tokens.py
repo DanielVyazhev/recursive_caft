@@ -2,12 +2,13 @@
 Helper for registering <think>/</think> as special tokens on a tokenizer
 and (optionally) resizing + mean-initializing the model embedding table.
 
-Note: tokenizer.thinking_start_token / thinking_end_token are dynamic python
-attributes consumed by MMLUReasoningResponseDataset. They are NOT persisted
-by tokenizer.save_pretrained — every downstream script that loads a saved
-tokenizer must call setup_thinking_tokens(tokenizer) again to re-attach them.
-The add_special_tokens call is a no-op when the tokens are already present
-(num_added == 0), so it is safe to call repeatedly.
+Note: tokenizer.thinking_start_token / thinking_end_token (string forms) and
+tokenizer.thinking_start_token_id / thinking_end_token_id (int ids) are dynamic
+python attributes consumed by datasets, the evaluator, and training helpers.
+They are NOT persisted by tokenizer.save_pretrained — every downstream script
+that loads a saved tokenizer must call setup_thinking_tokens(tokenizer) again
+to re-attach them. The add_special_tokens call is a no-op when the tokens are
+already present (num_added == 0), so it is safe to call repeatedly.
 """
 
 import torch
@@ -30,6 +31,8 @@ def setup_thinking_tokens(
 
     tokenizer.thinking_start_token = THINKING_START
     tokenizer.thinking_end_token = THINKING_END
+    tokenizer.thinking_start_token_id = tokenizer.convert_tokens_to_ids(THINKING_START)
+    tokenizer.thinking_end_token_id = tokenizer.convert_tokens_to_ids(THINKING_END)
 
     if model is not None:
         # pad_to_multiple_of=64 keeps the lm_head logits stride aligned with
