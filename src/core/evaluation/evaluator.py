@@ -136,6 +136,7 @@ class Evaluator:
                 row = ds[start + offset]
                 response = tokenizer.decode(gen_ids, skip_special_tokens=False).strip()
                 is_truncated = gen_result.truncated[offset]
+                is_thinking_budget_exhausted = gen_result.thinking_budget_exhausted[offset]
 
                 try:
                     parsed_answer, is_correct = qa_dataset.verify_assistant_response(row, response)
@@ -154,6 +155,7 @@ class Evaluator:
                         "parsed_answer": parsed_answer,
                         "is_correct": is_correct,
                         "is_truncated": is_truncated,
+                        "is_thinking_budget_exhausted": is_thinking_budget_exhausted,
                     }
                 )
 

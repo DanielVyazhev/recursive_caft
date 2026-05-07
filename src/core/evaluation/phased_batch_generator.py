@@ -19,6 +19,7 @@ class GenerationResult:
     num_truncated: int
     total: int
     truncated: list[bool] = field(default_factory=list)
+    thinking_budget_exhausted: list[bool] = field(default_factory=list)
 
 
 @dataclass
@@ -29,6 +30,7 @@ class _Slot:
     generated_ids: list[int] = field(default_factory=list)
     seq_position: int = 0  # total tokens seen = prompt_len + len(generated_ids)
     in_thinking: bool = False
+    thinking_budget_exhausted: bool = False
 
 
 @dataclass
@@ -348,6 +350,7 @@ class BatchGenerator:
         """
         results: list[list[int] | None] = [None] * len(prompts)
         truncated_flags: list[bool] = [False] * len(prompts)
+        thinking_exhausted_flags: list[bool] = [False] * len(prompts)
         pbar = tqdm(total=len(prompts), desc="Generating")
         max_prompt_len = max(len(p) for p in prompts)
         max_total = max_prompt_len + self.max_new_tokens
@@ -410,6 +413,7 @@ class BatchGenerator:
                 slot_queue,
                 results,
                 truncated_flags,
+                thinking_exhausted_flags,
                 total_threshold,
                 promote_queue,
                 pbar,
@@ -434,6 +438,7 @@ class BatchGenerator:
             num_truncated=trunc,
             total=len(prompts),
             truncated=truncated_flags,
+            thinking_budget_exhausted=thinking_exhausted_flags,
         )
 
     def _run_phase(
@@ -441,6 +446,7 @@ class BatchGenerator:
         slot_queue: deque[_StagedSlot],
         results: list[list[int] | None],
         truncated_flags: list[bool],
+        thinking_exhausted_flags: list[bool],
         total_threshold: int,
         promote_queue: deque[_StagedSlot],
         pbar: tqdm,
@@ -577,6 +583,7 @@ class BatchGenerator:
                             num_truncated += 1
                             truncated_flags[slot.index] = True
                         results[slot.index] = slot.generated_ids
+                        thinking_exhausted_flags[slot.index] = slot.thinking_budget_exhausted
                         finished.add(batch_idx)
                         pbar.update(1)
 
@@ -707,6 +714,7 @@ class BatchGenerator:
                     # research-mode forced decoding (cf. speculative decoding).
                     slot.generated_ids[-1] = self.thinking_end_token_id
                     slot.in_thinking = False
+                    slot.thinking_budget_exhausted = True
             slot.seq_position += 1
             self._valid_lens[i] += 1
 

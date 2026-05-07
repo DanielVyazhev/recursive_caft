@@ -316,7 +316,8 @@ class TestMaxThinkingTokens:
             max_thinking_tokens=max_thinking,
             thinking_end_token_id=end_id,
         )
-        [result] = gen.generate([prompt]).sequences
+        gen_result = gen.generate([prompt])
+        [result] = gen_result.sequences
 
         assert len(result) <= max_new
         # The cap fires at len(generated_ids) == max_thinking, and that token
@@ -325,6 +326,7 @@ class TestMaxThinkingTokens:
             f"Expected </think>={end_id} at position {max_thinking - 1}, got {result[max_thinking - 1]} "
             f"(full result: {result})"
         )
+        assert gen_result.thinking_budget_exhausted == [True]
 
     def test_natural_end_token_disables_cap(self, model_and_tokenizer):
         """If the model emits </think> early, in_thinking flips to False and
@@ -353,7 +355,8 @@ class TestMaxThinkingTokens:
             max_thinking_tokens=3,
             thinking_end_token_id=end_id,
         )
-        [result] = gen.generate([prompt]).sequences
+        gen_result = gen.generate([prompt])
+        [result] = gen_result.sequences
 
         # Token 0 is </think>; subsequent tokens should match the unrestricted
         # reference (cap is disabled after natural emit, no override).
@@ -362,6 +365,8 @@ class TestMaxThinkingTokens:
             f"After natural </think> at step 0, generation should match reference.\n"
             f"  got:      {result}\n  expected: {reference}"
         )
+        # Natural emit, not forced — cap-fire flag must stay False.
+        assert gen_result.thinking_budget_exhausted == [False]
 
     def test_cap_disabled_matches_reference(self, model_and_tokenizer):
         """max_thinking_tokens=None → behavior identical to existing path."""
@@ -376,10 +381,13 @@ class TestMaxThinkingTokens:
             max_thinking_tokens=None,
             thinking_end_token_id=None,
         )
-        [result] = gen.generate([prompt]).sequences
+        gen_result = gen.generate([prompt])
+        [result] = gen_result.sequences
 
         expected = _hf_generate_greedy(model, tokenizer, prompt, MAX_NEW_TOKENS)
         assert result == expected
+        # Cap not configured — flag must be False.
+        assert gen_result.thinking_budget_exhausted == [False]
 
     def test_cap_with_batched_prompts(self, model_and_tokenizer):
         """Per-slot cap fires independently across a batch."""
