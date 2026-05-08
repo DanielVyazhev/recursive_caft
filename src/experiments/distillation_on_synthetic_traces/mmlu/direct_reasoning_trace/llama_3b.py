@@ -49,7 +49,7 @@ trainer = LoRATrainer(
                 tokenizer=tokenizer,
             )
         ),
-        training_args=LoRATrainingArgs(num_train_epochs=20, per_device_train_batch_size=4),
+        training_args=LoRATrainingArgs(num_train_epochs=20, per_device_train_batch_size=8),
         lora_training_args=LoRASpecificTrainingArgs(train_thinking_token_embeddings=True),
         save_schedule=[1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20],
     ),
@@ -73,7 +73,7 @@ cot_evaluator = MultiCheckpointEvaluator(
             ),
             add_thinking_start_token=True,
         ),
-        # base_model_id=MODEL_NAME,
+        base_model_id=MODEL_NAME,
         generation=GenerationConfig(max_new_tokens=8500, max_thinking_tokens=8192, max_batch_size=1024),
         summary_filename="summary_reasoning_evals.json",
     ),
