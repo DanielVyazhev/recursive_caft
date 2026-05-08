@@ -31,7 +31,7 @@ class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
 
     @override
     def assistant_response(self, row: dict) -> str:
-        return str(row["answer"]).strip().lower()
+        return self._ground_truth_answer(row)
 
     @override
     def row_id(self, row: dict) -> str:
@@ -46,6 +46,9 @@ class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
             parsed_answer = parsed_answer[0]
 
         try:
-            return parsed_answer, self.assistant_response(row) == parsed_answer
+            return parsed_answer, self._ground_truth_answer(row) == parsed_answer
         except:
             return parsed_answer, False
+
+    def _ground_truth_answer(self, row: dict) -> str:
+        return str(row["answer"]).strip().lower()
