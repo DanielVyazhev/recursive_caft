@@ -117,6 +117,10 @@ class Evaluator:
 
             logger.info(f"Chunk {chunk_idx + 1}/{num_chunks}: prompts [{start}:{end}] ({len(chunk_prompts)} samples)")
 
+            if chunk_idx == 0:
+                for i, prompt in enumerate(chunk_prompts[:3]):
+                    logger.info(f"Example prompt {i}: {tokenizer.decode(prompt, skip_special_tokens=False)}")
+
             generator = BatchGenerator(
                 model=model,
                 tokenizer=tokenizer,
