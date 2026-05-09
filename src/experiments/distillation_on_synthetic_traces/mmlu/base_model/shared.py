@@ -8,7 +8,7 @@ from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.evaluation.evaluator import Evaluator, EvaluatorConfig, GenerationConfig
 from core.utils.logger import logger
 
-BASE_OUT_PATH = Path(__file__).parent.joinpath("../../../../../artifacts/distillation_on_synthetic_traces/mmlu")
+BASE_OUT_PATH = Path(__file__).parent.joinpath("../../../../../artifacts/distillation_on_synthetic_traces/mmlu/base_model")
 
 
 def evaluate_base_model(base_model_id: str, model_name: str) -> None:
@@ -31,10 +31,10 @@ def evaluate_base_model(base_model_id: str, model_name: str) -> None:
                 ),
                 tokenizer=tokenizer,
             ),
-            add_thinking_start_token=True,
+            add_thinking_start_token=False,
         ),
         out_path=out_path,
-        generation=GenerationConfig(max_new_tokens=8500, max_thinking_tokens=8192, max_batch_size=1024),
+        generation=GenerationConfig(max_new_tokens=10, max_batch_size=1024),
     )
     base_results = Evaluator(base_config, tokenizer).evaluate()
 
