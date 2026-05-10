@@ -1,28 +1,38 @@
 from pathlib import Path
+from typing import Literal
 
 from transformers import AutoTokenizer
 
+from core.datasets.mmlu.mmlu_cot_response_dataset import MMLUCoTResponseDataset
 from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset
 from core.datasets.qa_dataset import QADatasetConfig
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.evaluation.evaluator import Evaluator, EvaluatorConfig, GenerationConfig
 from core.utils.logger import logger
 
-BASE_OUT_PATH = Path(__file__).parent.joinpath("../../../../../artifacts/distillation_on_synthetic_traces/mmlu/base_model")
+BASE_OUT_PATH = Path(__file__).parent.joinpath(
+    "../../../../../artifacts/distillation_on_synthetic_traces/mmlu/base_model"
+)
 
 
-def evaluate_base_model(base_model_id: str, model_name: str) -> None:
+def evaluate_base_model(base_model_id: str, model_name: str, type: Literal["single_token"] | Literal["cot"]) -> None:
     logger.info(f"Evaluating base model {base_model_id} as epoch 0...")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model_id, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    out_path = str(BASE_OUT_PATH / model_name)
+    if type == "single_token":
+        dataset_cls = MMLUSingleTokenResponseDataset
+    else:
+        dataset_cls = MMLUCoTResponseDataset
+
+    out_path = str(BASE_OUT_PATH / f"{model_name}_{type}")
+
     base_config = EvaluatorConfig(
         model_path=base_model_id,
         eval_dataset=QADatasetAdapter(
-            dataset=MMLUSingleTokenResponseDataset(
+            dataset=dataset_cls(
                 config=QADatasetConfig(
                     path=Path(__file__)
                     .parent.joinpath("../../../../../data/out/splits/random/mmlu/test.parquet")
