@@ -10,4 +10,4 @@ class TeacherEntropySamplerConfig(BaseDatasetSamplerConfig):
 class EntropyGainSampler(BaseDatasetSampler):
     @override
     def _score_row(self, row: dict) -> float:
-        return max(row["student_entropy"] - row["teacher_entropy"], 0)
+        return max(row["entropy_value"] - row["teacher_entropy"], 0)

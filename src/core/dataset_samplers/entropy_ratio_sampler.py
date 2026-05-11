@@ -12,4 +12,4 @@ class EntropyGainSampler(BaseDatasetSampler):
 
     @override
     def _score_row(self, row: dict) -> float:
-        return row["student_entropy"] / (row["teacher_entropy"] + self._EPS)
+        return row["entropy_value"] / (row["teacher_entropy"] + self._EPS)
