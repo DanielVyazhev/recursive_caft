@@ -39,6 +39,9 @@ class MMLUCoTResponseDataset(MMLUSingleTokenResponseDataset):
             .strip()
             .lower()
         )
+        if len(extracted_answer) > 1:
+            # Llama 3B is stubborn
+            extracted_answer = extracted_answer[0]
 
         correct_answer = str(row["answer"]).strip().lower()
         try:
