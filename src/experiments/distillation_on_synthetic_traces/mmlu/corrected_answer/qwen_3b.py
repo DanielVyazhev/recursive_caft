@@ -28,9 +28,7 @@ setup_thinking_tokens(tokenizer)
 
 OUT_PATH = (
     Path(__file__)
-    .parent.joinpath(
-        "../../../../../artifacts/distillation_on_synthetic_traces/mmlu/direct_reasoning_trace_correct_only/qwen_3b"
-    )
+    .parent.joinpath("../../../../../artifacts/distillation_on_synthetic_traces/mmlu/corrected_answer/qwen_3b")
     .as_posix()
 )
 
