@@ -1,5 +1,8 @@
 import gc
+import hashlib
 import json
+import os
+import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -114,11 +117,25 @@ class Evaluator:
             thinking_end_token_id = resolved
 
         num_chunks = (total + CHUNK_SIZE - 1) // CHUNK_SIZE
+        chunks_dir = self._chunks_dir_for(eval_dataset)
+        chunks_dir.mkdir(parents=True, exist_ok=True)
+
         for chunk_idx in range(num_chunks):
             start = chunk_idx * CHUNK_SIZE
             end = min(start + CHUNK_SIZE, total)
-            chunk_prompts = prompts[start:end]
+            chunk_path = self._chunk_path(chunks_dir, chunk_idx)
 
+            cached_rows = self._load_chunk(chunk_path)
+            if cached_rows is not None:
+                logger.info(
+                    f"Chunk {chunk_idx + 1}/{num_chunks}: loaded {len(cached_rows)} rows from {chunk_path}"
+                )
+                all_results.extend(cached_rows)
+                correct += sum(1 for r in cached_rows if r["is_correct"])
+                num_truncated += sum(1 for r in cached_rows if r["is_truncated"])
+                continue
+
+            chunk_prompts = prompts[start:end]
             logger.info(f"Chunk {chunk_idx + 1}/{num_chunks}: prompts [{start}:{end}] ({len(chunk_prompts)} samples)")
 
             if chunk_idx == 0:
@@ -138,8 +155,8 @@ class Evaluator:
             )
 
             gen_result = generator.generate(chunk_prompts)
-            num_truncated += gen_result.num_truncated
 
+            chunk_rows: list[dict] = []
             for offset, gen_ids in enumerate(gen_result.sequences):
                 row = ds[start + offset]
                 response = tokenizer.decode(gen_ids, skip_special_tokens=False).strip()
@@ -153,10 +170,7 @@ class Evaluator:
                     parsed_answer = response
                     is_correct = False
 
-                if is_correct:
-                    correct += 1
-
-                all_results.append(
+                chunk_rows.append(
                     {
                         "row_id": row["row_id"],
                         "response": response,
@@ -166,6 +180,11 @@ class Evaluator:
                         "is_thinking_budget_exhausted": is_thinking_budget_exhausted,
                     }
                 )
+
+            self._save_chunk_atomic(chunk_path, chunk_rows)
+            all_results.extend(chunk_rows)
+            correct += sum(1 for r in chunk_rows if r["is_correct"])
+            num_truncated += gen_result.num_truncated
 
             # Release the chunk's CPU-staged KV caches before the next chunk
             # prefills its own. Without this, peak CPU RAM keeps climbing.
@@ -187,8 +206,55 @@ class Evaluator:
         logger.info(f"Evaluation complete: accuracy={accuracy:.4f} ({correct}/{total})")
 
         self._save_results(eval_dataset, result, all_results)
+        self._cleanup_chunks(eval_dataset)
 
         return result
+
+    def _config_hash(self) -> str:
+        gen = self.config.generation
+        raw = "|".join(
+            str(x)
+            for x in (
+                self.config.model_path,
+                gen.max_new_tokens,
+                gen.max_thinking_tokens,
+                gen.temperature,
+                gen.top_p,
+                gen.top_k,
+                CHUNK_SIZE,
+            )
+        )
+        return hashlib.md5(raw.encode()).hexdigest()[:12]
+
+    def _chunks_dir_for(self, eval_dataset: QADatasetAdapter) -> Path:
+        return self._out_path_for(eval_dataset) / f"_chunks_{self._config_hash()}"
+
+    def _chunk_path(self, chunks_dir: Path, chunk_idx: int) -> Path:
+        return chunks_dir / f"chunk_{chunk_idx:04d}.json"
+
+    def _load_chunk(self, path: Path) -> list[dict] | None:
+        if not path.exists():
+            return None
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except json.JSONDecodeError as ex:
+            logger.warning(f"Corrupt chunk cache at {path} ({ex}); will regenerate")
+            return None
+
+    def _save_chunk_atomic(self, path: Path, rows: list[dict]) -> None:
+        tmp = path.with_suffix(".json.tmp")
+        with open(tmp, "w") as f:
+            json.dump(rows, f)
+        os.replace(tmp, path)
+
+    def _cleanup_chunks(self, eval_dataset: QADatasetAdapter) -> None:
+        out_dir = self._out_path_for(eval_dataset)
+        if not out_dir.exists():
+            return
+        for entry in out_dir.iterdir():
+            if entry.is_dir() and entry.name.startswith("_chunks_"):
+                shutil.rmtree(entry, ignore_errors=True)
 
     def _load_cached_result(self, eval_dataset: QADatasetAdapter) -> EvaluationResult | None:
         results_path = self._eval_results_path_for(eval_dataset)
