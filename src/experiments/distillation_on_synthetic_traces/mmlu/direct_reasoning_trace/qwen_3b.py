@@ -73,7 +73,7 @@ cot_evaluator = MultiCheckpointEvaluator(
             ),
             add_thinking_start_token=True,
         ),
-        generation=GenerationConfig(max_new_tokens=8500, max_thinking_tokens=8192, max_batch_size=1024),
+        generation=GenerationConfig(max_new_tokens=8500, max_thinking_tokens=8192, max_batch_size=512),
         summary_filename="summary_reasoning_evals.json",
     ),
     tokenizer=tokenizer,
