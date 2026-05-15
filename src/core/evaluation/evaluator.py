@@ -20,7 +20,7 @@ from core.utils.logger import logger
 # cache on CPU RAM. For 12k+ MMLU-Pro prompts on a 200k-vocab model like
 # Phi-4-mini that's ~200GB of staged KV and the container gets OOM-killed.
 # Chunking the prompt list bounds peak CPU RAM to one chunk's staging queue.
-CHUNK_SIZE = 512
+CHUNK_SIZE = 256
 
 
 class GenerationConfig(BaseModel):
