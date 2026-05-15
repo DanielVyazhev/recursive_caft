@@ -5,12 +5,33 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
+import psutil
 import torch
 from tqdm import tqdm
 from transformers import DynamicCache, PreTrainedModel, PreTrainedTokenizer
 from transformers.cache_utils import _static_cache_update
 
 from core.utils.logger import logger
+
+
+def _mem_snapshot(staged_slots: int | None = None) -> str:
+    rss_gb = psutil.Process().memory_info().rss / 1e9
+    parts = [f"rss={rss_gb:.2f}GB"]
+    if torch.cuda.is_available():
+        free, total = torch.cuda.mem_get_info()
+        alloc = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
+        parts.extend(
+            [
+                f"cuda_free={free / 1e9:.2f}GB",
+                f"cuda_alloc={alloc / 1e9:.2f}GB",
+                f"cuda_reserved={reserved / 1e9:.2f}GB",
+                f"cuda_total={total / 1e9:.2f}GB",
+            ]
+        )
+    if staged_slots is not None:
+        parts.append(f"staged_slots={staged_slots}")
+    return " ".join(parts)
 
 
 @dataclass
@@ -407,6 +428,10 @@ class BatchGenerator:
             pbar.write(
                 f"[phase] Starting phase {phase + 1}: {len(slot_queue)} sequences, total_threshold={total_threshold}"
             )
+            logger.info(
+                f"[trace] phase_start phase={phase + 1} staged={len(slot_queue)} "
+                f"total_threshold={total_threshold} {_mem_snapshot(staged_slots=len(slot_queue))}"
+            )
 
             is_last = total_threshold >= max_total
             trunc += self._run_phase(
@@ -422,6 +447,10 @@ class BatchGenerator:
             )
 
             self._cache = None
+            logger.info(
+                f"[trace] phase_end phase={phase + 1} promoted={len(promote_queue)} "
+                f"{_mem_snapshot(staged_slots=len(promote_queue))}"
+            )
 
             if not promote_queue:
                 break

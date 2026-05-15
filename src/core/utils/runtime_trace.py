@@ -1,0 +1,86 @@
+"""Runtime tracing hooks for diagnosing silent process deaths.
+
+Importing this module installs:
+- Line-buffered stdout/stderr so tqdm/print output is not lost on abrupt exit
+- faulthandler with all-threads stack dumps (heartbeat every 5 min, SIGUSR1 on demand,
+  and a one-shot dump on fatal signals like SIGSEGV/SIGABRT)
+- sys.excepthook + threading.excepthook that route uncaught exceptions through loguru
+  so the traceback lands in the per-run log file before the process disappears
+- SIGTERM / SIGABRT signal handlers that log before exiting
+
+SIGKILL cannot be caught — the absence of the atexit "=== process exit ===" marker
+emitted by logger.py is itself the signal that the OS OOM-killer struck.
+"""
+
+from __future__ import annotations
+
+import faulthandler
+import signal
+import sys
+import threading
+
+from core.utils.logger import logger
+
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+except (AttributeError, OSError):
+    pass
+try:
+    sys.stderr.reconfigure(line_buffering=True)
+except (AttributeError, OSError):
+    pass
+
+faulthandler.enable(all_threads=True)
+
+if hasattr(signal, "SIGUSR1"):
+    faulthandler.register(signal.SIGUSR1, all_threads=True, chain=False)
+
+faulthandler.dump_traceback_later(300, repeat=True, file=sys.stderr)
+
+
+def _excepthook(exc_type, exc_value, exc_tb) -> None:
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+        return
+    logger_obj = logger
+    logger_obj.error(f"[trace] uncaught exception: {exc_type.__name__}: {exc_value}")
+    from loguru import logger as _raw_logger
+
+    _raw_logger.opt(exception=(exc_type, exc_value, exc_tb)).error("[trace] traceback follows")
+    _raw_logger.complete()
+    sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+
+sys.excepthook = _excepthook
+
+
+def _thread_excepthook(args) -> None:
+    from loguru import logger as _raw_logger
+
+    _raw_logger.opt(exception=(args.exc_type, args.exc_value, args.exc_traceback)).error(
+        f"[trace] uncaught thread exception in {args.thread.name}"
+    )
+    _raw_logger.complete()
+
+
+threading.excepthook = _thread_excepthook
+
+
+def _signal_handler(signum, frame) -> None:
+    name = signal.Signals(signum).name
+    logger.error(f"[trace] received signal {name} ({signum}) — exiting")
+    from loguru import logger as _raw_logger
+
+    _raw_logger.complete()
+    sys.exit(128 + signum)
+
+
+for _sig_name in ("SIGTERM", "SIGABRT", "SIGHUP"):
+    _sig = getattr(signal, _sig_name, None)
+    if _sig is not None:
+        try:
+            signal.signal(_sig, _signal_handler)
+        except (OSError, ValueError):
+            pass
+
+logger.info("[trace] runtime_trace installed (faulthandler, excepthook, signal handlers)")

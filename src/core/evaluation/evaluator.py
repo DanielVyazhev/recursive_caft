@@ -9,6 +9,7 @@ from pydraconf import PydraConfig
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizer
 
+import core.utils.runtime_trace  # noqa: F401  # install faulthandler/excepthook/signal handlers
 from core.datasets.qa_dataset import QADataset
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.evaluation.phased_batch_generator import BatchGenerator
