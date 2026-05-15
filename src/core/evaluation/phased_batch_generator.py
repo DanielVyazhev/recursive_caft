@@ -428,7 +428,7 @@ class BatchGenerator:
             pbar.write(
                 f"[phase] Starting phase {phase + 1}: {len(slot_queue)} sequences, total_threshold={total_threshold}"
             )
-            logger.info(
+            logger.trace(
                 f"[trace] phase_start phase={phase + 1} staged={len(slot_queue)} "
                 f"total_threshold={total_threshold} {_mem_snapshot(staged_slots=len(slot_queue))}"
             )
@@ -447,9 +447,13 @@ class BatchGenerator:
             )
 
             self._cache = None
-            logger.info(
+            try:
+                compile_times = torch._dynamo.utils.compile_times(repr="csv")
+            except Exception:
+                compile_times = "unavailable"
+            logger.trace(
                 f"[trace] phase_end phase={phase + 1} promoted={len(promote_queue)} "
-                f"{_mem_snapshot(staged_slots=len(promote_queue))}"
+                f"{_mem_snapshot(staged_slots=len(promote_queue))} compile_times={compile_times!r}"
             )
 
             if not promote_queue:

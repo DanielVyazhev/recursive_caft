@@ -19,7 +19,7 @@ import signal
 import sys
 import threading
 
-from core.utils.logger import logger
+from core.utils.logger import LOG_DIR, RUN_BASENAME, logger
 
 try:
     sys.stdout.reconfigure(line_buffering=True)
@@ -32,10 +32,16 @@ except (AttributeError, OSError):
 
 faulthandler.enable(all_threads=True)
 
-if hasattr(signal, "SIGUSR1"):
-    faulthandler.register(signal.SIGUSR1, all_threads=True, chain=False)
+_FAULTS_FILE = LOG_DIR / f"{RUN_BASENAME}.faults.log"
+# Plain Python file object with line buffering. Kept alive at module scope so
+# faulthandler can write into it for the full lifetime of the process — even
+# if Python's allocator is starved.
+_faults_fp = open(_FAULTS_FILE, "a", buffering=1)
 
-faulthandler.dump_traceback_later(300, repeat=True, file=sys.stderr)
+if hasattr(signal, "SIGUSR1"):
+    faulthandler.register(signal.SIGUSR1, all_threads=True, chain=False, file=_faults_fp)
+
+faulthandler.dump_traceback_later(300, repeat=True, file=_faults_fp)
 
 
 def _excepthook(exc_type, exc_value, exc_tb) -> None:
@@ -83,4 +89,7 @@ for _sig_name in ("SIGTERM", "SIGABRT", "SIGHUP"):
         except (OSError, ValueError):
             pass
 
-logger.info("[trace] runtime_trace installed (faulthandler, excepthook, signal handlers)")
+logger.info(
+    f"[trace] runtime_trace installed (faulthandler, excepthook, signal handlers); "
+    f"faults_file={_FAULTS_FILE}"
+)

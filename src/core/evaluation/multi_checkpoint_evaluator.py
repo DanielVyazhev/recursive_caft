@@ -94,7 +94,7 @@ class MultiCheckpointEvaluator:
             ckpt_name = ckpt_dir.name
             ckpt_out_path = str(self._out_path / ckpt_name / "evals")
 
-            logger.info(f"[trace] starting checkpoint={ckpt_name} {_mem_snapshot()}")
+            logger.trace(f"[trace] starting checkpoint={ckpt_name} {_mem_snapshot()}")
             logger.info(f"Evaluating {ckpt_name}...")
 
             config = EvaluatorConfig(
@@ -124,7 +124,7 @@ class MultiCheckpointEvaluator:
                     )
 
             self._free_vram()
-            logger.info(f"[trace] done checkpoint={ckpt_name} {_mem_snapshot()}")
+            logger.trace(f"[trace] done checkpoint={ckpt_name} {_mem_snapshot()}")
 
         self._save_summary(results)
 
