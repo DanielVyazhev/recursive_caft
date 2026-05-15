@@ -44,7 +44,7 @@ def evaluate_base_model(base_model_id: str, model_name: str, type: Literal["sing
             add_thinking_start_token=False,
         ),
         out_path=out_path,
-        generation=GenerationConfig(max_new_tokens=8192, max_batch_size=1024),
+        generation=GenerationConfig(max_new_tokens=8192, max_batch_size=512),
     )
     base_results = Evaluator(base_config, tokenizer).evaluate()
 
