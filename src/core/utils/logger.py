@@ -1,4 +1,5 @@
 import atexit
+import os
 import re
 import sys
 from datetime import datetime
@@ -6,12 +7,14 @@ from pathlib import Path
 
 from loguru import logger as _logger
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_LOG_DIR = _REPO_ROOT / "artifacts" / "logs"
-_LOG_DIR.mkdir(parents=True, exist_ok=True)
+REPO_ROOT = Path(__file__).resolve().parents[3]
+LOG_DIR = REPO_ROOT / "artifacts" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-_RUN_TS = datetime.now().strftime("%Y%m%d-%H%M%S")
-_LOG_FILE = _LOG_DIR / f"eval-{_RUN_TS}-{__import__('os').getpid()}.log"
+RUN_TS = datetime.now().strftime("%Y%m%d-%H%M%S")
+PID = os.getpid()
+RUN_BASENAME = f"eval-{RUN_TS}-{PID}"
+_LOG_FILE = LOG_DIR / f"{RUN_BASENAME}.log"
 
 _logger.remove()
 _logger.add(
@@ -19,7 +22,7 @@ _logger.add(
     enqueue=True,
     backtrace=True,
     diagnose=True,
-    level="DEBUG",
+    level="INFO",
 )
 _logger.add(
     _LOG_FILE,
@@ -27,10 +30,10 @@ _logger.add(
     backtrace=True,
     diagnose=True,
     rotation="100 MB",
-    level="DEBUG",
+    level="TRACE",
 )
 
-_logger.info(f"=== process start === pid={__import__('os').getpid()} log_file={_LOG_FILE}")
+_logger.info(f"=== process start === pid={PID} log_file={_LOG_FILE}")
 
 
 def _on_exit() -> None:

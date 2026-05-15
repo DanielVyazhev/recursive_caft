@@ -75,6 +75,21 @@ class Evaluator:
                 logger.info("Compiling model with torch.compile... First forward call will be slow.")
                 torch.set_float32_matmul_precision("high")
                 torch._dynamo.config.cache_size_limit = 128
+                # [trace] surface dynamo recompiles + dynamo errors instead of suppressing them.
+                # Without this, a recompile cascade (e.g. batch-size change between phases) is
+                # invisible until the inductor compile worker hangs.
+                import logging
+
+                import torch._inductor.config as _inductor_config
+
+                torch._logging.set_logs(recompiles=True, recompiles_verbose=True, dynamo=logging.INFO)
+                torch._dynamo.config.suppress_errors = False
+                torch._dynamo.config.verbose = True
+                logger.info(
+                    f"[trace] torch.compile config: cache_size_limit={torch._dynamo.config.cache_size_limit} "
+                    f"compile_threads={getattr(_inductor_config, 'compile_threads', '?')} "
+                    f"suppress_errors={torch._dynamo.config.suppress_errors}"
+                )
                 model = torch.compile(model)
 
         results: list[EvaluationResult] = []
