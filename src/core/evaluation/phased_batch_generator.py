@@ -314,11 +314,46 @@ class BatchGenerator:
         per_layer = 2 * batch_size * num_kv_heads * max_cache_len * head_dim * element_size
         return num_layers * per_layer
 
+    @staticmethod
+    def _hysteresis_band(current: int) -> int:
+        """Minimum delta to accept as a non-trivial bs change."""
+        return max(2, round(current * 0.25))
+
+    def _apply_bs_hysteresis(self, candidate: int, queue_len: int, max_cache_len: int) -> int:
+        """Round `candidate` to `self._effective_batch_size` when the change is trivial.
+
+        Bypasses the band for:
+          - OOM-driven caps (_vram_reduced_bs is set): honour the cap immediately.
+          - Trailing single-slot phases: drop straight to 1 — keeping a wide cache
+            for one slot wastes VRAM and isn't worth the compile reuse.
+        Upward changes must clear the same band as downward ones to prevent churn.
+        A higher `current` is only honoured if its cache still fits in usable VRAM.
+        """
+        current = self._effective_batch_size
+        if candidate == current:
+            return candidate
+        if self._vram_reduced_bs is not None and candidate <= self._vram_reduced_bs:
+            return candidate
+        if queue_len == 1 and candidate == 1:
+            return candidate
+
+        band = self._hysteresis_band(current)
+        if abs(candidate - current) >= band:
+            return candidate
+
+        if current > candidate and self._usable_vram is not None:
+            if self._estimate_cache_bytes(max_cache_len, current) > self._usable_vram:
+                return candidate
+        return current
+
     def _fit_batch_size_to_vram(self, max_cache_len: int, batch_size: int, pbar: tqdm) -> int:
         """Reduce batch_size until the estimated KV cache fits in usable VRAM.
 
         Uses self._usable_vram (measured once after prefill). Pure math, no
         CUDA queries. No-ops if _usable_vram was not measured (CPU-only).
+
+        Steps down by ~25% per iteration (floor 2) instead of halving — keeps
+        successive phases on the same bs when seq_len growth is modest.
         """
         if self._usable_vram is None:
             return batch_size
@@ -329,7 +364,8 @@ class BatchGenerator:
                 return batch_size
             if batch_size == 1:
                 break
-            new_bs = max(batch_size // 2, 1)
+            step = max(2, batch_size // 4)
+            new_bs = max(batch_size - step, 1)
             pbar.write(
                 f"[vram] Cache for bs={batch_size}, seq_len={max_cache_len} needs "
                 f"{needed / 1e9:.2f} GB but only {self._usable_vram / 1e9:.2f} GB usable. "
@@ -501,6 +537,11 @@ class BatchGenerator:
 
         # Pre-allocation VRAM check: reduce batch size until cache fits (pure math)
         effective_bs = self._fit_batch_size_to_vram(max_cache_len, effective_bs, pbar)
+
+        # Hysteresis: avoid trivial bs changes that trigger torch.compile re-trace.
+        # OOM-driven reductions (_vram_reduced_bs) and the trailing single-slot case
+        # bypass the band — the rest must clear a 25% delta (floor 2).
+        effective_bs = self._apply_bs_hysteresis(effective_bs, len(slot_queue), max_cache_len)
 
         if effective_bs != self._effective_batch_size:
             pbar.write(
