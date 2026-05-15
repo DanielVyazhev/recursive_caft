@@ -319,6 +319,18 @@ class BatchGenerator:
         """Minimum delta to accept as a non-trivial bs change."""
         return max(2, round(current * 0.25))
 
+    @staticmethod
+    def _snap_to_even(bs: int) -> int:
+        """Round bs down to the nearest even number, but never below 1.
+
+        Halves the set of distinct bs values seen by torch.compile (only evens
+        plus 1), so the compile cache stays small over long runs. Worst-case
+        throughput loss is one slot.
+        """
+        if bs <= 1:
+            return 1
+        return bs - (bs % 2)
+
     def _apply_bs_hysteresis(self, candidate: int, queue_len: int, max_cache_len: int) -> int:
         """Round `candidate` to `self._effective_batch_size` when the change is trivial.
 
@@ -329,6 +341,7 @@ class BatchGenerator:
         Upward changes must clear the same band as downward ones to prevent churn.
         A higher `current` is only honoured if its cache still fits in usable VRAM.
         """
+        candidate = self._snap_to_even(candidate)
         current = self._effective_batch_size
         if candidate == current:
             return candidate
@@ -365,7 +378,7 @@ class BatchGenerator:
             if batch_size == 1:
                 break
             step = max(2, batch_size // 4)
-            new_bs = max(batch_size - step, 1)
+            new_bs = self._snap_to_even(max(batch_size - step, 1))
             pbar.write(
                 f"[vram] Cache for bs={batch_size}, seq_len={max_cache_len} needs "
                 f"{needed / 1e9:.2f} GB but only {self._usable_vram / 1e9:.2f} GB usable. "
