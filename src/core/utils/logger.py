@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from loguru import logger as _logger
+from tqdm import tqdm
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LOG_DIR = REPO_ROOT / "artifacts" / "logs"
@@ -16,9 +17,15 @@ PID = os.getpid()
 RUN_BASENAME = f"eval-{RUN_TS}-{PID}"
 _LOG_FILE = LOG_DIR / f"{RUN_BASENAME}.log"
 
+
+def _tqdm_sink(message: str) -> None:
+    # Falls back to a plain stderr write when no tqdm bar is active.
+    tqdm.write(message, end="", file=sys.stderr)
+
+
 _logger.remove()
 _logger.add(
-    sys.stderr,
+    _tqdm_sink,
     enqueue=True,
     backtrace=True,
     diagnose=True,
