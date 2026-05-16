@@ -359,7 +359,7 @@ class BatchGenerator:
                 return candidate
         return current
 
-    def _fit_batch_size_to_vram(self, max_cache_len: int, batch_size: int, pbar: tqdm) -> int:
+    def _fit_batch_size_to_vram(self, max_cache_len: int, batch_size: int) -> int:
         """Reduce batch_size until the estimated KV cache fits in usable VRAM.
 
         Uses self._usable_vram (measured once after prefill). Pure math, no
@@ -379,7 +379,7 @@ class BatchGenerator:
                 break
             step = max(2, batch_size // 4)
             new_bs = self._snap_to_even(max(batch_size - step, 1))
-            pbar.write(
+            logger.info(
                 f"[vram] Cache for bs={batch_size}, seq_len={max_cache_len} needs "
                 f"{needed / 1e9:.2f} GB but only {self._usable_vram / 1e9:.2f} GB usable. "
                 f"Reducing batch size to {new_bs}."
@@ -451,7 +451,7 @@ class BatchGenerator:
         if torch.cuda.is_available():
             torch.cuda.synchronize()
         prefill_time = time.perf_counter() - prefill_start
-        pbar.write(
+        logger.info(
             f"[perf] Prefill: {len(prompts)} prompts, {total_prefill_tokens} tokens, "
             f"{prefill_time:.4f}s ({total_prefill_tokens / prefill_time:.0f} tok/s)"
         )
@@ -462,7 +462,7 @@ class BatchGenerator:
         self._measure_usable_vram()
 
         # --- Phase loop ---
-        pbar.write(
+        logger.info(
             f"[phase] Starting generation: {len(slot_queue)} prompts, "
             f"phase_step={self._PHASE_STEP} max={self.max_new_tokens}"
         )
@@ -474,7 +474,7 @@ class BatchGenerator:
         while True:
             promote_queue: deque[_StagedSlot] = deque()
 
-            pbar.write(
+            logger.info(
                 f"[phase] Starting phase {phase + 1}: {len(slot_queue)} sequences, total_threshold={total_threshold}"
             )
             logger.trace(
@@ -507,7 +507,7 @@ class BatchGenerator:
             slot_queue = promote_queue
             phase += 1
             total_threshold = min(self._PHASE_STEP * (phase + 1), max_total)
-            pbar.write(f"[phase] Phase {phase}: {len(slot_queue)} sequences promoted")
+            logger.info(f"[phase] Phase {phase}: {len(slot_queue)} sequences promoted")
 
         pbar.close()
         sequences = [r if r is not None else [] for r in results]
@@ -545,7 +545,7 @@ class BatchGenerator:
         effective_bs = min(len(slot_queue), max_bs)
 
         # Pre-allocation VRAM check: reduce batch size until cache fits (pure math)
-        effective_bs = self._fit_batch_size_to_vram(max_cache_len, effective_bs, pbar)
+        effective_bs = self._fit_batch_size_to_vram(max_cache_len, effective_bs)
 
         # Hysteresis: avoid trivial bs changes that trigger torch.compile re-trace.
         # OOM-driven reductions (_vram_reduced_bs) and the trailing single-slot case
@@ -553,7 +553,7 @@ class BatchGenerator:
         effective_bs = self._apply_bs_hysteresis(effective_bs, len(slot_queue), max_cache_len)
 
         if effective_bs != self._effective_batch_size:
-            pbar.write(
+            logger.info(
                 f"[perf] Adjusting batch size: {self._effective_batch_size} → {effective_bs}. torch.compile will take time."
             )
             self._effective_batch_size = effective_bs
@@ -562,7 +562,7 @@ class BatchGenerator:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-        pbar.write(f"[phase] Effective batch size: {self._effective_batch_size}")
+        logger.info(f"[phase] Effective batch size: {self._effective_batch_size}")
 
         self._cache = self._init_cache(max_cache_len, effective_bs)
         num_truncated = 0
@@ -592,10 +592,10 @@ class BatchGenerator:
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             restore_time = time.perf_counter() - restore_start
-            pbar.write(f"[perf] Restored {len(chunk_slots)} slots from CPU in {restore_time:.4f}s")
+            logger.info(f"[perf] Restored {len(chunk_slots)} slots from CPU in {restore_time:.4f}s")
 
             if early_promoted > 0:
-                pbar.write(f"[phase] Early promoted {early_promoted} slots that exceeded the phase budget")
+                logger.info(f"[phase] Early promoted {early_promoted} slots that exceeded the phase budget")
 
             if not chunk_slots:
                 continue
@@ -625,7 +625,7 @@ class BatchGenerator:
 
                 if step % 200 == 0:
                     avg_step = step_time_sum / (step + 1)
-                    pbar.write(
+                    logger.info(
                         f"[perf] phase step={step} active={len(active)} "
                         f"max_active_len={max_active_len} avg_step={avg_step:.4f}s "
                         f"queue={len(slot_queue)}"
@@ -637,7 +637,7 @@ class BatchGenerator:
                 if torch.cuda.is_available() and step % self._vram_check_interval == 0:
                     if self._check_vram_pressure():
                         self._vram_reduced_bs = max(effective_bs // 2, 1)
-                        pbar.write(
+                        logger.info(
                             f"[vram] Free VRAM critically low at step {step}. Aborting phase. "
                             f"Reducing batch size for next attempt: {effective_bs} -> {self._vram_reduced_bs}."
                         )
@@ -688,7 +688,7 @@ class BatchGenerator:
                     break
 
         if step > 0:
-            pbar.write(f"[perf] Phase done: {step} decode steps, avg_step={step_time_sum / step:.4f}s")
+            logger.info(f"[perf] Phase done: {step} decode steps, avg_step={step_time_sum / step:.4f}s")
 
         return num_truncated
 
