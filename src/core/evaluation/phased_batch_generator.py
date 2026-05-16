@@ -496,13 +496,9 @@ class BatchGenerator:
             )
 
             self._cache = None
-            try:
-                compile_times = torch._dynamo.utils.compile_times(repr="csv")
-            except Exception:
-                compile_times = "unavailable"
             logger.trace(
                 f"[trace] phase_end phase={phase + 1} promoted={len(promote_queue)} "
-                f"{_mem_snapshot(staged_slots=len(promote_queue))} compile_times={compile_times!r}"
+                f"{_mem_snapshot(staged_slots=len(promote_queue))}"
             )
 
             if not promote_queue:
