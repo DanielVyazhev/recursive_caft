@@ -80,7 +80,7 @@ trainer = ResamplingTrainer(
                         ),
                         tokenizer=tokenizer,
                     ),
-                    dataset_sampler=EntropyGainSampler(BaseDatasetSamplerConfig(top_k=128)),
+                    dataset_sampler=EntropyGainSampler(BaseDatasetSamplerConfig(top_k=256)),
                 ),
             ]
         ),

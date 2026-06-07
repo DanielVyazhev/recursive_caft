@@ -4,7 +4,7 @@ from typing import override
 
 from transformers import PreTrainedTokenizer
 
-from core.datasets.qa_dataset import QADataset, QADatasetConfig
+from core.datasets.qa_dataset import InvalidAnswerError, QADataset, QADatasetConfig
 
 
 class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
@@ -40,6 +40,11 @@ class MMLUSingleTokenResponseDataset(QADataset[QADatasetConfig]):
     @override
     def verify_assistant_response(self, row: dict, assistant_response: str) -> tuple[str, bool]:
         parsed_answer = assistant_response.strip().lower()
+
+        if not parsed_answer:
+            # Empty after stripping special tokens: the model emitted a thinking/special token
+            # instead of an answer letter. Treat as a failed measurement, not a crash.
+            raise InvalidAnswerError("empty single-token answer (model likely emitted a thinking/special token)")
 
         if len(parsed_answer) != 1:
             # Phi4mini adds a dot after the option letter, so we can try to parse that out if it's present

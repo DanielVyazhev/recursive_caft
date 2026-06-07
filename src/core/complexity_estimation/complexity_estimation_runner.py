@@ -10,6 +10,7 @@ from transformers.modeling_utils import PreTrainedModel
 
 from core.complexity_estimation.complexity_estimator import BaseComplexityEstimator
 from core.datasets.base_dataset_adapter import TokenizedRow
+from core.datasets.qa_dataset import InvalidAnswerError
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 
 
@@ -116,6 +117,10 @@ class ComplexityEstimationRunner:
                     print(f"Row {row.row_id}:")
                     print(f"Input: {row.model_dump()}")
                     print(f"Processed: {df.loc[index]}")
+            except InvalidAnswerError:
+                # Expected: the model didn't emit a parseable answer (e.g. drifted to a thinking
+                # token). Leave entropy_value unset (NaN) so it is backfilled; count it quietly.
+                invalid_answers += 1
             except Exception as ex:
                 print(f"Error processing row {row.row_id}: {ex}")
                 invalid_answers += 1
