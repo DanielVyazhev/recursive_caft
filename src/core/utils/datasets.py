@@ -41,6 +41,7 @@ def merge_mmlu_on_question_id(
         df_merged = aggregation_function(df_merged)
 
     if save_path:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         df_merged.to_parquet(save_path)
 
     return df_merged
