@@ -11,6 +11,7 @@ class BaseDatasetSamplerConfig(PydraConfig):
 class BaseDatasetSampler(ABC):
     def __init__(self, config: BaseDatasetSamplerConfig):
         self.config = config
+        self._sample_calls = 0
 
     @abstractmethod
     def _score_row(self, row: dict) -> float: ...
@@ -21,6 +22,8 @@ class BaseDatasetSampler(ABC):
         df = df.sort_values("score", ascending=False)
 
         sampled_df = df.head(self.config.top_k)
+        # Sort in the increasing order of score so that easier samples are seen first during training (potentially leading to faster convergence, as the model learns from easier examples before harder ones).
+        sampled_df = sampled_df.sort_values("score", ascending=True)
 
         sampled_ds = Dataset.from_pandas(sampled_df)
         return sampled_ds
