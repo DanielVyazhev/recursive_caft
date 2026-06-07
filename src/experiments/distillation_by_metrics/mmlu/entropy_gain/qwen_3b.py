@@ -67,7 +67,7 @@ trainer = ResamplingTrainer(
             ),
             dataset_sampler=EntropyGainSampler(BaseDatasetSamplerConfig(top_k=1024)),
         ),
-        save_schedule=[1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20],
+        save_schedule=[1, 2, 3, 5, 7, 10, 15, 20],
         complexity_evaluation_dataset=QADatasetAdapter(
             dataset=MMLUSingleTokenResponseDataset(
                 config=QADatasetConfig(
