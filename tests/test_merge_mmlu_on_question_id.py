@@ -61,6 +61,29 @@ def test_merge_carries_distill_and_builds_teacher_entropy(tmp_path):
     assert out.exists()
 
 
+def test_merge_creates_missing_save_path_parent(tmp_path):
+    # The experiment writes teacher_entropy.parquet into OUT_PATH before that dir
+    # exists (the merge runs before the trainer creates it), so the util must mkdir.
+    main = pd.DataFrame(
+        {"question_id": [1, 2], "distill_reasoning": ["r1", "r2"], "distill_answer": ["a", "b"]}
+    )
+    llama = pd.DataFrame({"question_id": [1, 2], "entropy_value": [0.2, 0.4]})
+    qwen = pd.DataFrame({"question_id": [1, 2], "entropy_value": [0.4, 0.6]})
+
+    out = tmp_path / "does" / "not" / "exist" / "teacher_entropy.parquet"
+    assert not out.parent.exists()
+
+    merge_mmlu_on_question_id(
+        main_path=_write(tmp_path, "main.parquet", main),
+        extra_paths=[_write(tmp_path, "llama.parquet", llama), _write(tmp_path, "qwen.parquet", qwen)],
+        extra_columns=EXTRA_COLUMNS,
+        aggregation_function=_aggregate,
+        save_path=out,
+    )
+
+    assert out.exists()
+
+
 def test_missing_question_id_raises(tmp_path):
     main = pd.DataFrame(
         {"question_id": [1, 2, 3], "distill_reasoning": ["r1", "r2", "r3"], "distill_answer": ["a", "b", "c"]}
