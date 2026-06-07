@@ -31,9 +31,9 @@ def _single_token_adapter(tokenizer, top_k):
 
 def test_sampled_size_sums_subadapters(thinking_tokenizer):
     merged = MergedDatasetAdapter(
-        [_reasoning_adapter(thinking_tokenizer, 1024), _single_token_adapter(thinking_tokenizer, 128)]
+        [_reasoning_adapter(thinking_tokenizer, 1024), _single_token_adapter(thinking_tokenizer, 256)]
     )
-    assert merged.sampled_size() == 1152
+    assert merged.sampled_size() == 1280
 
 
 def test_sampled_size_none_when_a_subadapter_has_no_sampler(thinking_tokenizer):
