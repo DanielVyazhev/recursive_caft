@@ -8,14 +8,20 @@ top_k so that check passes and the normal per-epoch loop runs. These tests asser
 the exact condition that gates that error, with no model/GPU.
 """
 
+from pathlib import Path
+
 from transformers.trainer_utils import has_length
 
+from core.complexity_estimation.complexity_estimation_runner import ModelGenerateConfig
+from core.complexity_estimation.entropy.single_token_entropy_estimator import SingleTokenEntropyEstimator
 from core.dataset_samplers.base_sampler import BaseDatasetSamplerConfig
 from core.dataset_samplers.entropy_gain_sampler import EntropyGainSampler
 from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
 from core.datasets.mmlu.mmlu_reasoning_response_dataset import MMLUReasoningResponseDataset
+from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset
 from core.datasets.qa_dataset import QADatasetConfig
-from core.training.resampling_trainer import ResamplingDataset
+from core.datasets.qa_dataset_adapter import QADatasetAdapter
+from core.training.resampling_trainer import EstimateComplexityCallback, ResamplingDataset
 
 TOP_K = 7
 
@@ -60,3 +66,23 @@ def test_len_fallback_without_sampler(thinking_tokenizer, tmp_path, make_resampl
     ds = ResamplingDataset(adapter, thinking_tokenizer)
     ds.dataset_path = str(parquet)
     assert len(ds) == 3
+
+
+def test_out_path_for_epoch_uses_dataset_id(thinking_tokenizer):
+    # The per-epoch complexity-estimation path is built from the complexity
+    # dataset's dataset_id; it must not reference a nonexistent `config.id`.
+    callback = EstimateComplexityCallback(
+        complexity_evaluation_dataset=QADatasetAdapter(
+            dataset=MMLUSingleTokenResponseDataset(
+                config=QADatasetConfig(path="sentinel", dataset_id="mmlu_teacher_entropy"),
+                tokenizer=thinking_tokenizer,
+            )
+        ),
+        complexity_estimator=SingleTokenEntropyEstimator(),
+        complexity_estimation_runner_generation_config=ModelGenerateConfig(max_new_tokens=1),
+        out_path=Path("/tmp/resampling_trainer_data"),
+    )
+
+    path = callback.out_path_for_epoch(3)
+
+    assert path == Path("/tmp/resampling_trainer_data/3/complexity_estimation/mmlu_teacher_entropy.parquet")

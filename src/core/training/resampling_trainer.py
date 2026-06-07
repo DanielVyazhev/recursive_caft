@@ -90,7 +90,7 @@ class EstimateComplexityCallback(TrainerCallback):
             self._out_path
             / str(epoch)
             / "complexity_estimation"
-            / f"{self._complexity_evaluation_dataset.dataset.config.id}.parquet"
+            / f"{self._complexity_evaluation_dataset.dataset.dataset_id}.parquet"
         )
 
 
