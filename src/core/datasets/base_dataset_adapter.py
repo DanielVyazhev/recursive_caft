@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from pathlib import Path
 from typing import override
 
 import pandas as pd
@@ -59,4 +60,5 @@ class BaseDatasetAdapter[D: BaseDataset](AbstractDatasetAdapter):
 
     @override
     def save_processed_dataset(self, df: pd.DataFrame, path: str, tmp: bool) -> None:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(path=path, index=False, compression=None if tmp else "snappy")
