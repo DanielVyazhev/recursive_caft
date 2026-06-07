@@ -28,6 +28,11 @@ class BaseDatasetAdapter[D: BaseDataset](AbstractDatasetAdapter):
     @abstractmethod
     def process_row(self, row: dict) -> TokenizedRow: ...
 
+    def sampled_size(self) -> int | None:
+        """Row count after sampling, without materializing the dataset. Returns the sampler's
+        top_k, or None when there is no sampler (size is only known by loading the source)."""
+        return self.dataset_sampler.config.top_k if self.dataset_sampler is not None else None
+
     def _load_ds(self, dataset: BaseDataset) -> Dataset:
         ds = load_dataset(
             "parquet",

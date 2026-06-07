@@ -17,6 +17,7 @@ from core.complexity_estimation.entropy.single_token_entropy_estimator import Si
 from core.dataset_samplers.base_sampler import BaseDatasetSamplerConfig
 from core.dataset_samplers.entropy_gain_sampler import EntropyGainSampler
 from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
+from core.datasets.merged_dataset_adapter import MergedDatasetAdapter
 from core.datasets.mmlu.mmlu_reasoning_response_dataset import MMLUReasoningResponseDataset
 from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset
 from core.datasets.qa_dataset import QADatasetConfig
@@ -66,6 +67,20 @@ def test_len_fallback_without_sampler(thinking_tokenizer, tmp_path, make_resampl
     ds = ResamplingDataset(adapter, thinking_tokenizer)
     ds.dataset_path = str(parquet)
     assert len(ds) == 3
+
+
+def test_len_over_merged_adapter(thinking_tokenizer):
+    # A MergedDatasetAdapter reports the summed top_k of its sub-adapters, so HF still sees a
+    # sized dataset (no max_steps error) when training on multiple datasets.
+    merged = MergedDatasetAdapter(
+        [
+            _adapter(thinking_tokenizer, EntropyGainSampler(BaseDatasetSamplerConfig(top_k=7))),
+            _adapter(thinking_tokenizer, EntropyGainSampler(BaseDatasetSamplerConfig(top_k=3))),
+        ]
+    )
+    ds = ResamplingDataset(merged, thinking_tokenizer)
+    assert has_length(ds) is True
+    assert len(ds) == 10
 
 
 def test_save_processed_dataset_creates_parent_dir(thinking_tokenizer, tmp_path):

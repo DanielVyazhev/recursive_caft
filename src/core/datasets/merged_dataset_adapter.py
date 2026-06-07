@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import override
 
 import pandas as pd
@@ -14,19 +13,26 @@ class MergedDatasetAdapter(AbstractDatasetAdapter):
 
     @override
     def process_dataset(self, path_override: str | None = None) -> Dataset:
+        # Every sub-adapter reads the same source: path_override (e.g. the resampling per-epoch
+        # parquet) when given, otherwise each adapter's own configured path. Each applies its own
+        # sampler / target builder, then the results are concatenated.
         datasets = [
-            adapter.process_dataset(
-                path_override=(Path(path_override) / f"{adapter.dataset.id}.parquet").as_posix()
-                if path_override is not None
-                else None,
-                strict=True,
-            )
+            adapter.process_dataset(path_override=path_override, strict=True)
             for adapter in self.dataset_adapters
         ]
 
         ds = concatenate_datasets(datasets)
 
         return ds
+
+    def sampled_size(self) -> int | None:
+        total = 0
+        for adapter in self.dataset_adapters:
+            size = adapter.sampled_size()
+            if size is None:
+                return None
+            total += size
+        return total
 
     @override
     def save_processed_dataset(self, df: pd.DataFrame, path: str, tmp: bool) -> None:
