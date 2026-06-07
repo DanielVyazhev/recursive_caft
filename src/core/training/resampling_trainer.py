@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import override
 
+import pandas as pd
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
 from transformers.modeling_utils import PreTrainedModel
@@ -28,12 +29,12 @@ class ResamplingDataset(IterableDataset):
 
     def __len__(self) -> int:
         # HF Trainer requires the train dataset to be sized (otherwise it raises and demands
-        # max_steps). The resampled dataset always yields the sampler's top_k rows, so report
-        # that. This must stay O(1) / I/O-free: __len__ is evaluated in Trainer.__init__ while
-        # dataset_path is still None, before the first on_epoch_begin sets it.
-        sampler = getattr(self.dataset, "dataset_sampler", None)
-        if sampler is not None:
-            return sampler.config.top_k
+        # max_steps). Each adapter reports its post-sampling size (the sampler's top_k, summed
+        # across a MergedDatasetAdapter). This must stay O(1) / I/O-free: __len__ is evaluated in
+        # Trainer.__init__ while dataset_path is still None, before the first on_epoch_begin sets it.
+        size = self.dataset.sampled_size()
+        if size is not None:
+            return size
         return len(self.dataset.process_dataset(path_override=self.dataset_path))
 
     def __iter__(self):
@@ -59,6 +60,7 @@ class EstimateComplexityCallback(TrainerCallback):
         complexity_estimator: BaseComplexityEstimator,
         complexity_estimation_runner_generation_config: ModelGenerateConfig,
         out_path: Path,
+        max_failed_estimation_fraction: float = 0.1,
     ) -> None:
         super().__init__()
 
@@ -66,6 +68,7 @@ class EstimateComplexityCallback(TrainerCallback):
         self._complexity_estimator = complexity_estimator
         self._complexity_estimation_runner_generation_config = complexity_estimation_runner_generation_config
         self._out_path = out_path
+        self._max_failed_estimation_fraction = max_failed_estimation_fraction
 
     @override
     def on_epoch_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs) -> None:
@@ -84,6 +87,33 @@ class EstimateComplexityCallback(TrainerCallback):
             ),
             complexity_estimator=self._complexity_estimator,
         ).estimate(dataset_adapter=self._complexity_evaluation_dataset, model=model)
+
+        self._reconcile_estimation(int(state.epoch))
+
+    def _reconcile_estimation(self, epoch: int) -> None:
+        # After a LoRA epoch the model may emit a thinking token instead of a single answer letter,
+        # so those rows fail to measure (entropy_value is NaN). Abort if too many fail this epoch;
+        # otherwise reuse the previous epoch's last-known-good entropy for the failed rows. Any
+        # residual NaN (epoch 0, or rows that failed every epoch) is harmlessly dropped by the
+        # sampler (NaN scores sort to the bottom).
+        path = self.out_path_for_epoch(epoch)
+        df = pd.read_parquet(path)
+
+        failed = df["entropy_value"].isna()
+        failure_rate = float(failed.mean())
+        if failure_rate > self._max_failed_estimation_fraction:
+            raise RuntimeError(
+                f"Complexity estimation failed for {failure_rate:.1%} of rows at epoch {epoch} "
+                f"(> {self._max_failed_estimation_fraction:.0%} allowed); aborting training."
+            )
+
+        if epoch > 0 and failed.any():
+            prev = pd.read_parquet(self.out_path_for_epoch(epoch - 1))
+            prev_entropy = prev.dropna(subset=["entropy_value"]).set_index("question_id")["entropy_value"]
+            df.loc[failed, "entropy_value"] = df.loc[failed, "question_id"].map(prev_entropy)
+            df.to_parquet(path, index=False)
+            backfilled = int(failed.sum() - df["entropy_value"].isna().sum())
+            logger.info(f"Backfilled {backfilled} failed entropy rows from epoch {epoch - 1}.")
 
     def out_path_for_epoch(self, epoch: int) -> Path:
         return (
@@ -118,6 +148,9 @@ class ResamplingTrainerConfig(LoRATrainerConfig):
     complexity_evaluation_dataset: QADatasetAdapter
     complexity_estimator: BaseComplexityEstimator
     complexity_estimation_runner_generation_config: ModelGenerateConfig
+    # Abort training if more than this fraction of rows fail single-token entropy measurement
+    # in an epoch (the model drifting to chain-of-thought output).
+    max_failed_estimation_fraction: float = 0.1
 
 
 class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
@@ -135,6 +168,7 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
             complexity_estimator=self.config.complexity_estimator,
             complexity_estimation_runner_generation_config=self.config.complexity_estimation_runner_generation_config,
             out_path=self._data_path,
+            max_failed_estimation_fraction=self.config.max_failed_estimation_fraction,
         )
         trainer.add_callback(self._estimate_complexity_callback)
         trainer.add_callback(

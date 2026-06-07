@@ -7,6 +7,7 @@ from core.complexity_estimation.entropy.single_token_entropy_estimator import Si
 from core.dataset_samplers.entropy_gain_sampler import EntropyGainSampler
 from core.dataset_samplers.entropy_ratio_sampler import BaseDatasetSamplerConfig
 from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
+from core.datasets.merged_dataset_adapter import MergedDatasetAdapter
 from core.datasets.mmlu.mmlu_reasoning_response_dataset import MMLUReasoningResponseDataset
 from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset
 from core.datasets.qa_dataset import QADatasetConfig
@@ -57,15 +58,31 @@ trainer = ResamplingTrainer(
         lora_training_args=LoRASpecificTrainingArgs(train_thinking_token_embeddings=True),
         out_path=OUT_PATH.as_posix(),
         model_id=MODEL_NAME,
-        train_dataset=CausalDatasetAdapter(
-            dataset=MMLUReasoningResponseDataset(
-                config=QADatasetConfig(
-                    path="should be overridden by SetResamplingPathCallback",
-                    dataset_id="train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large",
+        train_dataset=MergedDatasetAdapter(
+            [
+                CausalDatasetAdapter(
+                    dataset=MMLUReasoningResponseDataset(
+                        config=QADatasetConfig(
+                            path="should be overridden by SetResamplingPathCallback",
+                            dataset_id="train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large",
+                        ),
+                        tokenizer=tokenizer,
+                    ),
+                    dataset_sampler=EntropyGainSampler(BaseDatasetSamplerConfig(top_k=1024)),
                 ),
-                tokenizer=tokenizer,
-            ),
-            dataset_sampler=EntropyGainSampler(BaseDatasetSamplerConfig(top_k=1024)),
+                # Mix in a smaller single-token-answer set (hardest by gain) so the model keeps
+                # answering with a single letter, keeping the per-epoch entropy estimation stable.
+                CausalDatasetAdapter(
+                    dataset=MMLUSingleTokenResponseDataset(
+                        config=QADatasetConfig(
+                            path="should be overridden by SetResamplingPathCallback",
+                            dataset_id="mmlu_single_token_train",
+                        ),
+                        tokenizer=tokenizer,
+                    ),
+                    dataset_sampler=EntropyGainSampler(BaseDatasetSamplerConfig(top_k=128)),
+                ),
+            ]
         ),
         save_schedule=[1, 2, 3, 5, 7, 10, 15, 20],
         complexity_evaluation_dataset=QADatasetAdapter(
