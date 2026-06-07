@@ -26,6 +26,16 @@ class ResamplingDataset(IterableDataset):
 
         self.dataset_path: str | None = None
 
+    def __len__(self) -> int:
+        # HF Trainer requires the train dataset to be sized (otherwise it raises and demands
+        # max_steps). The resampled dataset always yields the sampler's top_k rows, so report
+        # that. This must stay O(1) / I/O-free: __len__ is evaluated in Trainer.__init__ while
+        # dataset_path is still None, before the first on_epoch_begin sets it.
+        sampler = getattr(self.dataset, "dataset_sampler", None)
+        if sampler is not None:
+            return sampler.config.top_k
+        return len(self.dataset.process_dataset(path_override=self.dataset_path))
+
     def __iter__(self):
         # Calling process_dataset to re-sample dataset after EstimateComplexityCallback runs
         dataset = self.dataset.process_dataset(path_override=self.dataset_path)

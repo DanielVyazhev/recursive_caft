@@ -31,7 +31,9 @@ setup_thinking_tokens(tokenizer)
 
 TEACHER_ENTROPY_DATASET_PATH = OUT_PATH.joinpath("teacher_entropy.parquet")
 merge_mmlu_on_question_id(
-    main_path=Path(__file__).parent.joinpath("../../../../../data/out/splits/random/mmlu/train_original.parquet"),
+    main_path=Path(__file__).parent.joinpath(
+        "../../../../../data/out/splits/random/mmlu/train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large.parquet"
+    ),
     extra_paths=[
         Path(__file__).parent.joinpath("../../../../../data/out/single_token_entropy/mmlu_llama_70b.parquet"),
         Path(__file__).parent.joinpath("../../../../../data/out/single_token_entropy/mmlu_qwen_72b.parquet"),
@@ -58,12 +60,8 @@ trainer = ResamplingTrainer(
         train_dataset=CausalDatasetAdapter(
             dataset=MMLUReasoningResponseDataset(
                 config=QADatasetConfig(
-                    path=Path(__file__)
-                    .parent.joinpath(
-                        "../../../../../data/out/splits/random/mmlu/train_distilled_w_explained_deepseek_v4_flash.parquet"
-                    )
-                    .as_posix(),
-                    dataset_id="train_distilled_w_explained_deepseek_v4_flash",
+                    path="should be overridden by SetResamplingPathCallback",
+                    dataset_id="train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large",
                 ),
                 tokenizer=tokenizer,
             ),
@@ -102,7 +100,7 @@ cot_evaluator = MultiCheckpointEvaluator(
             ),
             add_thinking_start_token=True,
         ),
-        generation=GenerationConfig(max_new_tokens=8500, max_thinking_tokens=8192, max_batch_size=1024),
+        generation=GenerationConfig(max_new_tokens=8500, max_thinking_tokens=8192, max_batch_size=256),
         summary_filename="summary_reasoning_evals.json",
     ),
     tokenizer=tokenizer,
