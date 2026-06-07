@@ -68,6 +68,20 @@ def test_len_fallback_without_sampler(thinking_tokenizer, tmp_path, make_resampl
     assert len(ds) == 3
 
 
+def test_save_processed_dataset_creates_parent_dir(thinking_tokenizer, tmp_path):
+    # The per-epoch complexity-estimation output lands in a fresh nested dir that
+    # nothing created yet; the adapter must mkdir before writing.
+    import pandas as pd
+
+    adapter = _adapter(thinking_tokenizer, None)
+    out = tmp_path / "0" / "complexity_estimation" / "x.parquet"
+    assert not out.parent.exists()
+
+    adapter.save_processed_dataset(pd.DataFrame({"x": [1, 2]}), path=str(out), tmp=True)
+
+    assert out.exists()
+
+
 def test_out_path_for_epoch_uses_dataset_id(thinking_tokenizer):
     # The per-epoch complexity-estimation path is built from the complexity
     # dataset's dataset_id; it must not reference a nonexistent `config.id`.
