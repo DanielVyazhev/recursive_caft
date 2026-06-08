@@ -63,6 +63,7 @@ class EstimateComplexityCallback(TrainerCallback):
         complexity_estimation_runner_generation_config: ModelGenerateConfig,
         out_path: Path,
         max_failed_estimation_fraction: float = 0.1,
+        save_schedule: list[int] | None = None,
     ) -> None:
         super().__init__()
 
@@ -71,24 +72,29 @@ class EstimateComplexityCallback(TrainerCallback):
         self._complexity_estimation_runner_generation_config = complexity_estimation_runner_generation_config
         self._out_path = out_path
         self._max_failed_estimation_fraction = max_failed_estimation_fraction
+        self._save_schedule = save_schedule
 
     @override
     def on_epoch_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs) -> None:
         assert state.epoch is not None
 
+        # `epoch` == int(state.epoch) at on_epoch_begin == the number of COMPLETED epochs, i.e. the
+        # model state this complexity is measured on — the *previous* training epoch's output. That
+        # state is held by the checkpoint whose trainer_state.epoch == epoch, which exists iff
+        # `epoch in save_schedule`. (e.g. with schedule [1,3]: dir "1" is model-after-1 == checkpoint
+        # epoch=1; dir "2" is model-after-2, which is NOT checkpointed.)
         epoch = int(state.epoch)
 
-        # Resume: reuse complexity already dumped for this epoch instead of recomputing it.
-        #  - stats file present -> epoch fully finalized; reuse as-is (skip estimate + reconcile).
-        #  - parquet complete but no stats -> estimate already finished (pre-existing dump, or a crash
-        #    between estimate and reconcile); skip estimate, just reconcile.
-        #  - otherwise -> (re)estimate; estimate() itself resumes from a partial .tmp dump.
-        if self._stats_path_for_epoch(epoch).exists():
-            logger.info(f"Reusing dumped complexity for epoch {epoch}; skipping re-estimation.")
+        # Resume: only reuse a dumped complexity when the weights it was measured on were checkpointed,
+        # so resume reloads exactly that model. A non-checkpointed epoch is re-trained from an earlier
+        # checkpoint, so its earlier dump is stale for the new trajectory -> recompute it on the
+        # current weights (estimate() still resumes from a partial .tmp within that recompute).
+        if self._should_reuse(epoch):
+            logger.info(f"Reusing dumped complexity for checkpointed epoch {epoch}; skipping re-estimation.")
             return
 
-        if self._estimation_complete(epoch):
-            logger.info(f"Complexity estimate for epoch {epoch} already on disk; running reconcile only.")
+        if self._is_checkpoint_epoch(epoch) and self._estimation_complete(epoch):
+            logger.info(f"Complexity estimate for checkpointed epoch {epoch} already on disk; running reconcile only.")
         else:
             logger.info(f"Estimating complexity for epoch {epoch}...")
 
@@ -155,6 +161,19 @@ class EstimateComplexityCallback(TrainerCallback):
 
     def _stats_path_for_epoch(self, epoch: int) -> Path:
         return self.out_path_for_epoch(epoch).parent / "estimation_stats.json"
+
+    def _is_checkpoint_epoch(self, epoch: int) -> bool:
+        # `epoch` == int(state.epoch) at on_epoch_begin == number of completed epochs. The previous
+        # training epoch saved its checkpoint under trainer_state.epoch == epoch (when that value is in
+        # save_schedule), so this tests whether the weights this complexity was measured on are
+        # checkpointed and thus reloaded exactly on resume. No schedule => HF checkpoints every epoch
+        # (save_strategy="epoch"), so every epoch qualifies.
+        return self._save_schedule is None or epoch in self._save_schedule
+
+    def _should_reuse(self, epoch: int) -> bool:
+        # Reuse a finalized dump only when the weights it was measured on were checkpointed (so resume
+        # reloads them exactly). Non-checkpointed epochs are re-trained -> the dump is stale -> recompute.
+        return self._is_checkpoint_epoch(epoch) and self._stats_path_for_epoch(epoch).exists()
 
     def _estimation_complete(self, epoch: int) -> bool:
         # estimate() writes out_path only at the very end and deletes its .tmp right after, so a
@@ -234,6 +253,7 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
             complexity_estimation_runner_generation_config=self.config.complexity_estimation_runner_generation_config,
             out_path=self._data_path,
             max_failed_estimation_fraction=self.config.max_failed_estimation_fraction,
+            save_schedule=self.config.save_schedule,
         )
         trainer.add_callback(self._estimate_complexity_callback)
         trainer.add_callback(
