@@ -1,3 +1,5 @@
+import json
+import os
 from pathlib import Path
 from typing import override
 
@@ -74,21 +76,35 @@ class EstimateComplexityCallback(TrainerCallback):
     def on_epoch_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs) -> None:
         assert state.epoch is not None
 
-        logger.info(f"Estimating complexity for epoch {state.epoch}...")
+        epoch = int(state.epoch)
 
-        model: PreTrainedModel = kwargs["model"]
+        # Resume: reuse complexity already dumped for this epoch instead of recomputing it.
+        #  - stats file present -> epoch fully finalized; reuse as-is (skip estimate + reconcile).
+        #  - parquet complete but no stats -> estimate already finished (pre-existing dump, or a crash
+        #    between estimate and reconcile); skip estimate, just reconcile.
+        #  - otherwise -> (re)estimate; estimate() itself resumes from a partial .tmp dump.
+        if self._stats_path_for_epoch(epoch).exists():
+            logger.info(f"Reusing dumped complexity for epoch {epoch}; skipping re-estimation.")
+            return
 
-        ComplexityEstimationRunner(
-            config=ComplexityEstimationRunnerConfig(
-                out_path=self.out_path_for_epoch(int(state.epoch)).as_posix(),
-                answer_field_name="estimation_phase_answer",
-                answer_correctness_field_name="estimation_phase_answer_correctness",
-                generate_config=self._complexity_estimation_runner_generation_config,
-            ),
-            complexity_estimator=self._complexity_estimator,
-        ).estimate(dataset_adapter=self._complexity_evaluation_dataset, model=model)
+        if self._estimation_complete(epoch):
+            logger.info(f"Complexity estimate for epoch {epoch} already on disk; running reconcile only.")
+        else:
+            logger.info(f"Estimating complexity for epoch {epoch}...")
 
-        self._reconcile_estimation(int(state.epoch))
+            model: PreTrainedModel = kwargs["model"]
+
+            ComplexityEstimationRunner(
+                config=ComplexityEstimationRunnerConfig(
+                    out_path=self.out_path_for_epoch(epoch).as_posix(),
+                    answer_field_name="estimation_phase_answer",
+                    answer_correctness_field_name="estimation_phase_answer_correctness",
+                    generate_config=self._complexity_estimation_runner_generation_config,
+                ),
+                complexity_estimator=self._complexity_estimator,
+            ).estimate(dataset_adapter=self._complexity_evaluation_dataset, model=model)
+
+        self._reconcile_estimation(epoch)
 
     def _reconcile_estimation(self, epoch: int) -> None:
         # After a LoRA epoch the model may emit a thinking token instead of a single answer letter,
@@ -100,6 +116,8 @@ class EstimateComplexityCallback(TrainerCallback):
         df = pd.read_parquet(path)
 
         failed = df["entropy_value"].isna()
+        failed_count = int(failed.sum())
+        total_rows = int(len(df))
         failure_rate = float(failed.mean())
         if failure_rate > self._max_failed_estimation_fraction:
             raise RuntimeError(
@@ -107,13 +125,25 @@ class EstimateComplexityCallback(TrainerCallback):
                 f"(> {self._max_failed_estimation_fraction:.0%} allowed); aborting training."
             )
 
+        backfilled = 0
         if epoch > 0 and failed.any():
             prev = pd.read_parquet(self.out_path_for_epoch(epoch - 1))
             prev_entropy = prev.dropna(subset=["entropy_value"]).set_index("question_id")["entropy_value"]
             df.loc[failed, "entropy_value"] = df.loc[failed, "question_id"].map(prev_entropy)
             df.to_parquet(path, index=False)
-            backfilled = int(failed.sum() - df["entropy_value"].isna().sum())
+            backfilled = int(failed_count - df["entropy_value"].isna().sum())
             logger.info(f"Backfilled {backfilled} failed entropy rows from epoch {epoch - 1}.")
+
+        # Persist how many rows could not be measured this epoch (failed_count, before backfill).
+        # This file is also the per-epoch "finalized" marker used by on_epoch_begin to skip
+        # re-estimation on resume, so it is written last, only after a successful reconcile.
+        self._write_estimation_stats(
+            epoch,
+            total_rows=total_rows,
+            failed_rows=failed_count,
+            backfilled=backfilled,
+            residual_failed=int(df["entropy_value"].isna().sum()),
+        )
 
     def out_path_for_epoch(self, epoch: int) -> Path:
         return (
@@ -122,6 +152,32 @@ class EstimateComplexityCallback(TrainerCallback):
             / "complexity_estimation"
             / f"{self._complexity_evaluation_dataset.dataset.dataset_id}.parquet"
         )
+
+    def _stats_path_for_epoch(self, epoch: int) -> Path:
+        return self.out_path_for_epoch(epoch).parent / "estimation_stats.json"
+
+    def _estimation_complete(self, epoch: int) -> bool:
+        # estimate() writes out_path only at the very end and deletes its .tmp right after, so a
+        # parquet with no sibling .tmp means estimation finished (reconcile may still be pending).
+        out_path = self.out_path_for_epoch(epoch)
+        return out_path.exists() and not out_path.with_suffix(".tmp").exists()
+
+    def _write_estimation_stats(
+        self, epoch: int, total_rows: int, failed_rows: int, backfilled: int, residual_failed: int
+    ) -> None:
+        stats = {
+            "epoch": epoch,
+            "total_rows": total_rows,
+            "failed_rows": failed_rows,
+            "failure_rate": (failed_rows / total_rows) if total_rows else 0.0,
+            "backfilled": backfilled,
+            "residual_failed": residual_failed,
+        }
+        path = self._stats_path_for_epoch(epoch)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(stats, indent=2))
+        os.replace(tmp, path)
 
 
 class SetResamplingPathCallback(TrainerCallback):
@@ -155,6 +211,15 @@ class ResamplingTrainerConfig(LoRATrainerConfig):
 
 class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
     @override
+    def train(self):
+        try:
+            return super().train()
+        finally:
+            # Aggregate per-epoch complexity-estimation failure counts. In finally so it also runs
+            # after a partial (crashed/killed) run; the body is defensive and never re-raises.
+            self._aggregate_estimation_stats()
+
+    @override
     def _prepare_data(self):
         train_ds = ResamplingDataset(self.config.train_dataset, self.tokenizer)
         return train_ds
@@ -185,3 +250,55 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
     @property
     def _data_path(self) -> Path:
         return Path(self.config.out_path) / "resampling_trainer_data"
+
+    def _aggregate_estimation_stats(self) -> None:
+        # Roll the per-epoch estimation_stats.json files up into one summary keyed by epoch. Runs in
+        # train()'s finally, so it must never raise (it would mask a training error) — log and move on.
+        try:
+            base = self._data_path
+            if not base.exists():
+                return
+
+            dataset_id = self.config.complexity_evaluation_dataset.dataset.dataset_id
+
+            details: list[dict] = []
+            for epoch_dir in sorted(
+                (d for d in base.iterdir() if d.is_dir() and d.name.isdigit()),
+                key=lambda d: int(d.name),
+            ):
+                epoch = int(epoch_dir.name)
+                stats_path = epoch_dir / "complexity_estimation" / "estimation_stats.json"
+                if stats_path.exists():
+                    entry = json.loads(stats_path.read_text())
+                    entry["source"] = "recorded"
+                else:
+                    # A dump produced before this feature: its pre-backfill count is gone (reconcile
+                    # overwrote the parquet), so report the post-backfill residual as a best effort.
+                    parquet = epoch_dir / "complexity_estimation" / f"{dataset_id}.parquet"
+                    if not parquet.exists():
+                        continue
+                    col = pd.read_parquet(parquet, columns=["entropy_value"])["entropy_value"]
+                    residual = int(col.isna().sum())
+                    entry = {
+                        "epoch": epoch,
+                        "total_rows": int(len(col)),
+                        "failed_rows": residual,
+                        "failure_rate": (residual / len(col)) if len(col) else 0.0,
+                        "backfilled": None,
+                        "residual_failed": residual,
+                        "source": "derived",
+                    }
+                details.append(entry)
+
+            summary = {
+                "total_failed_rows": sum(d["failed_rows"] for d in details),
+                "failed_rows_by_epoch": {str(d["epoch"]): d["failed_rows"] for d in details},
+                "details": details,
+            }
+            out_path = base / "complexity_estimation_failures.json"
+            tmp = out_path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(summary, indent=2))
+            os.replace(tmp, out_path)
+            logger.info(f"Wrote complexity-estimation failure summary to {out_path}")
+        except Exception as ex:
+            logger.warning(f"Failed to aggregate complexity-estimation stats: {ex}")
