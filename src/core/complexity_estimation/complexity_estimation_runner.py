@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import pandas as pd
 import torch
 from pydantic import BaseModel
 from pydraconf import PydraConfig
@@ -75,7 +76,10 @@ class ComplexityEstimationRunner:
         for index, df_row in tqdm(df.iterrows(), total=len(df)):
             processed_rows += 1
 
-            if df_row[self.config.answer_field_name] is not None:
+            # A resumed .tmp round-trips missing answers back as NaN (not None), so use a
+            # missing-aware check — a plain `is not None` would treat NaN (not-yet-measured) rows as
+            # done and skip them, so resume would measure nothing.
+            if pd.notna(df_row[self.config.answer_field_name]):
                 continue
 
             new_processed_rows += 1
