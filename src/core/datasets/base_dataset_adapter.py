@@ -55,6 +55,15 @@ class BaseDatasetAdapter[D: BaseDataset](AbstractDatasetAdapter):
         if self.dataset_sampler is not None:
             ds = self.dataset_sampler.create_sample(ds)
 
+        # A re-processed dump may already carry tokenization columns produced by an earlier
+        # process_row pass (e.g. the complexity runner's .tmp resume file, which keeps them until its
+        # final save). process_row re-tokenizes and passes these as explicit kwargs, so leaving them
+        # in the row collides with **row ("multiple values for keyword argument"). Drop them first;
+        # they are always regenerated below, so this is a no-op for source / final-parquet inputs.
+        stale_columns = [c for c in ("input_ids", "attention_mask", "labels", "row_id") if c in ds.column_names]
+        if stale_columns:
+            ds = ds.remove_columns(stale_columns)
+
         ds = ds.map(
             lambda row: self.process_row(row).model_dump(),
             num_proc=4,
