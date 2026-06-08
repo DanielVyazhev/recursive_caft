@@ -49,8 +49,12 @@ class ComplexityEstimationRunner:
         processed_rows = 0
         new_processed_rows = 0
 
-        if os.path.exists(self.config.out_path) and os.path.exists(self.tmp_path()):
-            print(f"Output path {self.config.out_path} already exists. Resuming from temporary file.")
+        if os.path.exists(self.tmp_path()):
+            # A partially-completed run periodically flushes progress to .tmp (every save_every rows)
+            # and only writes out_path at the very end, deleting .tmp right after. So a leftover .tmp
+            # means an interrupted run: resume from it, skipping rows already answered. (out_path is
+            # never present here in the normal flow, since it and .tmp don't coexist.)
+            print(f"Temporary file {self.tmp_path()} found. Resuming complexity estimation from it.")
             ds = dataset_adapter.process_dataset(path_override=str(self.tmp_path()), strict=False)
         else:
             print(f"No temporary file found. Starting from scratch. Writing to output file {self.config.out_path}.")
