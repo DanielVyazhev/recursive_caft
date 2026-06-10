@@ -52,7 +52,7 @@ merge_mmlu_on_question_id(
 trainer = ResamplingTrainer(
     config=ResamplingTrainerConfig(
         training_args=LoRATrainingArgs(
-            num_train_epochs=20,
+            num_train_epochs=50,
             per_device_train_batch_size=4,
         ),
         lora_training_args=LoRASpecificTrainingArgs(train_thinking_token_embeddings=True),
@@ -84,7 +84,7 @@ trainer = ResamplingTrainer(
                 ),
             ]
         ),
-        save_schedule=[1, 2, 3, 5, 7, 10, 15, 20],
+        save_schedule=[1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 40, 50],
         complexity_evaluation_dataset=QADatasetAdapter(
             dataset=MMLUSingleTokenResponseDataset(
                 config=QADatasetConfig(
