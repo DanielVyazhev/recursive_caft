@@ -46,6 +46,38 @@ CHUNK_SIZE = 640
 _WORKER_PATH = str(Path(__file__).with_name("_eval_worker.py"))
 
 
+def _terminate_process_group(proc: subprocess.Popen, grace_s: float = 10.0) -> None:
+    """SIGTERM the worker's whole process group, then SIGKILL stragglers.
+
+    The worker is spawned with start_new_session=True, so it leads its own process
+    group; signalling that group reaches the worker *and* any descendants it spawned
+    (DataLoader / vLLM workers) — which proc.send_signal() to the direct child would
+    miss. SIGTERM first lets runtime_trace's handler shut down cleanly and flush
+    logs; SIGKILL after grace_s guarantees teardown if it's wedged in a CUDA C call.
+    Catching KeyboardInterrupt means an impatient second Ctrl+C escalates immediately.
+    """
+    if proc.poll() is not None:
+        return
+    try:
+        pgid = os.getpgid(proc.pid)
+    except ProcessLookupError:
+        return
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+        try:
+            proc.wait(timeout=grace_s)
+            return
+        except subprocess.TimeoutExpired:
+            logger.warning(f"[unit] worker pid={proc.pid} ignored SIGTERM after {grace_s:.0f}s — sending SIGKILL")
+    except KeyboardInterrupt:
+        logger.warning("[unit] second interrupt — sending SIGKILL now")
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    proc.wait()
+
+
 class GenerationConfig(BaseModel):
     max_new_tokens: int
     max_thinking_tokens: int | None = None
@@ -152,7 +184,13 @@ class Evaluator:
         Restarts on any nonzero exit (the flaky GPU dies with SIGSEGV/139); resume
         rides the chunk/phase checkpoints. A circuit breaker hard-stops on repeated
         fast failures (a deterministic bug, not transient infra) so we never spin
-        forever. SIGINT/SIGTERM are forwarded to the child, then handlers restored.
+        forever.
+
+        Interrupts (Ctrl+C / scheduler SIGTERM) must stop the eval, not be mistaken
+        for a transient crash and retried. The worker is spawned in its own session
+        (start_new_session=True) so terminal Ctrl+C reaches only this supervisor; we
+        then tear down the worker's whole process group and re-raise, breaking the
+        retry loop and propagating out so the program exits.
         """
         min_healthy_s = float(os.environ.get("EVAL_MIN_HEALTHY_S", "120"))
         max_fast = int(os.environ.get("EVAL_MAX_FAST_FAILURES", "3"))
@@ -161,50 +199,39 @@ class Evaluator:
         cmd = [sys.executable, _WORKER_PATH, spec_path, str(ds_idx)]
         child_env = {**os.environ, "EVAL_SUPERVISE": "0"}
 
-        proc: subprocess.Popen | None = None
-
-        def _forward_signal(signum, _frame):
-            if proc is not None and proc.poll() is None:
-                proc.send_signal(signum)
-
-        prev_handlers = [(s, signal.getsignal(s)) for s in (signal.SIGINT, signal.SIGTERM)]
-        for s, _ in prev_handlers:
+        consecutive_fast = 0
+        for attempt in range(1, max_attempts + 1):
+            start = time.monotonic()
+            logger.info(f"[unit] dataset={ds_idx} starting worker attempt={attempt}")
+            proc = subprocess.Popen(cmd, env=child_env, start_new_session=True)
             try:
-                signal.signal(s, _forward_signal)
-            except (ValueError, OSError):
-                pass
-        try:
-            consecutive_fast = 0
-            for attempt in range(1, max_attempts + 1):
-                start = time.monotonic()
-                logger.info(f"[unit] dataset={ds_idx} starting worker attempt={attempt}")
-                proc = subprocess.Popen(cmd, env=child_env)
                 code = proc.wait()
-                dur = time.monotonic() - start
-                if code == 0:
-                    logger.info(f"[unit] dataset={ds_idx} worker attempt={attempt} finished in {dur:.0f}s.")
-                    return
-                consecutive_fast = consecutive_fast + 1 if dur < min_healthy_s else 0
+            except BaseException as exc:  # KeyboardInterrupt (Ctrl+C) or SystemExit (parent SIGTERM)
                 logger.warning(
-                    f"[unit] dataset={ds_idx} worker attempt={attempt} pid={proc.pid} crashed: "
-                    f"exit={code} after {dur:.0f}s (consecutive_fast={consecutive_fast})"
+                    f"[unit] dataset={ds_idx} supervisor interrupted by {type(exc).__name__} — "
+                    f"terminating worker group pid={proc.pid}"
                 )
-                if consecutive_fast >= max_fast:
-                    raise RuntimeError(
-                        f"[unit] dataset={ds_idx}: {consecutive_fast} consecutive crashes in "
-                        f"<{min_healthy_s:.0f}s — looks deterministic, not transient infra. "
-                        f"Aborting (last exit={code})."
-                    )
-                backoff = min(30.0, 2.0**consecutive_fast)
-                logger.info(f"[unit] dataset={ds_idx} restarting in {backoff:.0f}s …")
-                time.sleep(backoff)
-            raise RuntimeError(f"[unit] dataset={ds_idx}: exceeded max_unit_attempts={max_attempts}.")
-        finally:
-            for s, handler in prev_handlers:
-                try:
-                    signal.signal(s, handler)
-                except (ValueError, OSError):
-                    pass
+                _terminate_process_group(proc)
+                raise
+            dur = time.monotonic() - start
+            if code == 0:
+                logger.info(f"[unit] dataset={ds_idx} worker attempt={attempt} finished in {dur:.0f}s.")
+                return
+            consecutive_fast = consecutive_fast + 1 if dur < min_healthy_s else 0
+            logger.warning(
+                f"[unit] dataset={ds_idx} worker attempt={attempt} pid={proc.pid} crashed: "
+                f"exit={code} after {dur:.0f}s (consecutive_fast={consecutive_fast})"
+            )
+            if consecutive_fast >= max_fast:
+                raise RuntimeError(
+                    f"[unit] dataset={ds_idx}: {consecutive_fast} consecutive crashes in "
+                    f"<{min_healthy_s:.0f}s — looks deterministic, not transient infra. "
+                    f"Aborting (last exit={code})."
+                )
+            backoff = min(30.0, 2.0**consecutive_fast)
+            logger.info(f"[unit] dataset={ds_idx} restarting in {backoff:.0f}s …")
+            time.sleep(backoff)
+        raise RuntimeError(f"[unit] dataset={ds_idx}: exceeded max_unit_attempts={max_attempts}.")
 
     def _evaluate_single(self, eval_dataset: QADatasetAdapter, model, tokenizer) -> EvaluationResult:
         ds = eval_dataset.process_dataset()
