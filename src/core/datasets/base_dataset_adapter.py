@@ -33,6 +33,12 @@ class BaseDatasetAdapter[D: BaseDataset](AbstractDatasetAdapter):
         top_k, or None when there is no sampler (size is only known by loading the source)."""
         return self.dataset_sampler.config.top_k if self.dataset_sampler is not None else None
 
+    @override
+    def selected_sample_counts(self, df: pd.DataFrame) -> dict[str, int]:
+        if self.dataset_sampler is None:
+            return {}
+        return {self.dataset.dataset_id: self.dataset_sampler.count_selected(df)}
+
     def _load_ds(self, dataset: BaseDataset) -> Dataset:
         ds = load_dataset(
             "parquet",
