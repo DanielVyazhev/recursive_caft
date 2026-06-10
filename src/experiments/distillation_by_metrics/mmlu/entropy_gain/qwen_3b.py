@@ -58,6 +58,11 @@ trainer = ResamplingTrainer(
         lora_training_args=LoRASpecificTrainingArgs(train_thinking_token_embeddings=True),
         out_path=OUT_PATH.as_posix(),
         model_id=MODEL_NAME,
+        # EntropyGainSampler drops non-positive-gain rows each epoch (drop_non_positive defaults to
+        # True): rows where the student is already at/below the teacher's entropy carry no signal, so
+        # the per-epoch training set shrinks below top_k over time (see estimation_stats.json
+        # "selected_samples"). Because __len__ stays at top_k, the cosine LR schedule is sized for the
+        # upper bound and won't fully decay — accepted, as the shrinking set is the point.
         train_dataset=MergedDatasetAdapter(
             [
                 CausalDatasetAdapter(

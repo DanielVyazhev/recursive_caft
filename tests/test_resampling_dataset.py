@@ -10,8 +10,10 @@ the exact condition that gates that error, with no model/GPU.
 
 from pathlib import Path
 
+from datasets import Dataset
 from transformers.trainer_utils import has_length
 
+from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter
 from core.complexity_estimation.complexity_estimation_runner import ModelGenerateConfig
 from core.complexity_estimation.entropy.single_token_entropy_estimator import SingleTokenEntropyEstimator
 from core.dataset_samplers.base_sampler import BaseDatasetSamplerConfig
@@ -95,6 +97,23 @@ def test_save_processed_dataset_creates_parent_dir(thinking_tokenizer, tmp_path)
     adapter.save_processed_dataset(pd.DataFrame({"x": [1, 2]}), path=str(out), tmp=True)
 
     assert out.exists()
+
+
+class _EmptyAdapter(AbstractDatasetAdapter):
+    """Minimal adapter whose post-sampling dataset is empty, to exercise __iter__'s guard."""
+
+    def process_dataset(self, path_override=None):
+        return Dataset.from_dict({"input_ids": [], "attention_mask": [], "labels": [], "row_id": []})
+
+    def save_processed_dataset(self, df, path, tmp):
+        raise NotImplementedError
+
+
+def test_iter_does_not_crash_on_empty_dataset(thinking_tokenizer):
+    # The one-time sample logging does dataset[0]; on an empty post-filter dataset that must not
+    # raise IndexError before yielding (the guard `len(dataset) > 0`).
+    ds = ResamplingDataset(_EmptyAdapter(), thinking_tokenizer)
+    assert list(ds) == []
 
 
 def test_out_path_for_epoch_uses_dataset_id(thinking_tokenizer):

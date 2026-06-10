@@ -43,7 +43,7 @@ class ResamplingDataset(IterableDataset):
         # Calling process_dataset to re-sample dataset after EstimateComplexityCallback runs
         dataset = self.dataset.process_dataset(path_override=self.dataset_path)
 
-        if not self._logged_samples:
+        if not self._logged_samples and len(dataset) > 0:
             first_sample = dataset[0]
             logger.info("Dataset samples")
             logger.info("Train")
@@ -64,6 +64,7 @@ class EstimateComplexityCallback(TrainerCallback):
         out_path: Path,
         max_failed_estimation_fraction: float = 0.1,
         save_schedule: list[int] | None = None,
+        train_dataset: AbstractDatasetAdapter | None = None,
     ) -> None:
         super().__init__()
 
@@ -73,6 +74,10 @@ class EstimateComplexityCallback(TrainerCallback):
         self._out_path = out_path
         self._max_failed_estimation_fraction = max_failed_estimation_fraction
         self._save_schedule = save_schedule
+        # Used to record, per epoch, how many rows the train sampler(s) actually select from the
+        # finalized complexity parquet (after the non-positive-score drop). Optional so the callback
+        # can be constructed standalone (e.g. in tests) without the count.
+        self._train_dataset = train_dataset
 
     @override
     def on_epoch_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs) -> None:
@@ -140,6 +145,12 @@ class EstimateComplexityCallback(TrainerCallback):
             backfilled = int(failed_count - df["entropy_value"].isna().sum())
             logger.info(f"Backfilled {backfilled} failed entropy rows from epoch {epoch - 1}.")
 
+        # Count how many rows the train sampler(s) will actually select from this finalized parquet
+        # (after the non-positive-score drop). Computed here, after backfill, so `df` matches exactly
+        # what SetResamplingPathCallback feeds the samplers for this same epoch.
+        by_dataset = self._train_dataset.selected_sample_counts(df) if self._train_dataset is not None else {}
+        selected_total = sum(by_dataset.values()) if by_dataset else None
+
         # Persist how many rows could not be measured this epoch (failed_count, before backfill).
         # This file is also the per-epoch "finalized" marker used by on_epoch_begin to skip
         # re-estimation on resume, so it is written last, only after a successful reconcile.
@@ -149,6 +160,8 @@ class EstimateComplexityCallback(TrainerCallback):
             failed_rows=failed_count,
             backfilled=backfilled,
             residual_failed=int(df["entropy_value"].isna().sum()),
+            selected_samples=selected_total,
+            selected_samples_by_dataset=by_dataset or None,
         )
 
     def out_path_for_epoch(self, epoch: int) -> Path:
@@ -182,7 +195,14 @@ class EstimateComplexityCallback(TrainerCallback):
         return out_path.exists() and not out_path.with_suffix(".tmp").exists()
 
     def _write_estimation_stats(
-        self, epoch: int, total_rows: int, failed_rows: int, backfilled: int, residual_failed: int
+        self,
+        epoch: int,
+        total_rows: int,
+        failed_rows: int,
+        backfilled: int,
+        residual_failed: int,
+        selected_samples: int | None = None,
+        selected_samples_by_dataset: dict[str, int] | None = None,
     ) -> None:
         stats = {
             "epoch": epoch,
@@ -191,6 +211,10 @@ class EstimateComplexityCallback(TrainerCallback):
             "failure_rate": (failed_rows / total_rows) if total_rows else 0.0,
             "backfilled": backfilled,
             "residual_failed": residual_failed,
+            # Number of rows the train sampler(s) actually select this epoch after dropping
+            # non-positive scores (shrinks over time as the student catches the teacher).
+            "selected_samples": selected_samples,
+            "selected_samples_by_dataset": selected_samples_by_dataset,
         }
         path = self._stats_path_for_epoch(epoch)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -254,6 +278,7 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
             out_path=self._data_path,
             max_failed_estimation_fraction=self.config.max_failed_estimation_fraction,
             save_schedule=self.config.save_schedule,
+            train_dataset=self.config.train_dataset,
         )
         trainer.add_callback(self._estimate_complexity_callback)
         trainer.add_callback(
@@ -291,6 +316,9 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
                 if stats_path.exists():
                     entry = json.loads(stats_path.read_text())
                     entry["source"] = "recorded"
+                    # Pre-feature stats files lack selected_samples; surface as None rather than KeyError.
+                    entry.setdefault("selected_samples", None)
+                    entry.setdefault("selected_samples_by_dataset", None)
                 else:
                     # A dump produced before this feature: its pre-backfill count is gone (reconcile
                     # overwrote the parquet), so report the post-backfill residual as a best effort.
@@ -306,6 +334,10 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
                         "failure_rate": (residual / len(col)) if len(col) else 0.0,
                         "backfilled": None,
                         "residual_failed": residual,
+                        # Can't recompute reliably here: this aggregate only knows the complexity
+                        # dataset_id, not the train adapters' top_k(s)/scoring. Leave unknown.
+                        "selected_samples": None,
+                        "selected_samples_by_dataset": None,
                         "source": "derived",
                     }
                 details.append(entry)
@@ -313,6 +345,7 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
             summary = {
                 "total_failed_rows": sum(d["failed_rows"] for d in details),
                 "failed_rows_by_epoch": {str(d["epoch"]): d["failed_rows"] for d in details},
+                "selected_samples_by_epoch": {str(d["epoch"]): d.get("selected_samples") for d in details},
                 "details": details,
             }
             out_path = base / "complexity_estimation_failures.json"

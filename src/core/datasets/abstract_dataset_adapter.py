@@ -15,3 +15,8 @@ class AbstractDatasetAdapter(ABC):
         """Row count after sampling without materializing, or None when it can't be known
         without loading the source (e.g. no sampler)."""
         return None
+
+    def selected_sample_counts(self, df: pd.DataFrame) -> dict[str, int]:
+        """How many rows each sampler would actually select from `df`, keyed by dataset_id.
+        Empty when there is no sampler (nothing to report)."""
+        return {}

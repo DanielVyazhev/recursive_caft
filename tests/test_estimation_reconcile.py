@@ -2,20 +2,45 @@
 measure single-token entropy in an epoch, otherwise backfill the failures from the
 previous epoch's last-known-good values (joined on question_id)."""
 
+import json
 from math import nan
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
 
 from core.complexity_estimation.complexity_estimation_runner import ModelGenerateConfig
 from core.complexity_estimation.entropy.single_token_entropy_estimator import SingleTokenEntropyEstimator
+from core.dataset_samplers.base_sampler import BaseDatasetSamplerConfig
+from core.dataset_samplers.entropy_gain_sampler import EntropyGainSampler
+from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
+from core.datasets.merged_dataset_adapter import MergedDatasetAdapter
+from core.datasets.mmlu.mmlu_reasoning_response_dataset import MMLUReasoningResponseDataset
 from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset
 from core.datasets.qa_dataset import QADatasetConfig
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
-from core.training.resampling_trainer import EstimateComplexityCallback
+from core.training.resampling_trainer import EstimateComplexityCallback, ResamplingTrainer
 
 
-def _callback(thinking_tokenizer, out_path, max_failed=0.1):
+def _train_dataset(thinking_tokenizer, specs):
+    # specs: list of (dataset_id, top_k). Builds train adapters whose EntropyGainSampler the
+    # callback queries for selected_sample_counts. count_selected reads entropy_value/teacher_entropy
+    # off the parquet directly — no tokenization — so the sentinel path is never loaded.
+    return MergedDatasetAdapter(
+        [
+            CausalDatasetAdapter(
+                dataset=MMLUReasoningResponseDataset(
+                    config=QADatasetConfig(path="sentinel", dataset_id=dataset_id),
+                    tokenizer=thinking_tokenizer,
+                ),
+                dataset_sampler=EntropyGainSampler(BaseDatasetSamplerConfig(top_k=top_k)),
+            )
+            for dataset_id, top_k in specs
+        ]
+    )
+
+
+def _callback(thinking_tokenizer, out_path, max_failed=0.1, train_dataset=None):
     return EstimateComplexityCallback(
         complexity_evaluation_dataset=QADatasetAdapter(
             dataset=MMLUSingleTokenResponseDataset(
@@ -27,16 +52,22 @@ def _callback(thinking_tokenizer, out_path, max_failed=0.1):
         complexity_estimation_runner_generation_config=ModelGenerateConfig(max_new_tokens=1),
         out_path=out_path,
         max_failed_estimation_fraction=max_failed,
+        train_dataset=train_dataset,
     )
 
 
-def _write_epoch(callback, epoch, entropy_values):
+def _write_epoch(callback, epoch, entropy_values, teacher=None):
     path = callback.out_path_for_epoch(epoch)
     path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(
-        {"question_id": list(range(len(entropy_values))), "entropy_value": entropy_values}
-    ).to_parquet(path, index=False)
+    data = {"question_id": list(range(len(entropy_values))), "entropy_value": entropy_values}
+    if teacher is not None:
+        data["teacher_entropy"] = [teacher] * len(entropy_values)
+    pd.DataFrame(data).to_parquet(path, index=False)
     return path
+
+
+def _read_stats(callback, epoch):
+    return json.loads(callback._stats_path_for_epoch(epoch).read_text())
 
 
 def test_reconcile_backfills_from_previous_epoch(thinking_tokenizer, tmp_path):
@@ -77,3 +108,101 @@ def test_reconcile_epoch0_keeps_residual_nan(thinking_tokenizer, tmp_path):
 
     out = pd.read_parquet(path0)
     assert out["entropy_value"].isna().sum() == 1
+
+
+def test_reconcile_records_selected_samples_per_dataset(thinking_tokenizer, tmp_path):
+    # Two train adapters with different top_k score the same parquet; all 20 rows are positive
+    # (entropy 0.9 > teacher 0.2), so each selects min(top_k, 20).
+    train = _train_dataset(thinking_tokenizer, [("reasoning", 100), ("single", 50)])
+    cb = _callback(thinking_tokenizer, tmp_path, train_dataset=train)
+    _write_epoch(cb, 0, [0.9] * 20, teacher=0.2)
+
+    cb._reconcile_estimation(0)
+
+    stats = _read_stats(cb, 0)
+    assert stats["selected_samples"] == 40
+    assert stats["selected_samples_by_dataset"] == {"reasoning": 20, "single": 20}
+
+
+def test_reconcile_selected_samples_excludes_non_positive(thinking_tokenizer, tmp_path):
+    train = _train_dataset(thinking_tokenizer, [("t", 100)])
+    cb = _callback(thinking_tokenizer, tmp_path, train_dataset=train)
+    # 12 positive (gain 0.7), 8 non-positive (entropy == teacher -> gain 0).
+    _write_epoch(cb, 0, [0.9] * 12 + [0.2] * 8, teacher=0.2)
+
+    cb._reconcile_estimation(0)
+
+    assert _read_stats(cb, 0)["selected_samples"] == 12
+
+
+def test_reconcile_selected_samples_uses_post_backfill_values(thinking_tokenizer, tmp_path):
+    # Row 3 fails this epoch (NaN) and is backfilled to a positive-gain value from epoch 0.
+    # The count must reflect the post-backfill df (20), not the pre-backfill measured rows (19).
+    train = _train_dataset(thinking_tokenizer, [("t", 100)])
+    cb = _callback(thinking_tokenizer, tmp_path, train_dataset=train)
+    n = 20
+    _write_epoch(cb, 0, [0.9] * n, teacher=0.2)
+    epoch1 = [0.9] * n
+    epoch1[3] = nan  # 5% <= 10%, no abort
+    _write_epoch(cb, 1, epoch1, teacher=0.2)
+
+    cb._reconcile_estimation(1)
+
+    assert _read_stats(cb, 1)["selected_samples"] == 20
+
+
+def test_reconcile_without_train_dataset_records_none(thinking_tokenizer, tmp_path):
+    cb = _callback(thinking_tokenizer, tmp_path)  # no train_dataset
+    _write_epoch(cb, 0, [0.5] * 20, teacher=0.2)
+
+    cb._reconcile_estimation(0)
+
+    stats = _read_stats(cb, 0)
+    assert stats["selected_samples"] is None
+    assert stats["selected_samples_by_dataset"] is None
+
+
+def test_aggregate_carries_selected_samples_and_tolerates_missing(tmp_path):
+    # Roll-up across a new-format stats file (has selected_samples) and a pre-feature one (missing it).
+    base = tmp_path / "resampling_trainer_data"
+    d0 = base / "0" / "complexity_estimation"
+    d0.mkdir(parents=True)
+    (d0 / "estimation_stats.json").write_text(
+        json.dumps(
+            {
+                "epoch": 0,
+                "total_rows": 100,
+                "failed_rows": 0,
+                "failure_rate": 0.0,
+                "backfilled": 0,
+                "residual_failed": 0,
+                "selected_samples": 40,
+                "selected_samples_by_dataset": {"t": 40},
+            }
+        )
+    )
+    d1 = base / "1" / "complexity_estimation"
+    d1.mkdir(parents=True)
+    (d1 / "estimation_stats.json").write_text(
+        json.dumps(
+            {
+                "epoch": 1,
+                "total_rows": 100,
+                "failed_rows": 2,
+                "failure_rate": 0.02,
+                "backfilled": 2,
+                "residual_failed": 0,
+            }
+        )
+    )
+
+    trainer = ResamplingTrainer.__new__(ResamplingTrainer)
+    trainer.config = SimpleNamespace(  # type: ignore[assignment]
+        out_path=str(tmp_path),
+        complexity_evaluation_dataset=SimpleNamespace(dataset=SimpleNamespace(dataset_id="mmlu_teacher_entropy")),
+    )
+
+    trainer._aggregate_estimation_stats()
+
+    summary = json.loads((base / "complexity_estimation_failures.json").read_text())
+    assert summary["selected_samples_by_epoch"] == {"0": 40, "1": None}

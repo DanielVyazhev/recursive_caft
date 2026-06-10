@@ -35,6 +35,13 @@ class MergedDatasetAdapter(AbstractDatasetAdapter):
         return total
 
     @override
+    def selected_sample_counts(self, df: pd.DataFrame) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for adapter in self.dataset_adapters:
+            counts.update(adapter.selected_sample_counts(df))
+        return counts
+
+    @override
     def save_processed_dataset(self, df: pd.DataFrame, path: str, tmp: bool) -> None:
         raise NotImplementedError(
             "Saving is not implemented for MergedDatasetAdapter. Please save individual datasets separately."
