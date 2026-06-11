@@ -63,6 +63,38 @@
       "total": 2406,
       "correct": 1277,
       "num_truncated": 0
+    },
+    {
+      "epoch": 25.0,
+      "checkpoint": "checkpoint-500",
+      "accuracy": 0.5295095594347464,
+      "total": 2406,
+      "correct": 1274,
+      "num_truncated": 0
+    },
+    {
+      "epoch": 30.0,
+      "checkpoint": "checkpoint-600",
+      "accuracy": 0.5091438071487947,
+      "total": 2406,
+      "correct": 1225,
+      "num_truncated": 1
+    },
+    {
+      "epoch": 40.0,
+      "checkpoint": "checkpoint-800",
+      "accuracy": 0.5257689110556941,
+      "total": 2406,
+      "correct": 1265,
+      "num_truncated": 1
+    },
+    {
+      "epoch": 50.0,
+      "checkpoint": "checkpoint-1000",
+      "accuracy": 0.5228595178719867,
+      "total": 2406,
+      "correct": 1258,
+      "num_truncated": 2
     }
   ]
 }
