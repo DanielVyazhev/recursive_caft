@@ -71,7 +71,7 @@ trainer = ResamplingTrainer(
                     dataset=MMLUReasoningResponseDataset(
                         config=QADatasetConfig(
                             path="should be overridden by SetResamplingPathCallback",
-                            dataset_id="train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large",
+                            dataset_id="train_corrected_answer_deepseek_v4_pro_and_others",
                         ),
                         tokenizer=tokenizer,
                     ),
