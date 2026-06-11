@@ -4,16 +4,18 @@ Shared helpers for the v0 base-model embedding-init runs.
 flatten_distillation_parquet: the source distillation parquet under
 data/out/distillation/ has nested {input, output} columns. The MMLU
 dataset classes expect flat columns (question_id, question, options,
-answer, base_cluster, thinking). This rewrites the source parquet into
-a flat schema the existing dataset code can consume, caching the result
-on disk.
+answer, base_cluster, distill_reasoning, distill_answer). This rewrites
+the source parquet into a flat schema the existing dataset code can
+consume, caching the result on disk. The teacher reasoning trace lands in
+distill_reasoning and the teacher's answer in distill_answer (gold stays
+in answer), matching what MMLUReasoningResponseDataset reads.
 
 Optional thinking-trace truncation: v0 training only needs the embedding
 rows for <think>/</think> to see the tokens in realistic context. Long
 reasoning chains dominate peak memory (cross-entropy over [tokens, vocab]
 fp32 logits) without adding signal proportional to their length. Truncate
-the thinking column at a char cap, trimmed back to the last whitespace so
-we don't cut mid-word just before </think>.
+the distill_reasoning column at a char cap, trimmed back to the last
+whitespace so we don't cut mid-word just before </think>.
 """
 
 from pathlib import Path
@@ -39,6 +41,12 @@ def flatten_distillation_parquet(
     if max_thinking_chars is not None:
         thinking = thinking.apply(lambda t: _truncate_to_whitespace(t, max_thinking_chars))
 
+    # Guard None so a missing answer becomes "" (and is dropped below) rather
+    # than the string "none" slipping past the non-empty filter.
+    distill_answer = df["output"].apply(
+        lambda r: "" if r.get("answer") is None else str(r["answer"]).strip().lower()
+    )
+
     flat = pd.DataFrame(
         {
             "question_id": df["input"].apply(lambda r: str(r["question_id"])),
@@ -46,11 +54,16 @@ def flatten_distillation_parquet(
             "options": df["input"].apply(lambda r: str(list(r["options"].values()))),
             "answer": df["input"].apply(lambda r: str(r["gold"]).lower()),
             "base_cluster": df["input"].apply(lambda r: r["subject"]),
-            "thinking": thinking,
+            "distill_reasoning": thinking,
+            "distill_answer": distill_answer,
         }
     )
 
-    flat = flat[flat["thinking"].notna() & (flat["thinking"].str.len() > 0)]
+    flat = flat[
+        flat["distill_reasoning"].notna()
+        & (flat["distill_reasoning"].str.len() > 0)
+        & (flat["distill_answer"].str.len() > 0)
+    ]
     flat.to_parquet(dst, index=False)
     cap_note = f" (thinking capped at {max_thinking_chars} chars)" if max_thinking_chars else ""
     logger.info(f"Wrote flattened parquet to {dst} ({len(flat)} rows){cap_note}")
