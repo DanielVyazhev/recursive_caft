@@ -24,7 +24,7 @@ MAX_THINKING_CHARS = 12000
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FINAL_SAVE_DIR = REPO_ROOT / "artifacts" / "base_models_v0" / MODEL_NICK
 STAGING_DIR = FINAL_SAVE_DIR.with_name(MODEL_NICK + "_staging")
-SOURCE_PARQUET = REPO_ROOT / "data" / "out" / "distillation" / "mmlu_synth_qwen3_a_t0_8.parquet"
+SOURCE_PARQUET = REPO_ROOT / "data" / "out" / "distillation" / "archive" / "mmlu_synth_qwen3_a_t0_8.parquet"
 FLAT_PARQUET = (
     REPO_ROOT
     / "artifacts"
@@ -39,9 +39,7 @@ def main():
         logger.info(f"v0 base already at {FINAL_SAVE_DIR}, skipping. Delete the dir to force a rerun.")
         return
 
-    flat_path = flatten_distillation_parquet(
-        SOURCE_PARQUET, FLAT_PARQUET, max_thinking_chars=MAX_THINKING_CHARS
-    )
+    flat_path = flatten_distillation_parquet(SOURCE_PARQUET, FLAT_PARQUET, max_thinking_chars=MAX_THINKING_CHARS)
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
     if tokenizer.pad_token is None:
