@@ -52,6 +52,14 @@ class LoRASpecificTrainingArgs(BaseModel):
     train_thinking_token_embeddings: bool = False
 
 
+# Phi-4-mini is Phi3ForCausalLM, which FUSES the attention and MLP input
+# projections into qkv_proj / gate_up_proj. The default target_modules list
+# (q/k/v/gate/up_proj) is Llama/Qwen naming and matches NONE of these, so PEFT
+# would silently adapt only o_proj + down_proj (it doesn't error because those
+# two do match). That cripples the adapter and is why phi4 trained far worse.
+phi4_mini_lora_target_modules = ["qkv_proj", "o_proj", "gate_up_proj", "down_proj"]
+
+
 class LoRATrainerConfig(BaseTrainerConfig[LoRATrainingArgs]):
     lora_training_args: LoRASpecificTrainingArgs = Field(default_factory=LoRASpecificTrainingArgs)
 
