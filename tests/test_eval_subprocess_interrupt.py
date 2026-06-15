@@ -1,8 +1,8 @@
-"""Worker-teardown contract for Evaluator._run_unit_in_child.
+"""Worker-teardown contract for the subprocess supervisor.
 
-Ctrl+C / scheduler SIGTERM must tear down the eval worker *and its whole process
+Ctrl+C / scheduler SIGTERM must tear down the worker *and its whole process
 group* (DataLoader / vLLM grandchildren) — not leave orphans, and not be mistaken
-for a transient crash and retried. These exercise the _terminate_process_group
+for a transient crash and retried. These exercise the terminate_process_group
 helper directly; CPU-only, no model — just short-lived python subprocesses.
 """
 
@@ -14,7 +14,7 @@ import time
 
 import psutil
 
-from core.evaluation.evaluator import _terminate_process_group
+from core.utils.subprocess_supervision import terminate_process_group
 
 # Worker that spawns a long-sleeping grandchild (inheriting the worker's process
 # group), records both pids, then sleeps. Used to prove killpg reaches the whole tree.
@@ -76,7 +76,7 @@ def test_terminate_kills_whole_group_including_grandchild(tmp_path):
         worker_pid, grandchild_pid = (int(x) for x in pidfile.read_text().split())
         assert worker_pid == proc.pid
 
-        _terminate_process_group(proc, grace_s=5.0)
+        terminate_process_group(proc, grace_s=5.0)
 
         assert proc.poll() is not None
         assert _dead(worker_pid), "worker survived teardown"
@@ -101,7 +101,7 @@ def test_terminate_escalates_to_sigkill_when_sigterm_ignored(tmp_path):
         assert worker_pid == proc.pid
 
         start = time.monotonic()
-        _terminate_process_group(proc, grace_s=1.0)
+        terminate_process_group(proc, grace_s=1.0)
         elapsed = time.monotonic() - start
 
         assert proc.poll() is not None
