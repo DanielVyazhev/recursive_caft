@@ -4,11 +4,8 @@ import json
 import os
 import pickle
 import shutil
-import signal
-import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 import pandas as pd
@@ -25,6 +22,7 @@ from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.evaluation.phased_batch_generator import BatchGenerator, _malloc_trim
 from core.utils.device import DEVICE_MAP
 from core.utils.logger import logger
+from core.utils.subprocess_supervision import supervise_unit
 
 # BatchGenerator.generate() prefills every prompt upfront and stages each KV
 # cache on CPU RAM. For 12k+ MMLU-Pro prompts on a 200k-vocab model like
@@ -43,39 +41,8 @@ CHUNK_SIZE = 640
 # reset (CUDA context, caching allocator, host RAM) even on clean exit, and
 # isolates crashes; resume rides the per-chunk/per-phase checkpoints. The parent
 # does no GPU work, so it survives the crashes. Disable with EVAL_SUPERVISE=0.
+# The supervision loop / process-group teardown lives in core.utils.subprocess_supervision.
 _WORKER_PATH = str(Path(__file__).with_name("_eval_worker.py"))
-
-
-def _terminate_process_group(proc: subprocess.Popen, grace_s: float = 10.0) -> None:
-    """SIGTERM the worker's whole process group, then SIGKILL stragglers.
-
-    The worker is spawned with start_new_session=True, so it leads its own process
-    group; signalling that group reaches the worker *and* any descendants it spawned
-    (DataLoader / vLLM workers) — which proc.send_signal() to the direct child would
-    miss. SIGTERM first lets runtime_trace's handler shut down cleanly and flush
-    logs; SIGKILL after grace_s guarantees teardown if it's wedged in a CUDA C call.
-    Catching KeyboardInterrupt means an impatient second Ctrl+C escalates immediately.
-    """
-    if proc.poll() is not None:
-        return
-    try:
-        pgid = os.getpgid(proc.pid)
-    except ProcessLookupError:
-        return
-    try:
-        os.killpg(pgid, signal.SIGTERM)
-        try:
-            proc.wait(timeout=grace_s)
-            return
-        except subprocess.TimeoutExpired:
-            logger.warning(f"[unit] worker pid={proc.pid} ignored SIGTERM after {grace_s:.0f}s — sending SIGKILL")
-    except KeyboardInterrupt:
-        logger.warning("[unit] second interrupt — sending SIGKILL now")
-    try:
-        os.killpg(pgid, signal.SIGKILL)
-    except ProcessLookupError:
-        return
-    proc.wait()
 
 
 class GenerationConfig(BaseModel):
@@ -179,59 +146,22 @@ class Evaluator:
         return results
 
     def _run_unit_in_child(self, spec_path: str, ds_idx: int) -> None:
-        """Run one _evaluate_single (dataset ds_idx) in a fresh subprocess.
+        """Run one _evaluate_single (dataset ds_idx) in a fresh, supervised subprocess.
 
-        Restarts on any nonzero exit (the flaky GPU dies with SIGSEGV/139); resume
-        rides the chunk/phase checkpoints. A circuit breaker hard-stops on repeated
-        fast failures (a deterministic bug, not transient infra) so we never spin
-        forever.
-
-        Interrupts (Ctrl+C / scheduler SIGTERM) must stop the eval, not be mistaken
-        for a transient crash and retried. The worker is spawned in its own session
-        (start_new_session=True) so terminal Ctrl+C reaches only this supervisor; we
-        then tear down the worker's whole process group and re-raise, breaking the
-        retry loop and propagating out so the program exits.
+        Delegates the restart-on-crash / circuit-breaker / interrupt handling to
+        supervise_unit; resume rides the chunk/phase checkpoints the worker writes.
+        EVAL_SUPERVISE=0 in the child guards against any accidental nested spawn.
         """
-        min_healthy_s = float(os.environ.get("EVAL_MIN_HEALTHY_S", "120"))
-        max_fast = int(os.environ.get("EVAL_MAX_FAST_FAILURES", "3"))
-        max_attempts = int(os.environ.get("EVAL_MAX_UNIT_ATTEMPTS", "50"))
-        # EVAL_SUPERVISE=0 in the child guards against any accidental nested spawn.
         cmd = [sys.executable, _WORKER_PATH, spec_path, str(ds_idx)]
         child_env = {**os.environ, "EVAL_SUPERVISE": "0"}
-
-        consecutive_fast = 0
-        for attempt in range(1, max_attempts + 1):
-            start = time.monotonic()
-            logger.info(f"[unit] dataset={ds_idx} starting worker attempt={attempt}")
-            proc = subprocess.Popen(cmd, env=child_env, start_new_session=True)
-            try:
-                code = proc.wait()
-            except BaseException as exc:  # KeyboardInterrupt (Ctrl+C) or SystemExit (parent SIGTERM)
-                logger.warning(
-                    f"[unit] dataset={ds_idx} supervisor interrupted by {type(exc).__name__} — "
-                    f"terminating worker group pid={proc.pid}"
-                )
-                _terminate_process_group(proc)
-                raise
-            dur = time.monotonic() - start
-            if code == 0:
-                logger.info(f"[unit] dataset={ds_idx} worker attempt={attempt} finished in {dur:.0f}s.")
-                return
-            consecutive_fast = consecutive_fast + 1 if dur < min_healthy_s else 0
-            logger.warning(
-                f"[unit] dataset={ds_idx} worker attempt={attempt} pid={proc.pid} crashed: "
-                f"exit={code} after {dur:.0f}s (consecutive_fast={consecutive_fast})"
-            )
-            if consecutive_fast >= max_fast:
-                raise RuntimeError(
-                    f"[unit] dataset={ds_idx}: {consecutive_fast} consecutive crashes in "
-                    f"<{min_healthy_s:.0f}s — looks deterministic, not transient infra. "
-                    f"Aborting (last exit={code})."
-                )
-            backoff = min(30.0, 2.0**consecutive_fast)
-            logger.info(f"[unit] dataset={ds_idx} restarting in {backoff:.0f}s …")
-            time.sleep(backoff)
-        raise RuntimeError(f"[unit] dataset={ds_idx}: exceeded max_unit_attempts={max_attempts}.")
+        supervise_unit(
+            cmd,
+            child_env,
+            label=f"dataset={ds_idx}",
+            min_healthy_s=float(os.environ.get("EVAL_MIN_HEALTHY_S", "120")),
+            max_fast=int(os.environ.get("EVAL_MAX_FAST_FAILURES", "3")),
+            max_attempts=int(os.environ.get("EVAL_MAX_UNIT_ATTEMPTS", "50")),
+        )
 
     def _evaluate_single(self, eval_dataset: QADatasetAdapter, model, tokenizer) -> EvaluationResult:
         ds = eval_dataset.process_dataset()

@@ -1,9 +1,15 @@
+import gc
 import json
 import os
+import pickle
+import shutil
+import sys
+import tempfile
 from pathlib import Path
 from typing import override
 
 import pandas as pd
+import torch
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
 from transformers.modeling_utils import PreTrainedModel
@@ -17,8 +23,13 @@ from core.complexity_estimation.complexity_estimation_runner import (
     QADatasetAdapter,
 )
 from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter
+from core.training.callbacks.save_thinking_token_rows import write_thinking_token_rows
 from core.training.lora_trainer import LoRATrainer, LoRATrainerConfig
 from core.utils.logger import logger
+from core.utils.subprocess_supervision import supervise_unit
+
+# Standalone worker that runs one epoch's estimate() in a fresh, supervised process.
+_COMPLEXITY_WORKER = str(Path(__file__).with_name("_complexity_worker.py"))
 
 
 class ResamplingDataset(IterableDataset):
@@ -65,6 +76,7 @@ class EstimateComplexityCallback(TrainerCallback):
         max_failed_estimation_fraction: float = 0.1,
         save_schedule: list[int] | None = None,
         train_dataset: AbstractDatasetAdapter | None = None,
+        new_ids: list[int] | None = None,
     ) -> None:
         super().__init__()
 
@@ -78,6 +90,10 @@ class EstimateComplexityCallback(TrainerCallback):
         # finalized complexity parquet (after the non-positive-score drop). Optional so the callback
         # can be constructed standalone (e.g. in tests) without the count.
         self._train_dataset = train_dataset
+        # The trained <think>/</think> embedding rows live in the base model (not the LoRA adapter),
+        # so they must be persisted alongside the snapshot for the estimation subprocess to reload.
+        # None when thinking-token embeddings aren't trained. See _estimate_in_subprocess.
+        self._new_ids = new_ids
 
     @override
     def on_epoch_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs) -> None:
@@ -103,19 +119,108 @@ class EstimateComplexityCallback(TrainerCallback):
         else:
             logger.info(f"Estimating complexity for epoch {epoch}...")
 
+            # kwargs["model"] must be the FIRST access on this branch: tests drive on_epoch_begin
+            # without a model and rely on the KeyError surfacing here, before any snapshot save or
+            # subprocess spawn.
             model: PreTrainedModel = kwargs["model"]
 
-            ComplexityEstimationRunner(
-                config=ComplexityEstimationRunnerConfig(
-                    out_path=self.out_path_for_epoch(epoch).as_posix(),
-                    answer_field_name="estimation_phase_answer",
-                    answer_correctness_field_name="estimation_phase_answer_correctness",
-                    generate_config=self._complexity_estimation_runner_generation_config,
-                ),
-                complexity_estimator=self._complexity_estimator,
-            ).estimate(dataset_adapter=self._complexity_evaluation_dataset, model=model)
+            runner_config = ComplexityEstimationRunnerConfig(
+                out_path=self.out_path_for_epoch(epoch).as_posix(),
+                answer_field_name="estimation_phase_answer",
+                answer_correctness_field_name="estimation_phase_answer_correctness",
+                generate_config=self._complexity_estimation_runner_generation_config,
+            )
+
+            if os.environ.get("COMPLEXITY_SUPERVISE") == "0":
+                # Escape hatch (CPU/local/debug): run in-process, as before — no subprocess.
+                ComplexityEstimationRunner(
+                    config=runner_config, complexity_estimator=self._complexity_estimator
+                ).estimate(dataset_adapter=self._complexity_evaluation_dataset, model=model)
+            else:
+                self._estimate_in_subprocess(epoch, model, runner_config)
 
         self._reconcile_estimation(epoch)
+
+    def _estimate_in_subprocess(
+        self, epoch: int, model: PreTrainedModel, runner_config: ComplexityEstimationRunnerConfig
+    ) -> None:
+        # The flaky eval GPU dies with a native SIGSEGV mid-estimation; in-process that kills the
+        # whole training run "without a trace". Run estimate() in a fresh, supervised subprocess
+        # instead (mirrors Evaluator's per-unit isolation): a crash only kills the worker, which
+        # supervise_unit restarts, and the runner resumes from its sibling .tmp parquet.
+        out_path = self.out_path_for_epoch(epoch)
+
+        # Persist the current weights once (reused across all restart attempts): the adapter via
+        # save_pretrained, plus the trained thinking-token rows that PEFT's save_pretrained omits
+        # (they live in the base model). The worker reloads both with the evaluator's LoRA path.
+        model_dir = out_path.parent / "_model_snapshot"
+        shutil.rmtree(model_dir, ignore_errors=True)
+        model_dir.mkdir(parents=True, exist_ok=True)
+        # Unwrap a torch.compile wrapper so save_pretrained sees the real PeftModel.
+        to_save = getattr(model, "_orig_mod", model)
+        to_save.save_pretrained(model_dir.as_posix())
+        assert (model_dir / "adapter_config.json").exists(), (
+            f"save_pretrained wrote no adapter_config.json to {model_dir}"
+        )
+        if self._new_ids:
+            write_thinking_token_rows(model, self._new_ids, model_dir)
+
+        attn_implementation = getattr(model.config, "_attn_implementation", None)
+
+        # Offload the live training model to CPU for the estimation window so the worker's own
+        # base-model copy doesn't double VRAM against the resident parent. Restored in finally so a
+        # crash/interrupt never leaves training on CPU. Disable with COMPLEXITY_OFFLOAD_PARENT=0.
+        offload = os.environ.get("COMPLEXITY_OFFLOAD_PARENT") != "0"
+        device = next(model.parameters()).device
+
+        fd, spec_path = tempfile.mkstemp(prefix=f"complexity_spec_e{epoch}_", suffix=".pkl")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                try:
+                    pickle.dump(
+                        (
+                            model_dir.as_posix(),
+                            runner_config,
+                            self._complexity_estimator,
+                            self._complexity_evaluation_dataset,
+                            attn_implementation,
+                        ),
+                        f,
+                        protocol=pickle.HIGHEST_PROTOCOL,
+                    )
+                except Exception as ex:
+                    raise RuntimeError(
+                        f"Failed to pickle complexity-estimation spec for epoch {epoch}: {ex}"
+                    ) from ex
+
+            if offload:
+                model.to("cpu")
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
+            cmd = [sys.executable, _COMPLEXITY_WORKER, spec_path]
+            child_env = {**os.environ, "COMPLEXITY_SUPERVISE": "0"}
+            supervise_unit(
+                cmd,
+                child_env,
+                label=f"epoch={epoch}",
+                min_healthy_s=float(os.environ.get("COMPLEXITY_MIN_HEALTHY_S", "120")),
+                max_fast=int(os.environ.get("COMPLEXITY_MAX_FAST_FAILURES", "3")),
+                max_attempts=int(os.environ.get("COMPLEXITY_MAX_UNIT_ATTEMPTS", "50")),
+            )
+        finally:
+            if offload:
+                model.to(device)
+            try:
+                os.unlink(spec_path)
+            except OSError:
+                pass
+
+        if not out_path.exists():
+            raise RuntimeError(f"complexity worker for epoch {epoch} exited 0 but wrote no parquet at {out_path}")
+        # Estimation succeeded; the weight snapshot is no longer needed.
+        shutil.rmtree(model_dir, ignore_errors=True)
 
     def _reconcile_estimation(self, epoch: int) -> None:
         # After a LoRA epoch the model may emit a thinking token instead of a single answer letter,
@@ -279,6 +384,10 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
             max_failed_estimation_fraction=self.config.max_failed_estimation_fraction,
             save_schedule=self.config.save_schedule,
             train_dataset=self.config.train_dataset,
+            # Set by LoRATrainer.model when train_thinking_token_embeddings is on (available here
+            # because super()._build_trainer already constructed the model). Lets the estimation
+            # subprocess persist/reload the trained <think> rows that PEFT's save_pretrained omits.
+            new_ids=self._snapshot.new_ids if self._snapshot else None,
         )
         trainer.add_callback(self._estimate_complexity_callback)
         trainer.add_callback(
