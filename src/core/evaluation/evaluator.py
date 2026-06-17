@@ -59,6 +59,11 @@ class GenerationConfig(BaseModel):
     # Parent directory for spilled KV files. None → "_kv_spill" under the
     # dataset out dir. Keep this on local NVMe — a network mount is slow.
     kv_cache_spill_dir: str | None = None
+    # Stage KV into pinned (page-locked) host memory so CPU<->GPU transfers use
+    # the DMA fast path (~8-14x faster restore than pageable). Assumes the host
+    # has enough RAM to hold the RAM-resident staged KV page-locked; set False on
+    # RAM-constrained hosts (also auto-falls-back to pageable if pinning fails).
+    kv_cache_pin_memory: bool = True
 
 
 class EvaluatorConfig(PydraConfig):
@@ -227,6 +232,7 @@ class Evaluator:
                 thinking_end_token_id=thinking_end_token_id,
                 kv_cache_offload_threshold_gb=self.config.generation.kv_cache_offload_threshold_gb,
                 kv_cache_spill_dir=spill_parent,
+                kv_cache_pin_memory=self.config.generation.kv_cache_pin_memory,
             )
 
             gen_result = generator.generate(chunk_prompts, checkpoint_path=str(ckpt_path))

@@ -83,6 +83,37 @@ def _mem_snapshot(staged_slots: int | None = None) -> str:
     return " ".join(parts)
 
 
+# Set once if a pinned host allocation fails (e.g. cudaHostAlloc OOM / a low
+# RLIMIT_MEMLOCK in a container): we stop attempting to pin for the rest of the
+# process and fall back to pageable RAM.
+_PINNING_DISABLED = False
+
+
+def _to_pinned_host(stacked_gpu: torch.Tensor, pin: bool) -> torch.Tensor:
+    """Blocking D2H copy of a stacked KV tensor into host memory.
+
+    When `pin` is set (and pinning hasn't been disabled by a prior failure), the
+    destination is page-locked, so the copy uses the DMA fast path and a later
+    host->device restore can run async. The copy is intentionally *blocking*:
+    pinning — not non_blocking — is what speeds the transfer, and a blocking copy
+    keeps the transient GPU stack alive until it completes. Falls back to a plain
+    pageable copy on allocation failure (logged once).
+    """
+    global _PINNING_DISABLED
+    if pin and not _PINNING_DISABLED and torch.cuda.is_available():
+        try:
+            dest = torch.empty(stacked_gpu.shape, dtype=stacked_gpu.dtype, pin_memory=True)
+            dest.copy_(stacked_gpu)
+            return dest
+        except RuntimeError as exc:
+            _PINNING_DISABLED = True
+            logger.warning(
+                f"[kv-store] pinned host allocation failed ({exc}); "
+                "falling back to pageable KV staging for the rest of this run"
+            )
+    return stacked_gpu.to("cpu")
+
+
 @dataclass
 class GenerationResult:
     sequences: list[list[int]]
@@ -247,9 +278,11 @@ class _PreAllocatedBatchCache(DynamicCache):
         max_cache_len: int,
         device: torch.device,
         dtype: torch.dtype,
+        pin_memory: bool = False,
     ) -> None:
         super().__init__()
         self.max_cache_len = max_cache_len
+        self._pin_memory = pin_memory
         self._active_seq_len = 0
         self._per_row_cache_positions = torch.zeros(max_batch_size, dtype=torch.long, device=device)
         self._batch_indices = torch.arange(max_batch_size, device=device)
@@ -288,24 +321,27 @@ class _PreAllocatedBatchCache(DynamicCache):
 
         Returns (keys, vals) of shape [num_layers, 1, kv_heads, valid_len, head_dim].
         One GPU stack + one device->host copy per K/V (vs one tiny copy per layer),
-        so each slot costs 2 host allocations instead of 2*num_layers.
+        so each slot costs 2 host allocations instead of 2*num_layers. Host tensors
+        are page-locked when pin_memory is set (fast DMA + async restore later).
         """
-        keys = torch.stack(
+        keys_gpu = torch.stack(
             [self.key_cache[i][batch_idx : batch_idx + 1, :, :valid_len, :] for i in range(len(self))], dim=0
-        ).cpu()
-        vals = torch.stack(
+        )
+        vals_gpu = torch.stack(
             [self.value_cache[i][batch_idx : batch_idx + 1, :, :valid_len, :] for i in range(len(self))], dim=0
-        ).cpu()
-        return keys, vals
+        )
+        return _to_pinned_host(keys_gpu, self._pin_memory), _to_pinned_host(vals_gpu, self._pin_memory)
 
     def restore_row_from_cpu(self, batch_idx: int, valid_len: int, keys: torch.Tensor, vals: torch.Tensor) -> None:
         """Copy a slot's stacked CPU KV back into a batch row on GPU.
 
         keys/vals: [num_layers, 1, kv_heads, valid_len, head_dim]. One host->device
         copy per K/V, then per-layer GPU->GPU slice-assign (no host allocations).
+        The H2D copy is async only for pinned sources (safe — the caller syncs before
+        decode); pageable sources (disk-restored slots) fall back to a blocking copy.
         """
-        k_gpu = keys.to(self.key_cache[0].device)
-        v_gpu = vals.to(self.value_cache[0].device)
+        k_gpu = keys.to(self.key_cache[0].device, non_blocking=keys.is_pinned())
+        v_gpu = vals.to(self.value_cache[0].device, non_blocking=vals.is_pinned())
         for i in range(len(self)):
             self.key_cache[i][batch_idx, :, :valid_len, :] = k_gpu[i, 0]
             self.value_cache[i][batch_idx, :, :valid_len, :] = v_gpu[i, 0]
@@ -336,6 +372,7 @@ class BatchGenerator:
         thinking_end_token_id: int | None = None,
         kv_cache_offload_threshold_gb: float = 180.0,
         kv_cache_spill_dir: str | None = None,
+        kv_cache_pin_memory: bool = True,
     ):
         self.model = model
         self.tokenizer = tokenizer
@@ -348,6 +385,7 @@ class BatchGenerator:
         self.thinking_end_token_id = thinking_end_token_id
         self._kv_offload_threshold_bytes = int(kv_cache_offload_threshold_gb * 1e9)
         self._kv_spill_dir = kv_cache_spill_dir
+        self._kv_cache_pin_memory = kv_cache_pin_memory
         self._enforce_thinking_cap = max_thinking_tokens is not None and thinking_end_token_id is not None
         if (max_thinking_tokens is None) != (thinking_end_token_id is None):
             logger.warning(
@@ -462,6 +500,7 @@ class BatchGenerator:
             max_cache_len=max_seq_len,
             device=device,
             dtype=dtype,
+            pin_memory=self._kv_cache_pin_memory,
         )
 
     def _check_vram_pressure(self) -> bool:
@@ -990,10 +1029,12 @@ class BatchGenerator:
         slot.seq_position = seq_len + 1
 
         # Stage as two contiguous CPU tensors (one stack + one copy per K/V),
-        # matching _PreAllocatedBatchCache.stage_row_to_cpu's format.
-        keys = torch.stack([k[:, :, :seq_len, :] for k in cache.key_cache], dim=0).cpu()
-        vals = torch.stack([v[:, :, :seq_len, :] for v in cache.value_cache], dim=0).cpu()
-        return keys, vals, seq_len
+        # matching _PreAllocatedBatchCache.stage_row_to_cpu's format. Page-locked
+        # when pin_memory is set, for a fast DMA restore later.
+        pin = self._kv_cache_pin_memory
+        keys_gpu = torch.stack([k[:, :, :seq_len, :] for k in cache.key_cache], dim=0)
+        vals_gpu = torch.stack([v[:, :, :seq_len, :] for v in cache.value_cache], dim=0)
+        return _to_pinned_host(keys_gpu, pin), _to_pinned_host(vals_gpu, pin), seq_len
 
     def _batched_decode(self, batch_indices: list[int], slots: list[_Slot]) -> None:
         """Run a single batched decode step for all active slots.
