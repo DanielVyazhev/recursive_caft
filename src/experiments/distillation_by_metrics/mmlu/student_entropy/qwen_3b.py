@@ -7,6 +7,7 @@ from core.complexity_estimation.entropy.single_token_entropy_estimator import Si
 from core.dataset_samplers.entropy_ratio_sampler import BaseDatasetSamplerConfig
 from core.dataset_samplers.student_entropy_sampler import StudentEntropySampler
 from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
+from core.datasets.merged_dataset_adapter import MergedDatasetAdapter
 from core.datasets.mmlu.mmlu_reasoning_response_dataset import MMLUReasoningResponseDataset
 from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset
 from core.datasets.qa_dataset import QADatasetConfig
@@ -22,7 +23,9 @@ from core.training.thinking_tokens import setup_thinking_tokens
 from core.utils.datasets import add_average_column, merge_mmlu_on_question_id
 
 MODEL_NAME = Path(__file__).resolve().parents[5].joinpath("artifacts/base_models_v0/qwen_3b").as_posix()
-OUT_PATH = Path(__file__).parent.joinpath("../../../../../artifacts/train_pipeline/mmlu/student_entropy/qwen_3b/")
+OUT_PATH = Path(__file__).parent.joinpath(
+    "../../../../../artifacts/train_pipeline/mmlu/student_entropy_direct_reasoning_trace/qwen_3b/"
+)
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 if not tokenizer.pad_token:
@@ -51,23 +54,37 @@ merge_mmlu_on_question_id(
 trainer = ResamplingTrainer(
     config=ResamplingTrainerConfig(
         training_args=LoRATrainingArgs(
-            num_train_epochs=20,
+            num_train_epochs=50,
             per_device_train_batch_size=4,
         ),
         lora_training_args=LoRASpecificTrainingArgs(train_thinking_token_embeddings=True),
         out_path=OUT_PATH.as_posix(),
         model_id=MODEL_NAME,
-        train_dataset=CausalDatasetAdapter(
-            dataset=MMLUReasoningResponseDataset(
-                config=QADatasetConfig(
-                    path="should be overridden by SetResamplingPathCallback",
-                    dataset_id="train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large",
+        train_dataset=MergedDatasetAdapter(
+            [
+                CausalDatasetAdapter(
+                    dataset=MMLUReasoningResponseDataset(
+                        config=QADatasetConfig(
+                            path="should be overridden by SetResamplingPathCallback",
+                            dataset_id="train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large",
+                        ),
+                        tokenizer=tokenizer,
+                    ),
+                    dataset_sampler=StudentEntropySampler(BaseDatasetSamplerConfig(top_k=1024)),
                 ),
-                tokenizer=tokenizer,
-            ),
-            dataset_sampler=StudentEntropySampler(BaseDatasetSamplerConfig(top_k=1024)),
+                CausalDatasetAdapter(
+                    dataset=MMLUSingleTokenResponseDataset(
+                        config=QADatasetConfig(
+                            path="should be overridden by SetResamplingPathCallback",
+                            dataset_id="mmlu_single_token_train",
+                        ),
+                        tokenizer=tokenizer,
+                    ),
+                    dataset_sampler=StudentEntropySampler(BaseDatasetSamplerConfig(top_k=256)),
+                ),
+            ]
         ),
-        save_schedule=[1, 2, 3, 5, 7, 10, 15, 20],
+        save_schedule=[5, 10, 15, 20, 30, 40, 50],
         complexity_evaluation_dataset=QADatasetAdapter(
             dataset=MMLUSingleTokenResponseDataset(
                 config=QADatasetConfig(
