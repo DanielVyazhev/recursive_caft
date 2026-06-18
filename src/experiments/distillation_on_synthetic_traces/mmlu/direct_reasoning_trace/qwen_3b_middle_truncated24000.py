@@ -50,8 +50,8 @@ trainer = LoRATrainer(
                 ),
                 tokenizer=tokenizer,
             )
-        ),
-        training_args=LoRATrainingArgs(num_train_epochs=20, per_device_train_batch_size=4),
+        ),crease batch size
+        training_args=LoRATrainingArgs(num_train_epochs=20, per_device_train_batch_size=1),
         lora_training_args=LoRASpecificTrainingArgs(train_thinking_token_embeddings=True),
         save_schedule=[1, 3, 5, 10, 15, 20],
     ),
