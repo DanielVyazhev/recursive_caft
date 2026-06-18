@@ -29,7 +29,9 @@ setup_thinking_tokens(tokenizer)
 
 OUT_PATH = (
     Path(__file__)
-    .parent.joinpath("../../../../../artifacts/distillation_on_synthetic_traces/mmlu/corrected_answer/phi4_mini")
+    .parent.joinpath(
+        "../../../../../artifacts/distillation_on_synthetic_traces/mmlu/corrected_answer/phi4_mini_head_truncated8192"
+    )
     .as_posix()
 )
 

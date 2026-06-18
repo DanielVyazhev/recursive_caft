@@ -28,7 +28,9 @@ setup_thinking_tokens(tokenizer)
 
 OUT_PATH = (
     Path(__file__)
-    .parent.joinpath("../../../../../artifacts/distillation_on_synthetic_traces/mmlu/direct_reasoning_trace/qwen_3b")
+    .parent.joinpath(
+        "../../../../../artifacts/distillation_on_synthetic_traces/mmlu/corrected_answer/qwen_3b_head_truncated8192"
+    )
     .as_posix()
 )
 
@@ -41,17 +43,17 @@ trainer = LoRATrainer(
                 config=QADatasetConfig(
                     path=Path(__file__)
                     .parent.joinpath(
-                        "../../../../../data/out/splits/random/mmlu/train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large.parquet"
+                        "../../../../../data/out/splits/random/mmlu/train_corrected_answer_deepseek_v4_pro_and_others.parquet"
                     )
                     .as_posix(),
-                    dataset_id="mmlu_train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large",
+                    dataset_id="mmlu_train_corrected_answer_deepseek_v4_pro_and_others",
                 ),
                 tokenizer=tokenizer,
             )
         ),
         training_args=LoRATrainingArgs(num_train_epochs=20, per_device_train_batch_size=4),
         lora_training_args=LoRASpecificTrainingArgs(train_thinking_token_embeddings=True),
-        save_schedule=[1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20],
+        save_schedule=[1, 2, 3, 5, 7, 10, 15, 20],
     ),
     tokenizer=tokenizer,
 )
