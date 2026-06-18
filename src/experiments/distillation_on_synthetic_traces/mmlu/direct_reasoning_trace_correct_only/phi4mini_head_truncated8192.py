@@ -29,7 +29,9 @@ setup_thinking_tokens(tokenizer)
 
 OUT_PATH = (
     Path(__file__)
-    .parent.joinpath("../../../../../artifacts/distillation_on_synthetic_traces/mmlu/distill_w_explained/phi4_mini")
+    .parent.joinpath(
+        "../../../../../artifacts/distillation_on_synthetic_traces/mmlu/direct_reasoning_trace_correct_only/phi4_mini_head_truncated8192"
+    )
     .as_posix()
 )
 
@@ -42,10 +44,10 @@ trainer = LoRATrainer(
                 config=QADatasetConfig(
                     path=Path(__file__)
                     .parent.joinpath(
-                        "../../../../../data/out/splits/random/mmlu/train_distilled_w_explained_deepseek_v4_flash.parquet"
+                        "../../../../../data/out/splits/random/mmlu/train_correct_only_distilled_deepseek_v4_flash_regenerate_incorrect_w_large.parquet"
                     )
                     .as_posix(),
-                    dataset_id="mmlu_train_distilled_w_explained_deepseek_v4_flash",
+                    dataset_id="mmlu_train_correct_only_distilled_deepseek_v4_flash_regenerate_incorrect_w_large",
                 ),
                 tokenizer=tokenizer,
             )
