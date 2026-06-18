@@ -24,7 +24,7 @@ from core.utils.datasets import add_average_column, merge_mmlu_on_question_id
 
 MODEL_NAME = Path(__file__).resolve().parents[5].joinpath("artifacts/base_models_v0/qwen_3b").as_posix()
 OUT_PATH = Path(__file__).parent.joinpath(
-    "../../../../../artifacts/train_pipeline/mmlu/student_entropy_direct_reasoning_trace/qwen_3b/"
+    "../../../../../artifacts/distillation_by_metrics/mmlu/student_entropy_direct_reasoning_trace/qwen_3b/"
 )
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
