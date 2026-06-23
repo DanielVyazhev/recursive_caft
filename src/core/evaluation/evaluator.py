@@ -1,28 +1,69 @@
+import gc
+import hashlib
 import json
+import os
+import pickle
+import shutil
+import sys
+import tempfile
 from pathlib import Path
 
 import pandas as pd
+import psutil
 import torch
 from pydantic import BaseModel
 from pydraconf import PydraConfig
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizer
 
+import core.utils.runtime_trace  # noqa: F401  # install faulthandler/excepthook/signal handlers
 from core.datasets.qa_dataset import QADataset
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
-from core.evaluation.phased_batch_generator import BatchGenerator
+from core.evaluation.phased_batch_generator import BatchGenerator, _malloc_trim
 from core.utils.device import DEVICE_MAP
 from core.utils.logger import logger
+from core.utils.subprocess_supervision import supervise_unit
+
+# BatchGenerator.generate() prefills every prompt upfront and stages each KV
+# cache on CPU RAM. For 12k+ MMLU-Pro prompts on a 200k-vocab model like
+# Phi-4-mini that's ~200GB of staged KV and the container gets OOM-killed.
+# Chunking the prompt list bounds peak CPU RAM to one chunk's staging queue.
+
+# A bit more than 1/6 of MMLU test
+CHUNK_SIZE = 410
+
+
+# --- Per-unit crash isolation ------------------------------------------------
+# The eval GPU is flaky and dies with a native SIGSEGV (EXIT=139) mid-run (see
+# the corrected-AER RxErr storm on 0000:61:00.0). Evaluator.evaluate() runs each
+# dataset's _evaluate_single in its own fresh subprocess (_eval_worker.py) and
+# restarts it on a nonzero exit — a fresh process per unit gives a full resource
+# reset (CUDA context, caching allocator, host RAM) even on clean exit, and
+# isolates crashes; resume rides the per-chunk/per-phase checkpoints. The parent
+# does no GPU work, so it survives the crashes. Disable with EVAL_SUPERVISE=0.
+# The supervision loop / process-group teardown lives in core.utils.subprocess_supervision.
+_WORKER_PATH = str(Path(__file__).with_name("_eval_worker.py"))
 
 
 class GenerationConfig(BaseModel):
     max_new_tokens: int
+    max_thinking_tokens: int | None = None
     max_batch_size: int
     temperature: float = 0.0
     top_p: float = 1.0
     top_k: int = -1
-    torch_compile: bool = True
     attn_implementation: str | None = "flash_attention_2"
+    # Once the cumulative RAM footprint of staged KV cache exceeds this many
+    # GB, overflow slots spill to disk instead of RAM.
+    kv_cache_offload_threshold_gb: float = 200.0
+    # Parent directory for spilled KV files. None → "_kv_spill" under the
+    # dataset out dir. Keep this on local NVMe — a network mount is slow.
+    kv_cache_spill_dir: str | None = None
+    # Stage KV into pinned (page-locked) host memory so CPU<->GPU transfers use
+    # the DMA fast path (~8-14x faster restore than pageable). Assumes the host
+    # has enough RAM to hold the RAM-resident staged KV page-locked; set False on
+    # RAM-constrained hosts (also auto-falls-back to pageable if pinning fails).
+    kv_cache_pin_memory: bool = True
 
 
 class EvaluatorConfig(PydraConfig):
@@ -52,98 +93,264 @@ class Evaluator:
 
     def evaluate(self) -> list[EvaluationResult]:
         cached_results: list[EvaluationResult | None] = [self._load_cached_result(ds) for ds in self._datasets]
-
         if all(r is not None for r in cached_results):
             return cached_results  # type: ignore[return-value]
 
+        # Escape hatch / non-GPU debugging: run everything in this process.
+        if os.environ.get("EVAL_SUPERVISE") == "0":
+            return self._evaluate_in_process(cached_results)
+
+        # Default: one fresh subprocess per uncached dataset (full resource reset
+        # even on clean exit), each restarted on crash. Pickle config+tokenizer
+        # once; the worker rebuilds the Evaluator, loads the model, and runs
+        # _evaluate_single, which writes results.json — recovered here via the cache.
+        fd, spec_path = tempfile.mkstemp(prefix="eval_spec_", suffix=".pkl")
+        results: list[EvaluationResult] = []
+        try:
+            with os.fdopen(fd, "wb") as f:
+                pickle.dump((self.config, self.tokenizer), f, protocol=pickle.HIGHEST_PROTOCOL)
+            for ds_idx, (ds, cached) in enumerate(
+                tqdm(zip(self._datasets, cached_results), total=len(self._datasets), desc="Datasets")
+            ):
+                if cached is not None:
+                    results.append(cached)
+                    continue
+                self._run_unit_in_child(spec_path, ds_idx)
+                result = self._load_cached_result(ds)
+                if result is None:
+                    raise RuntimeError(
+                        f"eval worker for dataset {ds_idx} exited 0 but wrote no results at "
+                        f"{self._eval_results_path_for(ds)}"
+                    )
+                results.append(result)
+        finally:
+            try:
+                os.unlink(spec_path)
+            except OSError:
+                pass
+        return results
+
+    def _evaluate_in_process(self, cached_results: list[EvaluationResult | None]) -> list[EvaluationResult]:
+        """Run every dataset's _evaluate_single in this process (no subprocesses).
+
+        Used for EVAL_SUPERVISE=0 (local / non-GPU debugging). The crash-isolation
+        path is evaluate() spawning one worker per dataset instead.
+        """
         model, tokenizer = self._load_model()
         model.eval()
-
-        if self.config.generation.torch_compile:
-            if not torch.cuda.is_available():
-                logger.warning("torch_compile=True but CUDA not available — skipping compilation.")
-            else:
-                logger.info("Compiling model with torch.compile... First forward call will be slow.")
-                torch.set_float32_matmul_precision("high")
-                torch._dynamo.config.cache_size_limit = 128
-                model = torch.compile(model)
-
+        logger.info(
+            f"[cfg] attn_implementation={getattr(model.config, '_attn_implementation', '?')} "
+            f"dtype={getattr(model, 'dtype', '?')}"
+        )
         results: list[EvaluationResult] = []
         for ds, cached in tqdm(zip(self._datasets, cached_results), total=len(self._datasets), desc="Datasets"):
             if cached is not None:
                 results.append(cached)
             else:
                 results.append(self._evaluate_single(ds, model, tokenizer))
-
         return results
+
+    def _run_unit_in_child(self, spec_path: str, ds_idx: int) -> None:
+        """Run one _evaluate_single (dataset ds_idx) in a fresh, supervised subprocess.
+
+        Delegates the restart-on-crash / circuit-breaker / interrupt handling to
+        supervise_unit; resume rides the chunk/phase checkpoints the worker writes.
+        EVAL_SUPERVISE=0 in the child guards against any accidental nested spawn.
+        """
+        cmd = [sys.executable, _WORKER_PATH, spec_path, str(ds_idx)]
+        child_env = {**os.environ, "EVAL_SUPERVISE": "0"}
+        supervise_unit(
+            cmd,
+            child_env,
+            label=f"dataset={ds_idx}",
+            min_healthy_s=float(os.environ.get("EVAL_MIN_HEALTHY_S", "120")),
+            max_fast=int(os.environ.get("EVAL_MAX_FAST_FAILURES", "3")),
+            max_attempts=int(os.environ.get("EVAL_MAX_UNIT_ATTEMPTS", "50")),
+        )
 
     def _evaluate_single(self, eval_dataset: QADatasetAdapter, model, tokenizer) -> EvaluationResult:
         ds = eval_dataset.process_dataset()
 
         prompts = [row["input_ids"] for row in ds]
-        logger.info(
-            f"Evaluating {len(prompts)} samples with model from {self.config.model_path} for dataset {eval_dataset.dataset.dataset_id}..."
-        )
-
-        generator = BatchGenerator(
-            model=model,
-            tokenizer=tokenizer,
-            max_new_tokens=self.config.generation.max_new_tokens,
-            max_batch_size=self.config.generation.max_batch_size,
-            temperature=self.config.generation.temperature,
-            top_p=self.config.generation.top_p,
-            top_k=self.config.generation.top_k,
-        )
-
-        gen_result = generator.generate(prompts)
-        generated = gen_result.sequences
-
-        if gen_result.num_truncated > 0:
-            pct = gen_result.num_truncated / gen_result.total * 100
-            logger.warning(
-                f"Generation reached max_new_tokens ({self.config.generation.max_new_tokens}) "
-                f"for {gen_result.num_truncated}/{gen_result.total} sequences ({pct:.1f}%)"
-            )
-
-        correct = 0
         total = len(prompts)
-        all_results: list[dict] = []
+        logger.info(
+            f"Evaluating {total} samples with model from {self.config.model_path} for dataset {eval_dataset.dataset.dataset_id}..."
+        )
 
         qa_dataset: QADataset = eval_dataset.dataset
 
-        for i, gen_ids in enumerate(generated):
-            row = ds[i]
-            response = tokenizer.decode(gen_ids, skip_special_tokens=True).strip()
+        correct = 0
+        num_truncated = 0
+        all_results: list[dict] = []
 
-            try:
-                parsed_answer, is_correct = qa_dataset.verify_assistant_response(row, response)
-            except Exception as ex:
-                logger.warning(f"Error verifying row {row['row_id']}: {ex}")
-                parsed_answer = response
-                is_correct = False
+        thinking_end_token_id: int | None = None
+        if self.config.generation.max_thinking_tokens is not None:
+            resolved = getattr(tokenizer, "thinking_end_token_id", None)
+            assert isinstance(resolved, int) and resolved >= 0, (
+                "max_thinking_tokens set but tokenizer has no thinking_end_token_id; "
+                "call setup_thinking_tokens(tokenizer) in the experiment script."
+            )
+            thinking_end_token_id = resolved
 
-            if is_correct:
-                correct += 1
+        num_chunks = (total + CHUNK_SIZE - 1) // CHUNK_SIZE
+        chunks_dir = self._chunks_dir_for(eval_dataset)
+        chunks_dir.mkdir(parents=True, exist_ok=True)
 
-            all_results.append(
-                {
-                    "row_id": row["row_id"],
-                    "response": response,
-                    "parsed_answer": parsed_answer,
-                    "is_correct": is_correct,
-                }
+        for chunk_idx in range(num_chunks):
+            start = chunk_idx * CHUNK_SIZE
+            end = min(start + CHUNK_SIZE, total)
+            chunk_path = self._chunk_path(chunks_dir, chunk_idx)
+            ckpt_path = chunk_path.with_suffix(".ckpt.json")
+
+            cached_rows = self._load_chunk(chunk_path)
+            if cached_rows is not None:
+                logger.info(f"Chunk {chunk_idx + 1}/{num_chunks}: loaded {len(cached_rows)} rows from {chunk_path}")
+                all_results.extend(cached_rows)
+                correct += sum(1 for r in cached_rows if r["is_correct"])
+                num_truncated += sum(1 for r in cached_rows if r["is_truncated"])
+                continue
+
+            chunk_prompts = prompts[start:end]
+            logger.info(f"Chunk {chunk_idx + 1}/{num_chunks}: prompts [{start}:{end}] ({len(chunk_prompts)} samples)")
+
+            if chunk_idx == 0:
+                for i, prompt in enumerate(chunk_prompts[:3]):
+                    logger.info(f"Example prompt {i}: {tokenizer.decode(prompt, skip_special_tokens=False)}")
+
+            spill_parent = self.config.generation.kv_cache_spill_dir or str(
+                self._out_path_for(eval_dataset) / "_kv_spill"
+            )
+            generator = BatchGenerator(
+                model=model,
+                tokenizer=tokenizer,
+                max_new_tokens=self.config.generation.max_new_tokens,
+                max_batch_size=self.config.generation.max_batch_size,
+                temperature=self.config.generation.temperature,
+                top_p=self.config.generation.top_p,
+                top_k=self.config.generation.top_k,
+                max_thinking_tokens=self.config.generation.max_thinking_tokens,
+                thinking_end_token_id=thinking_end_token_id,
+                kv_cache_offload_threshold_gb=self.config.generation.kv_cache_offload_threshold_gb,
+                kv_cache_spill_dir=spill_parent,
+                kv_cache_pin_memory=self.config.generation.kv_cache_pin_memory,
+            )
+
+            gen_result = generator.generate(chunk_prompts, checkpoint_path=str(ckpt_path))
+
+            chunk_rows: list[dict] = []
+            for offset, gen_ids in enumerate(gen_result.sequences):
+                row = ds[start + offset]
+                response = tokenizer.decode(gen_ids, skip_special_tokens=False).strip()
+                is_truncated = gen_result.truncated[offset]
+                is_thinking_budget_exhausted = gen_result.thinking_budget_exhausted[offset]
+
+                try:
+                    parsed_answer, is_correct = qa_dataset.verify_assistant_response(row, response)
+                except Exception as ex:
+                    logger.warning(f"Error verifying row {row['row_id']}: {ex}")
+                    parsed_answer = response
+                    is_correct = False
+
+                chunk_rows.append(
+                    {
+                        "row_id": row["row_id"],
+                        "response": response,
+                        "parsed_answer": parsed_answer,
+                        "is_correct": is_correct,
+                        "is_truncated": is_truncated,
+                        "is_thinking_budget_exhausted": is_thinking_budget_exhausted,
+                    }
+                )
+
+            self._save_chunk_atomic(chunk_path, chunk_rows)
+            # Chunk is durably saved; its resume checkpoint is no longer needed.
+            ckpt_path.unlink(missing_ok=True)
+            all_results.extend(chunk_rows)
+            correct += sum(1 for r in chunk_rows if r["is_correct"])
+            num_truncated += gen_result.num_truncated
+
+            # Release the chunk's CPU-staged KV caches before the next chunk
+            # prefills its own. Without this, peak CPU RAM keeps climbing.
+            del generator, gen_result
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            # gc.collect() drops Python refs; the chunks then sit in glibc's
+            # per-arena freelists and never return to the OS. The .cpu() in
+            # stage_row_to_cpu produces 2*num_layers small allocs per slot, so
+            # arenas fragment heavily over a run.
+            _malloc_trim()
+
+            # Post-chunk baseline: nothing is staged. RSS here == process baseline
+            # + glibc small-alloc residue. Subtract from mid-phase RSS in later
+            # chunks to isolate staged-KV-driven growth.
+            rss_gb = psutil.Process().memory_info().rss / 1e9
+            logger.info(f"[mem] post-chunk baseline: rss={rss_gb:.2f}GB")
+
+        if num_truncated > 0:
+            pct = num_truncated / total * 100
+            logger.warning(
+                f"Generation reached max_new_tokens ({self.config.generation.max_new_tokens}) "
+                f"for {num_truncated}/{total} sequences ({pct:.1f}%)"
             )
 
         accuracy = correct / total if total > 0 else 0.0
-        result = EvaluationResult(
-            accuracy=accuracy, total=total, correct=correct, num_truncated=gen_result.num_truncated
-        )
+        result = EvaluationResult(accuracy=accuracy, total=total, correct=correct, num_truncated=num_truncated)
 
         logger.info(f"Evaluation complete: accuracy={accuracy:.4f} ({correct}/{total})")
 
         self._save_results(eval_dataset, result, all_results)
+        self._cleanup_chunks(eval_dataset)
 
         return result
+
+    def _config_hash(self) -> str:
+        gen = self.config.generation
+        raw = "|".join(
+            str(x)
+            for x in (
+                self.config.model_path,
+                gen.max_new_tokens,
+                gen.max_thinking_tokens,
+                gen.temperature,
+                gen.top_p,
+                gen.top_k,
+                CHUNK_SIZE,
+            )
+        )
+        return hashlib.md5(raw.encode()).hexdigest()[:12]
+
+    def _chunks_dir_for(self, eval_dataset: QADatasetAdapter) -> Path:
+        return self._out_path_for(eval_dataset) / f"_chunks_{self._config_hash()}"
+
+    def _chunk_path(self, chunks_dir: Path, chunk_idx: int) -> Path:
+        return chunks_dir / f"chunk_{chunk_idx:04d}.json"
+
+    def _load_chunk(self, path: Path) -> list[dict] | None:
+        if not path.exists():
+            return None
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except json.JSONDecodeError as ex:
+            logger.warning(f"Corrupt chunk cache at {path} ({ex}); will regenerate")
+            return None
+
+    def _save_chunk_atomic(self, path: Path, rows: list[dict]) -> None:
+        tmp = path.with_suffix(".json.tmp")
+        with open(tmp, "w") as f:
+            json.dump(rows, f)
+        os.replace(tmp, path)
+
+    def _cleanup_chunks(self, eval_dataset: QADatasetAdapter) -> None:
+        out_dir = self._out_path_for(eval_dataset)
+        if not out_dir.exists():
+            return
+        for entry in out_dir.iterdir():
+            # _kv_spill holds per-chunk KV spill subdirs (each store removes its
+            # own; the empty parent is swept here).
+            if entry.is_dir() and (entry.name.startswith("_chunks_") or entry.name == "_kv_spill"):
+                shutil.rmtree(entry, ignore_errors=True)
 
     def _load_cached_result(self, eval_dataset: QADatasetAdapter) -> EvaluationResult | None:
         results_path = self._eval_results_path_for(eval_dataset)
@@ -194,6 +401,8 @@ class Evaluator:
     def _load_lora_model(self, model_path: Path, adapter_config: Path):
         from peft import PeftModel
 
+        from core.training.callbacks.save_thinking_token_rows import ROWS_FILENAME
+
         with open(adapter_config) as f:
             config = json.load(f)
 
@@ -208,6 +417,25 @@ class Evaluator:
             torch_dtype=torch.bfloat16,
             attn_implementation=self.config.generation.attn_implementation,
         )
+
+        rows_path = model_path / ROWS_FILENAME
+        if rows_path.exists():
+            payload = torch.load(rows_path, map_location="cpu", weights_only=True)
+            new_ids = payload["new_ids"]
+            in_rows = payload["input_rows"]
+            in_w = base_model.get_input_embeddings().weight
+            with torch.no_grad():
+                ids_t = torch.tensor(new_ids, dtype=torch.long, device=in_w.device)
+                in_w.data[ids_t] = in_rows.to(dtype=in_w.dtype, device=in_w.device)
+                if "output_rows" in payload:
+                    out_layer = base_model.get_output_embeddings()
+                    assert out_layer is not None, (
+                        f"{rows_path} has output_rows but base model has no output embedding layer"
+                    )
+                    out_w = out_layer.weight
+                    out_w.data[ids_t] = payload["output_rows"].to(dtype=out_w.dtype, device=out_w.device)
+            logger.info(f"Loaded {len(new_ids)} thinking-token rows from {rows_path}")
+
         model = PeftModel.from_pretrained(base_model, str(model_path))
         if not self.tokenizer:
             self.tokenizer = AutoTokenizer.from_pretrained(base_model_id)

@@ -31,10 +31,8 @@ So different runs never overwrite each other.
 
 import argparse
 import sys
-import setproctitle
-setproctitle.setproctitle('experiment_gpu_run')
 
-#from core.entropy_dynamics.analyzer import run_full_analysis
+from core.entropy_dynamics.analyzer import run_full_analysis
 from core.entropy_dynamics.config import (
     EntropyDynamicsConfig, ExperimentRole, InferenceMode, StudentModelConfig,
 )
@@ -42,17 +40,14 @@ from core.entropy_dynamics.runner import EntropyDynamicsRunner
 
 # ── Model presets by role ──
 STUDENT_MODELS = [
-    StudentModelConfig(model_id="/mnt/data198/LLM/models/Qwen2.5-3B-Instruct", label="qwen_3b"),
-    StudentModelConfig(model_id="/mnt/data198/LLM/models/Phi-4-mini-instruct", label="phi4_mini"),
-    StudentModelConfig(model_id="meta-llama/Llama-3.2-3B-Instruct", label="llama_3b"),
+    StudentModelConfig(model_id="/home/dviazhev/complexity-aware-fine-tuning-old/src/models/Qwen2.5-3B-Instruct", label="qwen_3b"),
+    StudentModelConfig(model_id="/home/dviazhev/qa_finetune/Phi-4-mini-instruct", label="phi4_mini"),
+#    StudentModelConfig(model_id="meta-llama/Llama-3.2-3B-Instruct", label="llama_3b"),
 ]
 
 PROXY_MODELS = [
-    StudentModelConfig(model_id="/mnt/data198/LLM/models/Qwen2.5-32B-Instruct", label="qwen_32b"),
-    StudentModelConfig(model_id="/mnt/data198/LLM/models/Qwen2.5-14B-Instruct", label="qwen_14b"),
-    StudentModelConfig(model_id="/mnt/data198/LLM/models/Mistral-Small-3.2-24B-Instruct-2506", label="mistral_24b"),
-    StudentModelConfig(model_id="/mnt/data198/LLM/models/Mistral-Small-22B-Instruct", label="mistral_22b"),
-    StudentModelConfig(model_id="/mnt/data198/LLM/models/Ministral-3-14B-Instruct-2512-BF16", label="mistral_14b"),
+    StudentModelConfig(model_id="/home/dviazhev/recursive_caft/models/Qwen2.5-32B-Instruct", label="qwen_32b"),
+    StudentModelConfig(model_id="/home/dviazhev/recursive_caft/models/Mistral-Small-24B-Instruct-2501", label="mistral_24b"),
 ]
 
 
@@ -80,7 +75,6 @@ def parse_args():
                         help="vLLM max sequence length")
     parser.add_argument("--tensor_parallel_size", type=int, default=1,
                         help="vLLM tensor parallelism (use >1 for multi-GPU)")
-    parser.add_argument("--max_thinking_tokens",type=int,default=None)
     return parser.parse_args()
 
 
@@ -144,7 +138,7 @@ def main():
     results_path = config.out_path / config.results_filename
     if results_path.exists():
         print(f"\nRunning analysis on {results_path}...")
-    #    run_full_analysis(results_path, config.out_path / "analysis")
+        run_full_analysis(results_path, config.out_path / "analysis")
     else:
         print(f"Results file not found at {results_path}. Run inference first.")
 

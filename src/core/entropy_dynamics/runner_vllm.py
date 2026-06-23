@@ -21,15 +21,31 @@ Usage:
       --out_dir artifacts/entropy_dynamics/mmlu_forced \\
       --role proxy --mode forced --students qwen_32b \\
       --use_vllm --gpu_memory_utilization 0.85
+
+My script for starting:
+env["PYTHONPATH"] = "/home/dviazhev/recursive_caft/src"
+env["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+env["TOKENIZERS_PARALLELISM"] = "false"
+env["VLLM_USE_V1"] = "0"
+
+cmd = [
+    "python", "-m", "core.entropy_dynamics.run_experiment",
+    "--teacher_reasoning_path", "/home/dviazhev/recursive_caft/data/out/distillation/mmlu_synth_gptoss_b_t0_8.parquet",
+    "--out_dir", "artifacts/entropy_dynamics/gpt_b_proxy",
+    "--role", "proxy",
+    "--mode", "forced",
+    "--dataset_type", "mmlu",
+    "--students", "qwen_32b", "mistral_24b",
+    "--use_vllm",
+    "--gpu_memory_utilization", "0.90",
+    "--max_model_len", "8192",
+    "--tensor_parallel_size", "0",   # 0 = auto-detect
 """
 
 from __future__ import annotations
 
 import hashlib
 import os
-os.environ["VLLM_USE_V1"] = "0"
-
-
 import pickle
 import time
 from pathlib import Path
@@ -38,11 +54,7 @@ import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
-import gc as _gc
-from array import array
 from transformers import AutoTokenizer
-from vllm import TokensPrompt
-
 
 from core.entropy_dynamics.config import EntropyDynamicsConfig, StudentModelConfig
 from core.entropy_dynamics.prompt_builder import PrefixedPrompt, build_prefixed_prompts
@@ -57,6 +69,7 @@ _LOGPROBS_K = 500
 
 # Force vLLM V0 engine: V1 caps logprobs at 20 and has other restrictions.
 # Must be set before any vLLM import / LLM() construction.
+os.environ["VLLM_USE_V1"] = "0"
 
 
 # ---------------------------------------------------------------------------
@@ -117,95 +130,6 @@ def _save_prompt_cache(path: Path, prompts: list[PrefixedPrompt]) -> None:
     print(f"  Prompt cache saved: {path.name} ({len(prompts)} prompts)")
 
 
-
-# ---------------------------------------------------------------------------
-# Parallel prompt building
-# ---------------------------------------------------------------------------
-
-def _build_one_sample(args: tuple) -> list:
-    """Worker function: tokenize one sample and build all its prefixed prompts.
-
-    Receives a plain tuple (not a TeacherReasoning) to be picklable across
-    processes.  Returns a list of dicts that can be reconstructed into
-    PrefixedPrompt objects in the main process.
-    """
-    from transformers import AutoTokenizer
-    from core.entropy_dynamics.prompt_builder import build_prefixed_prompts
-    from core.entropy_dynamics.reasoning_loader import TeacherReasoning
-
-    (question_id, question, options, gold_answer, thinking_text,
-     model_id, window_size, mode, dataset_type) = args
-
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
-    sample = TeacherReasoning(
-        question_id=question_id,
-        question=question,
-        options=options,
-        gold_answer=gold_answer,
-        thinking_text=thinking_text,
-        thinking_token_ids=tokenizer.encode(thinking_text, add_special_tokens=False),
-    )
-
-    prompts = build_prefixed_prompts(
-        sample=sample,
-        tokenizer=tokenizer,
-        window_size=window_size,
-        mode=mode,
-        dataset_type=dataset_type,
-    )
-    return prompts
-
-
-def _build_prompts_parallel(
-    samples: list,
-    model_id: str,
-    window_size: int,
-    mode,
-    dataset_type: str,
-    num_workers: int = 28,        # 0 = auto (cpu_count / 2)
-) -> list:
-    """Build all prefixed prompts in parallel using ProcessPoolExecutor.
-
-    Each worker loads its own tokenizer instance (necessary because
-    HuggingFace tokenizers are not fork-safe).  Workers are spawned fresh,
-    so GPU memory from the main process is not duplicated.
-    """
-    import multiprocessing
-    from concurrent.futures import ProcessPoolExecutor, as_completed
-
-    if num_workers <= 0:
-        num_workers = max(1, multiprocessing.cpu_count() // 2)
-
-    print(f"Building prompts for {len(samples)} questions "
-          f"(parallel, {num_workers} workers)...")
-
-    args_list = [
-        (
-            s.question_id, s.question, s.options, s.gold_answer,
-            s.thinking_text, model_id, window_size, mode, dataset_type,
-        )
-        for s in samples
-    ]
-
-    results_by_idx: dict[int, list] = {}
-    with ProcessPoolExecutor(max_workers=num_workers,
-                              mp_context=__import__("multiprocessing").get_context("spawn")) as pool:
-        futures = {pool.submit(_build_one_sample, a): i for i, a in enumerate(args_list)}
-        for fut in tqdm(as_completed(futures), total=len(futures), desc="Building prompts"):
-            results_by_idx[futures[fut]] = fut.result()
-
-    # вопросы в исходном порядке; внутри вопроса — по возрастанию k (= длины префикса),
-    # чтобы каждый следующий промпт максимально продолжал префикс предыдущего → APC попадает чаще
-    all_prompts = []
-    for i in range(len(args_list)):
-        all_prompts.extend(sorted(results_by_idx[i], key=lambda p: p.k))
-
-    print(f"  Built {len(all_prompts)} prompts total.")
-    return all_prompts
-
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
@@ -246,7 +170,6 @@ class VLLMEntropyRunner:
         print(f"Loading teacher reasoning from {self.config.teacher_reasoning_path}...")
         samples = load_teacher_reasoning(
             self.config.teacher_reasoning_path,
-            max_thinking_tokens = self.config.max_thinking_tokens,
             tokenizer=loader_tokenizer,
             min_thinking_tokens=self.config.window_size,
         )
@@ -318,23 +241,25 @@ class VLLMEntropyRunner:
         all_prompts = _load_prompt_cache(cache_path)
 
         if all_prompts is None:
-            all_prompts = _build_prompts_parallel(
-                samples=remaining,
-                model_id=model_cfg.model_id,
-                window_size=self.config.window_size,
-                mode=self.config.mode,
-                dataset_type=self.config.dataset_type,
-            )
+            print(f"Building prompts for {len(remaining)} questions...")
+            all_prompts = []
+            for sample in tqdm(remaining, desc="Building prompts"):
+                sample.thinking_token_ids = tokenizer.encode(
+                    sample.thinking_text, add_special_tokens=False
+                )
+                all_prompts.extend(build_prefixed_prompts(
+                    sample=sample,
+                    tokenizer=tokenizer,
+                    window_size=self.config.window_size,
+                    mode=self.config.mode,
+                    dataset_type=self.config.dataset_type,
+                ))
             _save_prompt_cache(cache_path, all_prompts)
         else:
             before = len(all_prompts)
             all_prompts = [p for p in all_prompts if p.question_id not in processed_ids]
             print(f"  After filtering already-done: {before} → {len(all_prompts)} prompts")
-        
-        for p in all_prompts:
-            if not isinstance(p.input_ids,array):
-                p.input_ids = array("i",p.input_ids)
-        _gc.collect()
+
         if not all_prompts:
             print("  All prompts already processed.")
             return
@@ -379,13 +304,11 @@ class VLLMEntropyRunner:
         llm = LLM(
             model=model_cfg.model_id,
             tokenizer=model_cfg.model_id,
-          #  tokenizer_kwargs={"fix_mistral_regex":True},
             gpu_memory_utilization=self.gpu_memory_utilization,
             max_model_len=self.max_model_len,
             tensor_parallel_size=self.tensor_parallel_size,
             dtype="bfloat16",
             trust_remote_code=True,
-            limit_mm_per_prompt={},
             # Override V0's default max_logprobs (5) so we can request 500.
             max_logprobs=_LOGPROBS_K,
         )
@@ -394,7 +317,7 @@ class VLLMEntropyRunner:
         # logprobs=K asks vLLM to return the top-K log-probabilities for the
         # single generated token. No per-request Python objects → works with any TP.
         sampling_params = SamplingParams(
-            max_tokens=4,
+            max_tokens=1,
             temperature=0.0,
             logprobs=_LOGPROBS_K,
         )
@@ -403,25 +326,19 @@ class VLLMEntropyRunner:
         # Splits all_prompts into chunks of CHECKPOINT_EVERY and saves after
         # each chunk. On restart, already-processed question_ids are filtered
         # out above, so we never reprocess completed work.
-        CHECKPOINT_EVERY = 10_000
+        CHECKPOINT_EVERY = 5_000
         total = len(all_prompts)
         t_start = time.perf_counter()
 
         print(f"Running vLLM inference on {total} prompts "
               f"(checkpoint every {CHECKPOINT_EVERY})...")
 
-        # One drain loop: take a chunk, run it, collect ITS results, free it,
-        # checkpoint, repeat. The result-collection and save MUST be inside the
-        # while — otherwise only the last chunk is ever recorded and the next
-        # outer iteration hits an unbound `batch_prompts`. `total` was captured
-        # above, before draining all_prompts.
-        processed = 0
-        while all_prompts:
-            batch_prompts = all_prompts[:CHECKPOINT_EVERY]
-            del all_prompts[:CHECKPOINT_EVERY]
-            vllm_inputs = [TokensPrompt(prompt_token_ids=list(p.input_ids)) for p in batch_prompts]
+        for batch_start in range(0, total, CHECKPOINT_EVERY):
+            batch_prompts = all_prompts[batch_start:batch_start + CHECKPOINT_EVERY]
+            batch_token_ids = [p.input_ids for p in batch_prompts]
+
             batch_outputs = llm.generate(
-                prompts=vllm_inputs,
+                prompt_token_ids=batch_token_ids,
                 sampling_params=sampling_params,
                 use_tqdm=True,
             )
@@ -443,12 +360,11 @@ class VLLMEntropyRunner:
                 ))
 
             results.save(checkpoint_path)
-            processed += len(batch_prompts)
-            del batch_prompts, vllm_inputs, batch_outputs
+            done = min(batch_start + CHECKPOINT_EVERY, total)
             elapsed = time.perf_counter() - t_start
-            rate = processed / elapsed if elapsed > 0 else 0
-            eta = (total - processed) / rate if rate > 0 else 0
-            print(f"  Checkpoint [{processed}/{total}] "
+            rate = done / elapsed if elapsed > 0 else 0
+            eta = (total - done) / rate if rate > 0 else 0
+            print(f"  Checkpoint [{done}/{total}] "
                   f"| {rate:.1f} prompts/s "
                   f"| ETA {eta/60:.0f} min")
 
@@ -468,31 +384,17 @@ class VLLMEntropyRunner:
 
     @staticmethod
     def _extract_from_output(output, tokenizer) -> tuple[str, float]:
-        """Return (answer_str, entropy_nats) from a single vLLM RequestOutput.
-
-        Scans generated tokens for the first whose decoded text contains a Latin
-        letter (the answer), and measures entropy at THAT position — not at
-        position 0, which for many models is a leading \\n / space token. For
-        models that emit the letter first (e.g. Qwen) this equals position 0.
-        """
-        import re
-
+        """Return (answer_str, entropy_nats) from a single vLLM RequestOutput."""
         if not output.outputs:
             return "", float("nan")
         gen = output.outputs[0]
 
         answer = ""
-        entropy = float("nan")
-
         if gen.token_ids:
-            for i, tid in enumerate(gen.token_ids):
-                m = re.search(r"[a-zA-Z]", tokenizer.decode([tid]))
-                if m:
-                    answer = m.group(0).lower()
-                    if gen.logprobs and i < len(gen.logprobs):
-                        entropy = _entropy_from_topk_logprobs(gen.logprobs[i])
-                    break
+            answer = tokenizer.decode([gen.token_ids[0]]).strip().lower()
+
+        entropy = float("nan")
+        if gen.logprobs and len(gen.logprobs) > 0:
+            entropy = _entropy_from_topk_logprobs(gen.logprobs[0])
 
         return answer, entropy
-
-

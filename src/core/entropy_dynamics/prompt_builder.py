@@ -59,7 +59,9 @@ def build_prefixed_prompts(
         input_ids = _tokenize_with_assistant_prefix(tokenizer, messages_k0, assistant_prefix)
     else:
         # Continuation: just the question, no think tag at k=0
-        input_ids = _apply_template_base(tokenizer, messages_k0)
+        input_ids = tokenizer.apply_chat_template(
+            messages_k0, tokenize=True, add_generation_prompt=True
+        )
 
     prompts.append(PrefixedPrompt(
         question_id=sample.question_id,
@@ -103,37 +105,16 @@ def build_prefixed_prompts(
     return prompts
 
 
-def _apply_template_base(tokenizer: PreTrainedTokenizer, messages: list[dict]) -> list[int]:
-    """Tokenize messages up to the start of the assistant turn.
-
-    Qwen/Llama/Phi need add_generation_prompt=True to emit the assistant header.
-    Mistral's mistral-common (MistralCommonTokenizer) backend *rejects* that flag
-    with a ValueError, because the assistant turn always begins right after the
-    [/INST] token — so for it we fall back to the plain call, which already ends
-    at the right place for prefixing.
-
-    If you hit a different exception class for some other tokenizer, add it here.
-    """
-    try:
-        base_ids = tokenizer.apply_chat_template(
-            messages, tokenize=True, add_generation_prompt=True
-        )
-    except (TypeError, ValueError, NotImplementedError):
-        base_ids = tokenizer.apply_chat_template(messages, tokenize=True)
-
-    # Flatten BatchEncoding if the tokenizer returned one
-    if not isinstance(base_ids, list):
-        base_ids = base_ids.input_ids[0] if isinstance(base_ids.input_ids[0], list) else list(base_ids.input_ids)
-    return base_ids
-
-
 def _tokenize_with_assistant_prefix(
     tokenizer: PreTrainedTokenizer,
     messages: list[dict],
     assistant_prefix: str,
 ) -> list[int]:
-    """Tokenize messages + beginning of assistant response."""
-    base_ids = _apply_template_base(tokenizer, messages)
+    """Tokenize messages + beginning of assistant response.
+    """
+    base_ids = tokenizer.apply_chat_template(
+        messages, tokenize=True, add_generation_prompt=True
+    )
     prefix_ids = tokenizer.encode(assistant_prefix, add_special_tokens=False)
     return base_ids + prefix_ids
 

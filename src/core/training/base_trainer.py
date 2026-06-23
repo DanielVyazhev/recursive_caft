@@ -2,10 +2,9 @@ import gc
 import json
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
-
 from pydantic import BaseModel
 from pydraconf import PydraConfig
 from transformers import (
@@ -15,6 +14,7 @@ from transformers import (
     PreTrainedTokenizer,
     Seq2SeqTrainingArguments,
 )
+from transformers.modeling_utils import PreTrainedModel
 from transformers.trainer_seq2seq import Seq2SeqTrainer
 
 from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter
@@ -59,7 +59,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
     def __init__(self, config: TConfig, tokenizer: PreTrainedTokenizer | None = None):
         self.config = config
         self._tokenizer: PreTrainedTokenizer | None = tokenizer
-        self._model: AutoModelForCausalLM | None = None
+        self._model: PreTrainedModel | None = None
 
     def train(self):
         if not self._directory_is_empty(self.config.out_path, self.config.training_args.num_train_epochs):
@@ -71,7 +71,8 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         logger.info(subprocess.run(["nvidia-smi"], capture_output=True, text=True).stdout)
 
         train_ds = self._prepare_data()
-        self._run_training(train_ds)
+        trainer = self._build_trainer(train_ds)
+        self._run_training(trainer)
 
         return get_last_checkpoint_dir(self.config.out_path)
 
@@ -89,7 +90,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         return self._tokenizer
 
     @property
-    def model(self):
+    def model(self) -> PreTrainedModel:
         if not self._model:
             self._model = AutoModelForCausalLM.from_pretrained(self.config.model_id)
 
@@ -115,7 +116,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
             output_dir=self.config.out_path,
         )
 
-    def _prepare_data(self):
+    def _prepare_data(self) -> torch.utils.data.Dataset:
         train_ds = self.config.train_dataset.process_dataset()
         logger.info("Dataset samples")
         logger.info("Train")
@@ -123,9 +124,9 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         labels = [tok for tok in train_ds[0]["labels"] if tok != -100]
         logger.info(f"Labels: {self.tokenizer.decode(labels)}")
 
-        return train_ds
+        return cast(torch.utils.data.Dataset, train_ds.with_format("torch"))
 
-    def _run_training(self, train_ds):
+    def _build_trainer(self, train_ds):
         trainer = Seq2SeqTrainer(
             model=self.model,
             args=self.training_args,
@@ -137,6 +138,9 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         if self.config.save_schedule is not None:
             trainer.add_callback(SaveByScheduleCallback(schedule=self.config.save_schedule))
 
+        return trainer
+
+    def _run_training(self, trainer):
         has_checkpoint = get_last_checkpoint_dir(self.config.out_path) is not None
         logger.info(f"Has checkpoint: {has_checkpoint}")
         trainer.train(resume_from_checkpoint=has_checkpoint)

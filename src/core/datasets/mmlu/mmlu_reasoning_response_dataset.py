@@ -6,8 +6,8 @@ from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleToke
 class MMLUReasoningResponseDataset(MMLUSingleTokenResponseDataset):
     @override
     def assistant_response(self, row: dict) -> str:
-        reasoning_chain = row["thinking"].strip()
-        answer = str(row["answer"]).strip().lower()
+        reasoning_chain = row["distill_reasoning"].strip()
+        answer = str(row["distill_answer"]).strip().lower()
         return f"{self.tokenizer.thinking_start_token}{reasoning_chain}{self.tokenizer.thinking_end_token}{answer}"
 
     @override
@@ -17,13 +17,14 @@ class MMLUReasoningResponseDataset(MMLUSingleTokenResponseDataset):
         )
         thinking_end_token_position = assistant_response.find(self.tokenizer.thinking_end_token)
         if thinking_end_token_position == -1:
-            return "", False
+            return super().verify_assistant_response(row, assistant_response)
 
-        extracted_answer = (
-            assistant_response[thinking_end_token_position + len(self.tokenizer.thinking_end_token) :].strip().lower()
-        )
+        raw = assistant_response[thinking_end_token_position + len(self.tokenizer.thinking_end_token) :]
+        for tok in self.tokenizer.all_special_tokens:
+            raw = raw.replace(tok, "")
+        extracted_answer = raw.strip().lower()
 
         try:
-            return extracted_answer, self.assistant_response(row) == extracted_answer
+            return super().verify_assistant_response(row, extracted_answer)
         except:
             return extracted_answer, False

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import pandas as pd
 import torch
 from pydantic import BaseModel
 from pydraconf import PydraConfig
@@ -9,7 +10,8 @@ from transformers.generation.utils import GenerateDecoderOnlyOutput
 from transformers.modeling_utils import PreTrainedModel
 
 from core.complexity_estimation.complexity_estimator import BaseComplexityEstimator
-from core.datasets.abstract_dataset_adapter import TokenizedRow
+from core.datasets.base_dataset_adapter import TokenizedRow
+from core.datasets.qa_dataset import InvalidAnswerError
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 
 
@@ -48,15 +50,19 @@ class ComplexityEstimationRunner:
         processed_rows = 0
         new_processed_rows = 0
 
-        if os.path.exists(self.config.out_path) and os.path.exists(self.tmp_path()):
-            print(f"Output path {self.config.out_path} already exists. Resuming from temporary file.")
-            ds = dataset_adapter.process_dataset(path_override=str(self.tmp_path()))
+        if os.path.exists(self.tmp_path()):
+            # A partially-completed run periodically flushes progress to .tmp (every save_every rows)
+            # and only writes out_path at the very end, deleting .tmp right after. So a leftover .tmp
+            # means an interrupted run: resume from it, skipping rows already answered. (out_path is
+            # never present here in the normal flow, since it and .tmp don't coexist.)
+            print(f"Temporary file {self.tmp_path()} found. Resuming complexity estimation from it.")
+            ds = dataset_adapter.process_dataset(path_override=str(self.tmp_path()), strict=False)
         else:
             print(f"No temporary file found. Starting from scratch. Writing to output file {self.config.out_path}.")
             if os.path.exists(self.config.out_path):
                 os.unlink(self.config.out_path)
 
-            ds = dataset_adapter.process_dataset()
+            ds = dataset_adapter.process_dataset(strict=False)
 
             ds = ds.add_column(self.config.answer_field_name, [None] * len(ds))
             ds = ds.add_column(self.config.answer_correctness_field_name, [None] * len(ds))
@@ -70,7 +76,10 @@ class ComplexityEstimationRunner:
         for index, df_row in tqdm(df.iterrows(), total=len(df)):
             processed_rows += 1
 
-            if df_row[self.config.answer_field_name] is not None:
+            # A resumed .tmp round-trips missing answers back as NaN (not None), so use a
+            # missing-aware check — a plain `is not None` would treat NaN (not-yet-measured) rows as
+            # done and skip them, so resume would measure nothing.
+            if pd.notna(df_row[self.config.answer_field_name]):
                 continue
 
             new_processed_rows += 1
@@ -116,19 +125,22 @@ class ComplexityEstimationRunner:
                     print(f"Row {row.row_id}:")
                     print(f"Input: {row.model_dump()}")
                     print(f"Processed: {df.loc[index]}")
+            except InvalidAnswerError:
+                # Expected: the model didn't emit a parseable answer (e.g. drifted to a thinking
+                # token). Leave entropy_value unset (NaN) so it is backfilled; count it quietly.
+                invalid_answers += 1
             except Exception as ex:
                 print(f"Error processing row {row.row_id}: {ex}")
                 invalid_answers += 1
 
             if processed_rows % self.config.save_every == 0:
-                df.to_parquet(path=self.tmp_path(), compression=None, index=False)
-
+                dataset_adapter.save_processed_dataset(df, path=self.tmp_path().as_posix(), tmp=True)
                 print(
                     f"Processing dataset {self.config.out_path}... Processed: {processed_rows}/{len(df)}. Invalid answers: {invalid_answers}"
                 )
 
         df = df.drop(columns=["input_ids", "attention_mask", "labels", "row_id"], errors="ignore")
-        df.to_parquet(path=self.config.out_path, index=False)
+        dataset_adapter.save_processed_dataset(df, path=self.config.out_path, tmp=False)
 
         if os.path.exists(self.tmp_path()):
             os.unlink(self.tmp_path())

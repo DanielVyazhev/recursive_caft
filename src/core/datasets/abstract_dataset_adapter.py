@@ -1,45 +1,22 @@
 from abc import ABC, abstractmethod
 
-from datasets import Dataset, load_dataset, load_from_disk
-from pydantic import BaseModel
-
-from core.datasets.base_dataset import BaseDataset
+import pandas as pd
+from datasets import Dataset
 
 
-class TokenizedRow(BaseModel):
-    model_config = {"extra": "allow"}
-
-    input_ids: list[int]
-    attention_mask: list[int]
-    labels: list[int]
-    row_id: str
-
-
-class AbstractDatasetAdapter[D: BaseDataset](ABC):
-    def __init__(self, dataset: D):
-        self.dataset = dataset
+class AbstractDatasetAdapter(ABC):
+    @abstractmethod
+    def process_dataset(self, path_override: str | None = None) -> Dataset: ...
 
     @abstractmethod
-    def process_row(self, row: dict) -> TokenizedRow: ...
+    def save_processed_dataset(self, df: pd.DataFrame, path: str, tmp: bool) -> None: ...
 
-    def _load_ds(self, path_override: str | None = None) -> Dataset:
-        if path_override is not None:
-            ds = load_from_disk(path_override)
-            return ds
+    def sampled_size(self) -> int | None:
+        """Row count after sampling without materializing, or None when it can't be known
+        without loading the source (e.g. no sampler)."""
+        return None
 
-        ds = load_dataset(
-            "parquet",
-            data_files={"default": self.dataset.config.path},
-        )
-        return ds["default"]
-
-    def process_dataset(self, path_override: str | None = None) -> Dataset:
-        ds = self._load_ds(path_override)
-
-        processed_ds = ds.map(
-            lambda row: self.process_row(row).model_dump(),
-            num_proc=4,
-            remove_columns=ds.column_names,
-        )
-
-        return processed_ds
+    def selected_sample_counts(self, df: pd.DataFrame) -> dict[str, int]:
+        """How many rows each sampler would actually select from `df`, keyed by dataset_id.
+        Empty when there is no sampler (nothing to report)."""
+        return {}

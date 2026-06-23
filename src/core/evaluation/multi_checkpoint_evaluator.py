@@ -2,6 +2,7 @@ import gc
 import json
 from pathlib import Path
 
+import psutil
 import torch
 from pydraconf import PydraConfig
 from transformers import PreTrainedTokenizer
@@ -9,6 +10,19 @@ from transformers import PreTrainedTokenizer
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.evaluation.evaluator import EvaluationResult, Evaluator, EvaluatorConfig, GenerationConfig
 from core.utils.logger import logger
+
+
+def _mem_snapshot() -> str:
+    rss_gb = psutil.Process().memory_info().rss / 1e9
+    if torch.cuda.is_available():
+        free, total = torch.cuda.mem_get_info()
+        alloc = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
+        return (
+            f"rss={rss_gb:.2f}GB cuda_free={free / 1e9:.2f}GB cuda_total={total / 1e9:.2f}GB "
+            f"cuda_alloc={alloc / 1e9:.2f}GB cuda_reserved={reserved / 1e9:.2f}GB"
+        )
+    return f"rss={rss_gb:.2f}GB cuda=unavailable"
 
 
 class MultiCheckpointEvaluatorConfig(PydraConfig):
@@ -80,6 +94,7 @@ class MultiCheckpointEvaluator:
             ckpt_name = ckpt_dir.name
             ckpt_out_path = str(self._out_path / ckpt_name / "evals")
 
+            logger.trace(f"[trace] starting checkpoint={ckpt_name} {_mem_snapshot()}")
             logger.info(f"Evaluating {ckpt_name}...")
 
             config = EvaluatorConfig(
@@ -89,7 +104,14 @@ class MultiCheckpointEvaluator:
                 generation=self.config.generation,
             )
 
-            eval_results = Evaluator(config, self.tokenizer).evaluate()
+            try:
+                eval_results = Evaluator(config, self.tokenizer).evaluate()
+            except Exception:
+                from loguru import logger as _raw_logger
+
+                _raw_logger.opt(exception=True).error(f"[trace] checkpoint failed: {ckpt_name}")
+                _raw_logger.complete()
+                raise
             epoch = self._read_epoch(ckpt_dir)
             results.append((ckpt_name, eval_results, epoch))
 
@@ -102,6 +124,7 @@ class MultiCheckpointEvaluator:
                     )
 
             self._free_vram()
+            logger.trace(f"[trace] done checkpoint={ckpt_name} {_mem_snapshot()}")
 
         self._save_summary(results)
 

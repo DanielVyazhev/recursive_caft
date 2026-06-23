@@ -37,7 +37,6 @@ class EntropyDynamicsConfig(PydraConfig):
     mode: InferenceMode = InferenceMode.FORCED
     role: ExperimentRole = ExperimentRole.STUDENT
     window_size: int = 32
-    max_thinking_tokens: int | None = None
     max_new_tokens_continuation: int = 2048
     tail_entropy_window: int = 5
     dataset_type: str = "mmlu"
