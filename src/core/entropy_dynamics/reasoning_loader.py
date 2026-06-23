@@ -27,13 +27,16 @@ def load_teacher_reasoning(
     tokenizer: PreTrainedTokenizer,
     min_thinking_tokens: int = 16,
 ) -> list[TeacherReasoning]:
-    """Load and tokenize teacher reasoning chains.
-    """
+    """Load and tokenize teacher reasoning chains."""
     df = pd.read_parquet(path)
+
+    # Маппим distill_reasoning в ожидаемый колонку thinking, если пришел новый датасет
+    if "distill_reasoning" in df.columns and "thinking" not in df.columns:
+        df = df.rename(columns={"distill_reasoning": "thinking"})
 
     if "input" in df.columns and "output" in df.columns:
         records = _parse_synth_aug(df)
-    elif "thinking" in df.columns:
+    elif "thinking" in df.columns:  # Сюда теперь зайдет и ваш датасет
         records = _parse_flat(df)
     else:
         raise ValueError(
@@ -56,7 +59,6 @@ def load_teacher_reasoning(
         results.append(rec)
 
     return results
-
 
 def _parse_synth_aug(df: pd.DataFrame) -> list[TeacherReasoning]:
     records: list[TeacherReasoning] = []
