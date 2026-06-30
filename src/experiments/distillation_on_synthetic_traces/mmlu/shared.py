@@ -23,7 +23,13 @@ from core.training.packing_budgets import packing_budget
 from core.training.thinking_tokens import setup_thinking_tokens
 
 
-def run(model_name: str, relative_out_path: str, train_dataset: str, save_schedule: list[int]):
+def run(
+    model_name: str,
+    relative_out_path: str,
+    train_dataset: str,
+    save_schedule: list[int],
+    max_thinking_tokens: int = 8192,
+):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
@@ -67,6 +73,12 @@ def run(model_name: str, relative_out_path: str, train_dataset: str, save_schedu
     trainer.train()
     trainer.unload()
 
+    eval_dataset_id = "mmlu_random_test"
+    summary_filename = "summary_reasoning_evals.json"
+    if max_thinking_tokens != 8192:
+        eval_dataset_id = f"mmlu_random_test_cap{max_thinking_tokens}"
+        summary_filename = f"summary_reasoning_evals_cap{max_thinking_tokens}.json"
+
     cot_evaluator = MultiCheckpointEvaluator(
         config=MultiCheckpointEvaluatorConfig(
             checkpoints_dir=OUT_PATH,
@@ -76,14 +88,16 @@ def run(model_name: str, relative_out_path: str, train_dataset: str, save_schedu
                         path=Path(__file__)
                         .parent.joinpath("../../../../data/out/splits/random/mmlu/test.parquet")
                         .as_posix(),
-                        dataset_id="mmlu_random_test",
+                        dataset_id=eval_dataset_id,
                     ),
                     tokenizer=tokenizer,
                 ),
                 add_thinking_start_token=True,
             ),
-            generation=GenerationConfig(max_new_tokens=8500, max_thinking_tokens=8192, max_batch_size=256),
-            summary_filename="summary_reasoning_evals.json",
+            generation=GenerationConfig(
+                max_new_tokens=max_thinking_tokens + 10, max_thinking_tokens=max_thinking_tokens, max_batch_size=256
+            ),
+            summary_filename=summary_filename,
         ),
         tokenizer=tokenizer,
     )
