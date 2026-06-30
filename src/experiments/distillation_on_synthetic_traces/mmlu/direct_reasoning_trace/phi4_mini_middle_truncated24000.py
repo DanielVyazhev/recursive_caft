@@ -4,5 +4,5 @@ run(
     model_name="phi4_mini",
     relative_out_path="./direct_reasoning_trace/phi4_mini_middle_truncated24000",
     train_dataset="train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large_middle_truncated24000",
-    save_schedule=[1, 3, 5, 10, 15, 20],
+    save_schedule=[2, 5, 10, 15, 20],
 )
