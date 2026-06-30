@@ -36,9 +36,17 @@ _logger.add(
     diagnose=False,
     level="INFO",
 )
+# enqueue=False: write each record synchronously in the calling thread. The file
+# sink is line-buffered (loguru default buffering=1), so every line — including the
+# excepthook traceback — is flushed to disk before the next statement and survives a
+# hard exit (os._exit in the mem watchdog, the parent's SIGKILL, a native SIGSEGV)
+# that would never drain an enqueue=True background queue. Re-entry safe: loguru's
+# _protected_lock fails fast on same-thread re-acquire, so a signal handler logging
+# mid-write can't deadlock. Per-PID files (no cross-process sink), so no enqueue
+# needed for multiprocessing safety either.
 _logger.add(
     _LOG_FILE,
-    enqueue=True,
+    enqueue=False,
     backtrace=True,
     diagnose=False,
     rotation="100 MB",

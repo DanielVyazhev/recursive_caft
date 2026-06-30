@@ -131,6 +131,14 @@ def _mem_snapshot(staged_slots: int | None = None) -> str:
 # process and fall back to pageable RAM.
 _PINNING_DISABLED = False
 
+# Cumulative staging cost, split so a phase can report the page-lock time apart
+# from the unavoidable D2H copy. _PIN_ALLOC_SECONDS is the cudaHostAlloc cost that
+# a reusable pinned-buffer pool would eliminate; _run_phase snapshots deltas around
+# each staging burst. Monotonic across the whole generate() call (read as deltas).
+_PIN_ALLOC_SECONDS = 0.0
+_PIN_COPY_SECONDS = 0.0
+_PIN_BYTES = 0
+
 
 def _to_pinned_host(stacked_gpu: torch.Tensor, pin: bool) -> torch.Tensor:
     """Blocking D2H copy of a stacked KV tensor into host memory.
@@ -142,11 +150,17 @@ def _to_pinned_host(stacked_gpu: torch.Tensor, pin: bool) -> torch.Tensor:
     keeps the transient GPU stack alive until it completes. Falls back to a plain
     pageable copy on allocation failure (logged once).
     """
-    global _PINNING_DISABLED
+    global _PINNING_DISABLED, _PIN_ALLOC_SECONDS, _PIN_COPY_SECONDS, _PIN_BYTES
     if pin and not _PINNING_DISABLED and torch.cuda.is_available():
         try:
+            t0 = time.perf_counter()
             dest = torch.empty(stacked_gpu.shape, dtype=stacked_gpu.dtype, pin_memory=True)
-            dest.copy_(stacked_gpu)
+            t1 = time.perf_counter()
+            dest.copy_(stacked_gpu)  # blocking D2H (returns once the transfer completes)
+            t2 = time.perf_counter()
+            _PIN_ALLOC_SECONDS += t1 - t0
+            _PIN_COPY_SECONDS += t2 - t1
+            _PIN_BYTES += dest.numel() * dest.element_size()
             return dest
         except RuntimeError as exc:
             _PINNING_DISABLED = True
@@ -996,8 +1010,25 @@ class BatchGenerator:
         num_truncated = 0
 
         step = 0
-        step_time_sum = 0.0
+        # Accurate total decode wall-time. The GPU runs async between syncs, so an
+        # unsynced perf_counter delta around a single _batched_decode is meaningless;
+        # we only accumulate time over windows that end at a sync. window_* track the
+        # currently-open window so the periodic log shows a true per-step average.
+        decode_wall = 0.0
+        window_start: float | None = None
+        window_step_base = 0
         early_promoted = 0
+
+        def _close_decode_window() -> None:
+            # Fold the partial window since the last sync into decode_wall (syncs once).
+            # No-op if the window was already closed (e.g. a staging break path).
+            nonlocal decode_wall, window_start
+            if window_start is None:
+                return
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            decode_wall += time.perf_counter() - window_start
+            window_start = None
 
         while slot_queue:
             # --- Take a chunk of up to effective_bs slots ---
@@ -1005,6 +1036,7 @@ class BatchGenerator:
             self._valid_lens = [0] * effective_bs
 
             restore_start = time.perf_counter()
+            restored_bytes = 0
             while slot_queue and len(chunk_slots) < effective_bs:
                 if not is_last and slot_queue[0].valid_len >= (total_threshold - self._PHASE_STEP * 0.1):
                     staged = slot_queue.popleft()
@@ -1018,11 +1050,14 @@ class BatchGenerator:
                 self._cache.restore_row_from_cpu(batch_idx, staged.valid_len, keys, vals)
                 self._valid_lens[batch_idx] = staged.valid_len
                 chunk_slots.append(staged.slot)
+                restored_bytes += staged.nbytes
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             restore_time = time.perf_counter() - restore_start
+            restore_gb = restored_bytes / 1e9
             logger.info(
                 f"[perf] Restored {len(chunk_slots)} slots from CPU in {restore_time:.4f}s "
+                f"({restore_gb:.2f}GB, {restore_gb / restore_time if restore_time > 0 else 0.0:.1f}GB/s) "
                 f"ram_kv={kv_store._ram_bytes / 1e9:.2f}GB"
             )
 
@@ -1044,6 +1079,9 @@ class BatchGenerator:
 
             finished: set[int] = set()
             chunk_step = 0
+            # Open a decode-timing window for this chunk (not spanning the restore above).
+            window_start = time.perf_counter()
+            window_step_base = step
 
             # --- Decode until all slots in chunk are done or budget exhausted ---
             while len(finished) < len(chunk_slots):
@@ -1055,18 +1093,24 @@ class BatchGenerator:
                 active_indices = [i for i, _ in active]
                 max_active_len = max(self._valid_lens[i] for i in active_indices)
 
-                step_start = time.perf_counter()
                 self._batched_decode(active_indices, active_slots)
                 step += 1
                 chunk_step += 1
 
                 # Sync only on log boundaries to avoid per-step GPU→CPU stalls.
-                # Keeps the GPU pipeline full between syncs.
+                # Keeps the GPU pipeline full between syncs. avg_step is the true
+                # per-step wall time over the just-closed (synced) window, not a
+                # single step's enqueue latency.
                 if step % 200 == 0:
                     if torch.cuda.is_available():
                         torch.cuda.synchronize()
-                    step_time_sum += time.perf_counter() - step_start
-                    avg_step = step_time_sum / step
+                    now = time.perf_counter()
+                    window = now - window_start
+                    decode_wall += window
+                    window_steps = step - window_step_base
+                    avg_step = window / window_steps if window_steps else 0.0
+                    window_start = now
+                    window_step_base = step
                     rss_gb = psutil.Process().memory_info().rss / 1e9
                     logger.info(
                         f"[perf] phase step={step} active={len(active)} "
@@ -1088,11 +1132,10 @@ class BatchGenerator:
                             f"Reducing batch size for next attempt: {effective_bs} -> {self._vram_reduced_bs}."
                         )
                         # Stage active slots back off the GPU and re-queue
-                        for i, slot in enumerate(chunk_slots):
-                            if i not in finished:
-                                valid_len = self._valid_lens[i]
-                                keys, vals = self._cache.stage_row_to_cpu(i, valid_len)
-                                promote_queue.appendleft(kv_store.stage(slot, valid_len, keys, vals))
+                        _close_decode_window()
+                        to_stage = [(i, s) for i, s in enumerate(chunk_slots) if i not in finished]
+                        for staged in self._stage_slots(to_stage, kv_store):
+                            promote_queue.appendleft(staged)
                         while slot_queue:
                             promote_queue.append(slot_queue.popleft())
                         break
@@ -1121,18 +1164,48 @@ class BatchGenerator:
 
                 # Batch-level promotion: budget exhausted → stage all remaining off the GPU
                 if chunk_step >= phase_budget:
-                    for batch_idx, slot in enumerate(chunk_slots):
-                        if batch_idx not in finished:
-                            valid_len = self._valid_lens[batch_idx]
-                            keys, vals = self._cache.stage_row_to_cpu(batch_idx, valid_len)
-                            promote_queue.append(kv_store.stage(slot, valid_len, keys, vals))
-                            finished.add(batch_idx)
+                    _close_decode_window()
+                    to_stage = [(bi, s) for bi, s in enumerate(chunk_slots) if bi not in finished]
+                    for staged in self._stage_slots(to_stage, kv_store):
+                        promote_queue.append(staged)
+                    finished.update(bi for bi, _ in to_stage)
                     break
 
+            # Close the window for chunks that finished naturally (no staging break).
+            _close_decode_window()
+
         if step > 0:
-            logger.info(f"[perf] Phase done: {step} decode steps, avg_step={step_time_sum / step:.4f}s")
+            logger.info(
+                f"[perf] Phase done: {step} decode steps, "
+                f"avg_step={decode_wall / step:.4f}s (decode_wall={decode_wall:.2f}s)"
+            )
 
         return num_truncated
+
+    def _stage_slots(self, batch_slots: list[tuple[int, _Slot]], kv_store: _StagedKVStore) -> list[_StagedSlot]:
+        """D2H-stage each (batch_idx, slot) off the GPU and log the cost.
+
+        Splits the page-lock (cudaHostAlloc) time from the unavoidable D2H copy via
+        the module-level _PIN_* accumulators, so a phase reports how much of staging
+        a reusable pinned-buffer pool would remove (pin_alloc) vs not (copy).
+        """
+        pin_alloc_0, pin_copy_0, pin_bytes_0 = _PIN_ALLOC_SECONDS, _PIN_COPY_SECONDS, _PIN_BYTES
+        stage_start = time.perf_counter()
+        out: list[_StagedSlot] = []
+        for batch_idx, slot in batch_slots:
+            valid_len = self._valid_lens[batch_idx]
+            keys, vals = self._cache.stage_row_to_cpu(batch_idx, valid_len)
+            out.append(kv_store.stage(slot, valid_len, keys, vals))
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        stage_wall = time.perf_counter() - stage_start
+        logger.info(
+            f"[perf] Staged {len(out)} slots to CPU in {stage_wall:.4f}s "
+            f"(pin_alloc={_PIN_ALLOC_SECONDS - pin_alloc_0:.4f}s "
+            f"copy={_PIN_COPY_SECONDS - pin_copy_0:.4f}s "
+            f"{(_PIN_BYTES - pin_bytes_0) / 1e9:.2f}GB)"
+        )
+        return out
 
     def _prefill(
         self,
