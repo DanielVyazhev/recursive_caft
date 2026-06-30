@@ -29,6 +29,11 @@ from core.utils.subprocess_supervision import supervise_unit
 # cache on CPU RAM. For 12k+ MMLU-Pro prompts on a 200k-vocab model like
 # Phi-4-mini that's ~200GB of staged KV and the container gets OOM-killed.
 # Chunking the prompt list bounds peak CPU RAM to one chunk's staging queue.
+#
+# This is the *stage-0* base chunk size. The outer length-stage loop halves it
+# each subsequent stage (256, 128, 64, ...) because later-stage sequences carry
+# many more generated tokens, so each sequence's staged KV (~valid_len) is larger
+# and a fixed-width chunk would balloon peak CPU RAM in later stages.
 
 # A bit more than 1/10 of MMLU test
 CHUNK_SIZE = 256
@@ -257,15 +262,23 @@ class Evaluator:
             stage_dir = chunks_dir / f"stage_{stage:02d}"
             stage_dir.mkdir(parents=True, exist_ok=True)
 
-            num_sub = (len(pending) + CHUNK_SIZE - 1) // CHUNK_SIZE
+            # Later stages re-prefill sequences that carry more generated tokens, so each
+            # sequence's CPU-staged KV cache is larger. Halve the chunk size each stage to
+            # keep peak CPU RAM per sub-chunk roughly bounded; floor at 1 so deep stages
+            # (few, very long survivors) still make progress. Deterministic in `stage`, so a
+            # restarted worker replays identical sub-chunk boundaries (resume stays valid).
+            chunk_size = max(1, CHUNK_SIZE >> stage)
+
+            num_sub = (len(pending) + chunk_size - 1) // chunk_size
             logger.info(
                 f"Stage {stage + 1}: {len(pending)} sequences, carry_len={carry_len} "
-                f"({'final' if carry_arg is None else 'pooling'}), {num_sub} sub-chunk(s)"
+                f"({'final' if carry_arg is None else 'pooling'}), chunk_size={chunk_size}, "
+                f"{num_sub} sub-chunk(s)"
             )
 
             survivors: list[dict] = []
             for sub_idx in range(num_sub):
-                sub = pending[sub_idx * CHUNK_SIZE : (sub_idx + 1) * CHUNK_SIZE]
+                sub = pending[sub_idx * chunk_size : (sub_idx + 1) * chunk_size]
                 result_path = stage_dir / f"subchunk_{sub_idx:04d}.result.json"
 
                 cached = self._load_subchunk_result(result_path)
@@ -435,6 +448,11 @@ class Evaluator:
                 gen.top_p,
                 gen.top_k,
                 CHUNK_SIZE,
+                # Stage chunk-sizing scheme: bump this tag whenever the per-stage
+                # chunk_size derivation changes so old sub-chunk caches (whose stage
+                # boundaries differ) land in a fresh _chunks_<hash> dir instead of
+                # being mis-loaded by _load_subchunk_result (which doesn't verify size).
+                "chunk=halve",
                 gen.stage_new_tokens,
             )
         )

@@ -51,13 +51,17 @@ try:
 except (AttributeError, OSError):
     pass
 
-faulthandler.enable(all_threads=True)
-
 _FAULTS_FILE = LOG_DIR / f"{RUN_BASENAME}.faults.log"
 # Plain Python file object with line buffering. Kept alive at module scope so
 # faulthandler can write into it for the full lifetime of the process — even
 # if Python's allocator is starved.
 _faults_fp = open(_FAULTS_FILE, "a", buffering=1)
+
+# Route fatal-signal tracebacks (SIGSEGV/SIGBUS/SIGFPE/SIGILL — the flaky eval GPU
+# dies with a native SIGSEGV) to the faults file, not the default stderr. The parent
+# supervisor inherits the child's stderr without capturing it, so a stderr-only dump
+# lands in no file; this makes the native trace durable in <run>.faults.log.
+faulthandler.enable(all_threads=True, file=_faults_fp)
 
 if hasattr(signal, "SIGUSR1"):
     faulthandler.register(signal.SIGUSR1, all_threads=True, chain=False, file=_faults_fp)
