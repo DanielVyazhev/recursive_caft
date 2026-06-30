@@ -4,5 +4,5 @@ run(
     model_name="qwen_3b",
     relative_out_path="./direct_reasoning_trace/qwen_3b_tail_truncated3072",
     train_dataset="train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large_tail_truncated3072",
-    save_schedule=[1, 3, 5, 10, 15, 20],
+    save_schedule=[2, 5, 10, 15, 20],
 )
