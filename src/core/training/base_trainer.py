@@ -158,8 +158,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
             return configured
 
         assert self._packing_stats is not None, (
-            "Packing stats must be computed before building training_args; "
-            "_prepare_data() runs first in train()."
+            "Packing stats must be computed before building training_args; _prepare_data() runs first in train()."
         )
         num_docs = self._packing_stats["num_docs"]
         num_packs = self._packing_stats["num_packs"]
@@ -215,7 +214,12 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         return trainer
 
     def _run_training(self, trainer):
-        has_checkpoint = get_last_checkpoint_dir(self.config.out_path) is not None
+        checkpoint_dir = get_last_checkpoint_dir(self.config.out_path)
+        has_checkpoint = False
+        if checkpoint_dir is not None:
+            state_file = Path(checkpoint_dir) / "trainer_state.json"
+            if state_file.exists():
+                has_checkpoint = True
         logger.info(f"Has checkpoint: {has_checkpoint}")
         trainer.train(resume_from_checkpoint=has_checkpoint)
 
