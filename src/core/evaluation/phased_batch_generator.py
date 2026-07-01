@@ -32,6 +32,49 @@ def _malloc_trim() -> None:
         pass
 
 
+# Resolved once on first call: the torch entry point that releases the pinned host caching
+# allocator's free pool. "unresolved" until first lookup, then a callable or None.
+_HOST_EMPTY_CACHE = "unresolved"
+
+
+def _empty_pinned_host_cache() -> None:
+    """Release the pinned (page-locked) host caching allocator's free pool back to the OS.
+
+    glibc's malloc_trim cannot touch pinned memory — it's managed by PyTorch's CUDA host
+    allocator (cudaHostAlloc), whose freed blocks are pooled, not returned. Our variable-sized
+    KV staging makes that pool inflate well past the live set, which is the bulk of the gap
+    between tracked KV (ram_kv) and process RSS. Emptying only drops *free* blocks; blocks
+    still owned by live staged tensors are retained, so this is safe to call between chunks.
+
+    Resolves the torch symbol once and logs which one (or warns if none), so a build without
+    the binding is a visible warning rather than a silent no-op. No-op on CPU-only builds.
+    """
+    global _HOST_EMPTY_CACHE
+    if not torch.cuda.is_available():
+        return
+    if _HOST_EMPTY_CACHE == "unresolved":
+        fn = None
+        try:
+            fn = getattr(torch.cuda.memory._host_allocator(), "empty_cache", None)
+        except Exception:
+            fn = None
+        if fn is None:
+            fn = getattr(torch._C, "_host_emptyCache", None)
+        _HOST_EMPTY_CACHE = fn
+        if fn is None:
+            logger.warning(
+                "[kv-store] no pinned-host empty_cache symbol found; pinned free pool will "
+                "NOT be reclaimed (consider the bounce-buffer fallback)"
+            )
+        else:
+            logger.info(f"[kv-store] pinned-host release via {getattr(fn, '__qualname__', fn)}")
+    if _HOST_EMPTY_CACHE is not None:
+        try:
+            _HOST_EMPTY_CACHE()
+        except Exception:
+            pass
+
+
 def _pin_glibc_mmap_threshold() -> None:
     """Pin glibc's M_MMAP_THRESHOLD low and disable adaptive growth.
 
@@ -88,6 +131,14 @@ def _mem_snapshot(staged_slots: int | None = None) -> str:
 # process and fall back to pageable RAM.
 _PINNING_DISABLED = False
 
+# Cumulative staging cost, split so a phase can report the page-lock time apart
+# from the unavoidable D2H copy. _PIN_ALLOC_SECONDS is the cudaHostAlloc cost that
+# a reusable pinned-buffer pool would eliminate; _run_phase snapshots deltas around
+# each staging burst. Monotonic across the whole generate() call (read as deltas).
+_PIN_ALLOC_SECONDS = 0.0
+_PIN_COPY_SECONDS = 0.0
+_PIN_BYTES = 0
+
 
 def _to_pinned_host(stacked_gpu: torch.Tensor, pin: bool) -> torch.Tensor:
     """Blocking D2H copy of a stacked KV tensor into host memory.
@@ -99,11 +150,17 @@ def _to_pinned_host(stacked_gpu: torch.Tensor, pin: bool) -> torch.Tensor:
     keeps the transient GPU stack alive until it completes. Falls back to a plain
     pageable copy on allocation failure (logged once).
     """
-    global _PINNING_DISABLED
+    global _PINNING_DISABLED, _PIN_ALLOC_SECONDS, _PIN_COPY_SECONDS, _PIN_BYTES
     if pin and not _PINNING_DISABLED and torch.cuda.is_available():
         try:
+            t0 = time.perf_counter()
             dest = torch.empty(stacked_gpu.shape, dtype=stacked_gpu.dtype, pin_memory=True)
-            dest.copy_(stacked_gpu)
+            t1 = time.perf_counter()
+            dest.copy_(stacked_gpu)  # blocking D2H (returns once the transfer completes)
+            t2 = time.perf_counter()
+            _PIN_ALLOC_SECONDS += t1 - t0
+            _PIN_COPY_SECONDS += t2 - t1
+            _PIN_BYTES += dest.numel() * dest.element_size()
             return dest
         except RuntimeError as exc:
             _PINNING_DISABLED = True
@@ -121,6 +178,11 @@ class GenerationResult:
     total: int
     truncated: list[bool] = field(default_factory=list)
     thinking_budget_exhausted: list[bool] = field(default_factory=list)
+    # True for sequences stopped at a per-call carry boundary (length-stage cap)
+    # without hitting EOS or the global max_new_tokens: still-running survivors the
+    # caller pools across chunks and re-prefills in the next stage. Always all-False
+    # when generate() is called without carry_at_new_tokens (the default).
+    unfinished: list[bool] = field(default_factory=list)
 
 
 @dataclass
@@ -578,25 +640,53 @@ class BatchGenerator:
     _PHASE_STEP = 512  # max tokens generated per phase
 
     @torch.no_grad()
-    def generate(self, prompts: list[list[int]], checkpoint_path: str | None = None) -> GenerationResult:
+    def generate(
+        self,
+        prompts: list[list[int]],
+        checkpoint_path: str | None = None,
+        carry_at_new_tokens: int | None = None,
+        resume_generated: list[list[int] | None] | None = None,
+        resume_thinking_exhausted: list[bool] | None = None,
+    ) -> GenerationResult:
         """Generate responses for a list of prompts using phased generation.
 
         All prompts are prefilled upfront (one-by-one, batch_size=1) with KV
         cache staged on CPU. Then decode phases restore slots to GPU, decode
         in batches, and re-stage promoted slots to CPU for the next phase.
 
+        Length-stage carry (optional): when `carry_at_new_tokens` is set, a
+        sequence that reaches that many generated tokens without hitting EOS or
+        the global `max_new_tokens` is stopped and returned as *unfinished*
+        (GenerationResult.unfinished[i] == True) rather than truncated. The caller
+        pools these survivors across chunks and re-issues them in the next stage
+        via `resume_generated`. With `carry_at_new_tokens=None` (the default)
+        behavior is identical to single-pass generation.
+
         Args:
             prompts: List of token ID sequences (one per sample).
+            checkpoint_path: Per-call crash-resume checkpoint (token ids only).
+            carry_at_new_tokens: Stop sequences at this many generated tokens and
+                mark them unfinished (None → run to EOS/max_new_tokens as before).
+            resume_generated: Per-prompt tokens already generated in a prior stage
+                (None entry → fresh prompt). Rebuilt via the prefill resume path.
+            resume_thinking_exhausted: Per-prompt thinking-budget-exhausted state to
+                restore for seeded rows (parallel to `resume_generated`).
 
         Returns:
-            GenerationResult with generated sequences and truncation stats.
+            GenerationResult with generated sequences and truncation/unfinished stats.
         """
         results: list[list[int] | None] = [None] * len(prompts)
         truncated_flags: list[bool] = [False] * len(prompts)
         thinking_exhausted_flags: list[bool] = [False] * len(prompts)
+        unfinished_flags: list[bool] = [False] * len(prompts)
         pbar = tqdm(total=len(prompts), desc="Generating")
         max_prompt_len = max(len(p) for p in prompts)
-        max_total = max_prompt_len + self.max_new_tokens
+        # When a carry cap is set, the phase loop runs only to that many new tokens
+        # and returns still-running sequences as unfinished. The cap (clamped to
+        # max_new_tokens by the caller) drives max_total so total_threshold /
+        # is_last / phase_budget / cache sizing all stop at the stage boundary.
+        effective_budget = carry_at_new_tokens if carry_at_new_tokens is not None else self.max_new_tokens
+        max_total = max_prompt_len + effective_budget
 
         # --- Resume from a per-chunk checkpoint, if one exists ---
         # Each completed phase persists finished results + in-flight token ids
@@ -612,16 +702,22 @@ class BatchGenerator:
         prefill_plan: list[tuple[int, list[int], list[int] | None]] = []
         for i, prompt_ids in enumerate(prompts):
             row = resume_rows.get(str(i))
+            seed = resume_generated[i] if resume_generated is not None else None
             if row is not None and row["done"]:
                 results[i] = row["generated_ids"]
                 truncated_flags[i] = row["truncated"]
                 thinking_exhausted_flags[i] = row["thinking_budget_exhausted"]
                 pbar.update(1)
             elif row is not None and row["generated_ids"]:
-                # In-flight: rebuild KV for prompt + all-but-last generated token,
-                # then resume decoding from the last generated token (see _prefill).
+                # In-flight checkpoint (strictly newer than any stage seed): rebuild
+                # KV for prompt + all-but-last generated token, then resume decoding
+                # from the last generated token (see _prefill).
                 gen = row["generated_ids"]
                 prefill_plan.append((i, prompt_ids + gen[:-1], gen))
+            elif seed:
+                # Cross-stage carry seed: this prompt already generated `seed` tokens
+                # in a prior length-stage. Same re-prefill path as checkpoint resume.
+                prefill_plan.append((i, prompt_ids + seed[:-1], seed))
             else:
                 prefill_plan.append((i, prompt_ids, None))
 
@@ -652,7 +748,11 @@ class BatchGenerator:
                 if gen is not None and self._enforce_thinking_cap:
                     # Reconstruct thinking-cap state from the generated tokens.
                     slot.in_thinking = self.thinking_end_token_id not in gen
-                    slot.thinking_budget_exhausted = resume_rows[str(i)]["thinking_budget_exhausted"]
+                    ckpt_row = resume_rows.get(str(i))
+                    if ckpt_row is not None:
+                        slot.thinking_budget_exhausted = ckpt_row["thinking_budget_exhausted"]
+                    elif resume_thinking_exhausted is not None:
+                        slot.thinking_budget_exhausted = resume_thinking_exhausted[i]
 
                 # Stage KV off the GPU (RAM, or disk once over threshold)
                 slot_queue.append(kv_store.stage(slot, valid_len, keys, vals))
@@ -673,13 +773,26 @@ class BatchGenerator:
                 f"phase_step={self._PHASE_STEP} max={self.max_new_tokens}"
             )
 
-            phase = (resume_phase + 1) if resume_phase is not None else 0
+            # Start the phase counter so total_threshold immediately clears the
+            # already-staged length. Fresh prompts start at 0; seeded survivors
+            # (stage > 0) start past their prior tokens so we don't churn empty
+            # phases early-promoting every slot until the threshold catches up.
+            has_seed = resume_generated is not None and any(s for s in resume_generated)
+            if resume_phase is not None:
+                phase = resume_phase + 1
+            elif has_seed and slot_queue:
+                phase = max(s.valid_len for s in slot_queue) // self._PHASE_STEP
+            else:
+                phase = 0
             total_threshold = min(self._PHASE_STEP * (phase + 1), max_total)
 
+            # Bound before the loop so the post-loop carry sweep is safe even when the
+            # loop breaks on the first iteration (e.g. a fully-resumed sub-chunk).
+            promote_queue: deque[_StagedSlot] = deque()
             while True:
                 if not slot_queue:
                     break  # nothing left to generate (e.g. a fully-resumed chunk)
-                promote_queue: deque[_StagedSlot] = deque()
+                promote_queue = deque()
 
                 logger.info(
                     f"[phase] Starting phase {phase + 1}: {len(slot_queue)} sequences, "
@@ -697,11 +810,13 @@ class BatchGenerator:
                     results,
                     truncated_flags,
                     thinking_exhausted_flags,
+                    unfinished_flags,
                     total_threshold,
                     promote_queue,
                     pbar,
                     total_threshold + 1,
                     is_last,
+                    carry_at_new_tokens,
                 )
 
                 self._cache = None
@@ -709,6 +824,7 @@ class BatchGenerator:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                 _malloc_trim()
+                _empty_pinned_host_cache()
                 logger.trace(
                     f"[trace] phase_end phase={phase + 1} promoted={len(promote_queue)} "
                     f"{_mem_snapshot(staged_slots=len(promote_queue))}"
@@ -716,17 +832,45 @@ class BatchGenerator:
 
                 # Persist progress for crash-resume (finished results + in-flight
                 # token ids; no KV). Cheap and atomic — see _write_checkpoint.
+                # Carried survivors are written as in-flight (done=False) so a
+                # resume re-decodes and re-carries them idempotently.
                 self._write_checkpoint(
-                    checkpoint_path, phase, results, truncated_flags, thinking_exhausted_flags, promote_queue
+                    checkpoint_path,
+                    phase,
+                    results,
+                    truncated_flags,
+                    thinking_exhausted_flags,
+                    unfinished_flags,
+                    promote_queue,
                 )
 
                 if not promote_queue:
+                    break
+                # With a carry cap, a non-empty promote_queue on the final phase
+                # (is_last) is carried survivors — e.g. staged off the GPU by a
+                # VRAM-pressure abort. Stop and record them as unfinished (below)
+                # instead of re-running. Without a carry cap, fall through to the
+                # normal re-run path (preserves VRAM-abort recovery on the last phase).
+                if carry_at_new_tokens is not None and is_last:
                     break
 
                 slot_queue = promote_queue
                 phase += 1
                 total_threshold = min(self._PHASE_STEP * (phase + 1), max_total)
                 logger.info(f"[phase] Phase {phase}: {len(slot_queue)} sequences promoted")
+
+            # Record any sequence still queued at the carry boundary as an unfinished
+            # survivor. Normally empty (hit_carry already recorded carries directly);
+            # this only catches slots a VRAM abort staged off the GPU on the last phase.
+            if carry_at_new_tokens is not None:
+                for staged in promote_queue:
+                    s = staged.slot
+                    if results[s.index] is None:
+                        results[s.index] = s.generated_ids
+                        thinking_exhausted_flags[s.index] = s.thinking_budget_exhausted
+                        unfinished_flags[s.index] = True
+                        pbar.update(1)
+                promote_queue.clear()
 
             pbar.close()
             sequences = [r if r is not None else [] for r in results]
@@ -738,6 +882,7 @@ class BatchGenerator:
                 total=len(prompts),
                 truncated=truncated_flags,
                 thinking_budget_exhausted=thinking_exhausted_flags,
+                unfinished=unfinished_flags,
             )
         finally:
             kv_store.close()
@@ -772,6 +917,7 @@ class BatchGenerator:
         results: list[list[int] | None],
         truncated_flags: list[bool],
         thinking_exhausted_flags: list[bool],
+        unfinished_flags: list[bool],
         promote_queue: "deque[_StagedSlot]",
     ) -> None:
         """Persist finished results + in-flight token ids after a phase (no KV).
@@ -779,6 +925,10 @@ class BatchGenerator:
         Token ids only (a few MB), written atomically (tmp + os.replace) once per
         phase — negligible next to the multi-second per-phase KV restores. Lets a
         re-launched process resume this chunk via generate(checkpoint_path=...).
+
+        Carried survivors (a carry boundary stopped them, `unfinished_flags[i]`)
+        are persisted as in-flight (done=False) so resume re-decodes and re-carries
+        them idempotently rather than treating them as finished.
         """
         if not checkpoint_path:
             return
@@ -787,7 +937,7 @@ class BatchGenerator:
             if gen is not None:
                 rows[str(i)] = {
                     "generated_ids": gen,
-                    "done": True,
+                    "done": not unfinished_flags[i],
                     "truncated": bool(truncated_flags[i]),
                     "thinking_budget_exhausted": bool(thinking_exhausted_flags[i]),
                 }
@@ -814,11 +964,13 @@ class BatchGenerator:
         results: list[list[int] | None],
         truncated_flags: list[bool],
         thinking_exhausted_flags: list[bool],
+        unfinished_flags: list[bool],
         total_threshold: int,
         promote_queue: deque[_StagedSlot],
         pbar: tqdm,
         max_cache_len: int,
         is_last: bool,
+        carry_cap: int | None = None,
     ) -> int:
         """Run a complete phase with static batching.
 
@@ -850,6 +1002,7 @@ class BatchGenerator:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
             _malloc_trim()
+            _empty_pinned_host_cache()
 
         logger.info(f"[phase] Effective batch size: {self._effective_batch_size}")
 
@@ -857,8 +1010,25 @@ class BatchGenerator:
         num_truncated = 0
 
         step = 0
-        step_time_sum = 0.0
+        # Accurate total decode wall-time. The GPU runs async between syncs, so an
+        # unsynced perf_counter delta around a single _batched_decode is meaningless;
+        # we only accumulate time over windows that end at a sync. window_* track the
+        # currently-open window so the periodic log shows a true per-step average.
+        decode_wall = 0.0
+        window_start: float | None = None
+        window_step_base = 0
         early_promoted = 0
+
+        def _close_decode_window() -> None:
+            # Fold the partial window since the last sync into decode_wall (syncs once).
+            # No-op if the window was already closed (e.g. a staging break path).
+            nonlocal decode_wall, window_start
+            if window_start is None:
+                return
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            decode_wall += time.perf_counter() - window_start
+            window_start = None
 
         while slot_queue:
             # --- Take a chunk of up to effective_bs slots ---
@@ -866,6 +1036,7 @@ class BatchGenerator:
             self._valid_lens = [0] * effective_bs
 
             restore_start = time.perf_counter()
+            restored_bytes = 0
             while slot_queue and len(chunk_slots) < effective_bs:
                 if not is_last and slot_queue[0].valid_len >= (total_threshold - self._PHASE_STEP * 0.1):
                     staged = slot_queue.popleft()
@@ -879,11 +1050,14 @@ class BatchGenerator:
                 self._cache.restore_row_from_cpu(batch_idx, staged.valid_len, keys, vals)
                 self._valid_lens[batch_idx] = staged.valid_len
                 chunk_slots.append(staged.slot)
+                restored_bytes += staged.nbytes
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             restore_time = time.perf_counter() - restore_start
+            restore_gb = restored_bytes / 1e9
             logger.info(
                 f"[perf] Restored {len(chunk_slots)} slots from CPU in {restore_time:.4f}s "
+                f"({restore_gb:.2f}GB, {restore_gb / restore_time if restore_time > 0 else 0.0:.1f}GB/s) "
                 f"ram_kv={kv_store._ram_bytes / 1e9:.2f}GB"
             )
 
@@ -893,12 +1067,21 @@ class BatchGenerator:
             if not chunk_slots:
                 continue
 
+            # Reclaim the pinned buffers freed by this chunk's restores before the long decode,
+            # so the pinned free pool never accumulates across chunks (the gap between ram_kv
+            # and RSS). Each restore rebinds keys/vals, so all but the last slot's buffers are
+            # already unreferenced here; the last frees on the next chunk's restore.
+            _empty_pinned_host_cache()
+
             # Compute batch-level phase budget
             max_valid_len = max(self._valid_lens[i] for i in range(len(chunk_slots)))
             phase_budget = total_threshold - max_valid_len
 
             finished: set[int] = set()
             chunk_step = 0
+            # Open a decode-timing window for this chunk (not spanning the restore above).
+            window_start = time.perf_counter()
+            window_step_base = step
 
             # --- Decode until all slots in chunk are done or budget exhausted ---
             while len(finished) < len(chunk_slots):
@@ -910,18 +1093,24 @@ class BatchGenerator:
                 active_indices = [i for i, _ in active]
                 max_active_len = max(self._valid_lens[i] for i in active_indices)
 
-                step_start = time.perf_counter()
                 self._batched_decode(active_indices, active_slots)
                 step += 1
                 chunk_step += 1
 
                 # Sync only on log boundaries to avoid per-step GPU→CPU stalls.
-                # Keeps the GPU pipeline full between syncs.
+                # Keeps the GPU pipeline full between syncs. avg_step is the true
+                # per-step wall time over the just-closed (synced) window, not a
+                # single step's enqueue latency.
                 if step % 200 == 0:
                     if torch.cuda.is_available():
                         torch.cuda.synchronize()
-                    step_time_sum += time.perf_counter() - step_start
-                    avg_step = step_time_sum / step
+                    now = time.perf_counter()
+                    window = now - window_start
+                    decode_wall += window
+                    window_steps = step - window_step_base
+                    avg_step = window / window_steps if window_steps else 0.0
+                    window_start = now
+                    window_step_base = step
                     rss_gb = psutil.Process().memory_info().rss / 1e9
                     logger.info(
                         f"[perf] phase step={step} active={len(active)} "
@@ -943,20 +1132,29 @@ class BatchGenerator:
                             f"Reducing batch size for next attempt: {effective_bs} -> {self._vram_reduced_bs}."
                         )
                         # Stage active slots back off the GPU and re-queue
-                        for i, slot in enumerate(chunk_slots):
-                            if i not in finished:
-                                valid_len = self._valid_lens[i]
-                                keys, vals = self._cache.stage_row_to_cpu(i, valid_len)
-                                promote_queue.appendleft(kv_store.stage(slot, valid_len, keys, vals))
+                        _close_decode_window()
+                        to_stage = [(i, s) for i, s in enumerate(chunk_slots) if i not in finished]
+                        for staged in self._stage_slots(to_stage, kv_store):
+                            promote_queue.appendleft(staged)
                         while slot_queue:
                             promote_queue.append(slot_queue.popleft())
                         break
 
-                # Check per-slot completion (EOS / max_new_tokens)
+                # Check per-slot completion (EOS / max_new_tokens / carry boundary)
                 for batch_idx, slot in active:
                     last_token = slot.generated_ids[-1]
-                    if last_token == self.eos_token_id or len(slot.generated_ids) >= self.max_new_tokens:
-                        if last_token != self.eos_token_id:
+                    n = len(slot.generated_ids)
+                    hit_eos = last_token == self.eos_token_id
+                    hit_global = n >= self.max_new_tokens
+                    # Carry boundary (length-stage cap): stop without finishing so the
+                    # caller pools this sequence across chunks and re-prefills it next
+                    # stage. EOS and the global cap take precedence — a sequence that
+                    # also ended naturally or hit the hard budget is genuinely done.
+                    hit_carry = carry_cap is not None and n >= carry_cap and not hit_eos and not hit_global
+                    if hit_eos or hit_global or hit_carry:
+                        if hit_carry:
+                            unfinished_flags[slot.index] = True
+                        elif not hit_eos:
                             num_truncated += 1
                             truncated_flags[slot.index] = True
                         results[slot.index] = slot.generated_ids
@@ -966,18 +1164,48 @@ class BatchGenerator:
 
                 # Batch-level promotion: budget exhausted → stage all remaining off the GPU
                 if chunk_step >= phase_budget:
-                    for batch_idx, slot in enumerate(chunk_slots):
-                        if batch_idx not in finished:
-                            valid_len = self._valid_lens[batch_idx]
-                            keys, vals = self._cache.stage_row_to_cpu(batch_idx, valid_len)
-                            promote_queue.append(kv_store.stage(slot, valid_len, keys, vals))
-                            finished.add(batch_idx)
+                    _close_decode_window()
+                    to_stage = [(bi, s) for bi, s in enumerate(chunk_slots) if bi not in finished]
+                    for staged in self._stage_slots(to_stage, kv_store):
+                        promote_queue.append(staged)
+                    finished.update(bi for bi, _ in to_stage)
                     break
 
+            # Close the window for chunks that finished naturally (no staging break).
+            _close_decode_window()
+
         if step > 0:
-            logger.info(f"[perf] Phase done: {step} decode steps, avg_step={step_time_sum / step:.4f}s")
+            logger.info(
+                f"[perf] Phase done: {step} decode steps, "
+                f"avg_step={decode_wall / step:.4f}s (decode_wall={decode_wall:.2f}s)"
+            )
 
         return num_truncated
+
+    def _stage_slots(self, batch_slots: list[tuple[int, _Slot]], kv_store: _StagedKVStore) -> list[_StagedSlot]:
+        """D2H-stage each (batch_idx, slot) off the GPU and log the cost.
+
+        Splits the page-lock (cudaHostAlloc) time from the unavoidable D2H copy via
+        the module-level _PIN_* accumulators, so a phase reports how much of staging
+        a reusable pinned-buffer pool would remove (pin_alloc) vs not (copy).
+        """
+        pin_alloc_0, pin_copy_0, pin_bytes_0 = _PIN_ALLOC_SECONDS, _PIN_COPY_SECONDS, _PIN_BYTES
+        stage_start = time.perf_counter()
+        out: list[_StagedSlot] = []
+        for batch_idx, slot in batch_slots:
+            valid_len = self._valid_lens[batch_idx]
+            keys, vals = self._cache.stage_row_to_cpu(batch_idx, valid_len)
+            out.append(kv_store.stage(slot, valid_len, keys, vals))
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        stage_wall = time.perf_counter() - stage_start
+        logger.info(
+            f"[perf] Staged {len(out)} slots to CPU in {stage_wall:.4f}s "
+            f"(pin_alloc={_PIN_ALLOC_SECONDS - pin_alloc_0:.4f}s "
+            f"copy={_PIN_COPY_SECONDS - pin_copy_0:.4f}s "
+            f"{(_PIN_BYTES - pin_bytes_0) / 1e9:.2f}GB)"
+        )
+        return out
 
     def _prefill(
         self,
