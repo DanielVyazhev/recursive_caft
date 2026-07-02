@@ -121,7 +121,7 @@ class ComplexityEstimationRunner:
                 ):
                     df.at[index, field_name] = field_value
 
-                if new_processed_rows < 5:
+                if new_processed_rows < 2:
                     print(f"Row {row.row_id}:")
                     print(f"Input: {row.model_dump()}")
                     print(f"Processed: {df.loc[index]}")

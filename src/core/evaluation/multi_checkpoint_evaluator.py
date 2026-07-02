@@ -27,6 +27,7 @@ def _mem_snapshot() -> str:
 
 class MultiCheckpointEvaluatorConfig(PydraConfig):
     checkpoints_dir: str
+    skip_missing_checkpoints: bool = False
     eval_dataset: QADatasetAdapter | list[QADatasetAdapter]
     base_model_id: str | None = None
     out_path: str | None = None
@@ -96,6 +97,11 @@ class MultiCheckpointEvaluator:
 
             logger.trace(f"[trace] starting checkpoint={ckpt_name} {_mem_snapshot()}")
             logger.info(f"Evaluating {ckpt_name}...")
+
+            if self.config.skip_missing_checkpoints:
+                if not (ckpt_dir / "trainer_state.json").exists():
+                    logger.warning(f"Skipping {ckpt_name} because no model file found")
+                    continue
 
             config = EvaluatorConfig(
                 model_path=str(ckpt_dir),

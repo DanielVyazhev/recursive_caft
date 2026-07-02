@@ -161,7 +161,7 @@ def distill_on_dataset(
             cnt += 1
             distillation_result_writer.write_to_df(df, config, result)
 
-            if cnt < 5:
+            if cnt < 2:
                 print(
                     f"response: {df.at[result.index, config.field_reasoning]}\nextracted_answer: {df.at[result.index, config.field_ans]}\ncorrect:{df.at[result.index, config.field_ans_correct]}\n\n"
                 )

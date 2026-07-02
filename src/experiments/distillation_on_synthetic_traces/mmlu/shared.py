@@ -29,6 +29,7 @@ def run(
     train_dataset: str,
     save_schedule: list[int],
     max_thinking_tokens: int = 8192,
+    skip_missing_checkpoints: bool = False,
 ):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
@@ -98,6 +99,7 @@ def run(
                 max_new_tokens=max_thinking_tokens + 10, max_thinking_tokens=max_thinking_tokens, max_batch_size=256
             ),
             summary_filename=summary_filename,
+            skip_missing_checkpoints=skip_missing_checkpoints,
         ),
         tokenizer=tokenizer,
     )
