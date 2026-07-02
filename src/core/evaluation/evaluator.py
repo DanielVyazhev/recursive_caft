@@ -35,7 +35,7 @@ from core.utils.subprocess_supervision import supervise_unit
 # many more generated tokens, so each sequence's staged KV (~valid_len) is larger
 # and a fixed-width chunk would balloon peak CPU RAM in later stages.
 
-# A bit more than 1/10 of MMLU test
+# A bit more than 1/8 of MMLU test
 CHUNK_SIZE = 256
 
 
@@ -76,7 +76,7 @@ class GenerationConfig(BaseModel):
     # so the long tail is batched across chunks instead of decoded once per chunk
     # at a near-empty batch. >= max_new_tokens reproduces single-pass generation.
     # Best as a multiple of BatchGenerator._PHASE_STEP (512) for clean phase grids.
-    stage_new_tokens: int = 3072
+    stage_new_tokens: int = 2560
 
 
 class EvaluatorConfig(PydraConfig):
