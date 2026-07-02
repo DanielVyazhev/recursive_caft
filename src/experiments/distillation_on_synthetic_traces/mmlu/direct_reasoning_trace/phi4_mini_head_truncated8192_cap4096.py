@@ -6,4 +6,5 @@ run(
     train_dataset="train_distilled_deepseek_v4_flash_regenerate_incorrect_w_large_head_truncated8192",
     save_schedule=[2, 5, 10, 15, 20],
     max_thinking_tokens=4096,
+    skip_missing_checkpoints=True,
 )
