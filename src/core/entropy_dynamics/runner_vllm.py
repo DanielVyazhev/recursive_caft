@@ -21,25 +21,6 @@ Usage:
       --out_dir artifacts/entropy_dynamics/mmlu_forced \\
       --role proxy --mode forced --students qwen_32b \\
       --use_vllm --gpu_memory_utilization 0.85
-
-My script for starting:
-env["PYTHONPATH"] = "/home/dviazhev/recursive_caft/src"
-env["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
-env["TOKENIZERS_PARALLELISM"] = "false"
-env["VLLM_USE_V1"] = "0"
-
-cmd = [
-    "python", "-m", "core.entropy_dynamics.run_experiment",
-    "--teacher_reasoning_path", "/home/dviazhev/recursive_caft/data/out/distillation/mmlu_synth_gptoss_b_t0_8.parquet",
-    "--out_dir", "artifacts/entropy_dynamics/gpt_b_proxy",
-    "--role", "proxy",
-    "--mode", "forced",
-    "--dataset_type", "mmlu",
-    "--students", "qwen_32b", "mistral_24b",
-    "--use_vllm",
-    "--gpu_memory_utilization", "0.90",
-    "--max_model_len", "8192",
-    "--tensor_parallel_size", "0",   # 0 = auto-detect
 """
 
 from __future__ import annotations
@@ -55,6 +36,8 @@ import pandas as pd
 import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer
+from vllm import TokensPrompt
+
 
 from core.entropy_dynamics.config import EntropyDynamicsConfig, StudentModelConfig
 from core.entropy_dynamics.prompt_builder import PrefixedPrompt, build_prefixed_prompts
@@ -129,6 +112,91 @@ def _save_prompt_cache(path: Path, prompts: list[PrefixedPrompt]) -> None:
         pickle.dump(prompts, f, protocol=pickle.HIGHEST_PROTOCOL)
     print(f"  Prompt cache saved: {path.name} ({len(prompts)} prompts)")
 
+
+
+# ---------------------------------------------------------------------------
+# Parallel prompt building
+# ---------------------------------------------------------------------------
+
+def _build_one_sample(args: tuple) -> list:
+    """Worker function: tokenize one sample and build all its prefixed prompts.
+
+    Receives a plain tuple (not a TeacherReasoning) to be picklable across
+    processes.  Returns a list of dicts that can be reconstructed into
+    PrefixedPrompt objects in the main process.
+    """
+    from transformers import AutoTokenizer
+    from core.entropy_dynamics.prompt_builder import build_prefixed_prompts
+    from core.entropy_dynamics.reasoning_loader import TeacherReasoning
+
+    (question_id, question, options, gold_answer, thinking_text,
+     model_id, window_size, mode, dataset_type) = args
+
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    sample = TeacherReasoning(
+        question_id=question_id,
+        question=question,
+        options=options,
+        gold_answer=gold_answer,
+        thinking_text=thinking_text,
+        thinking_token_ids=tokenizer.encode(thinking_text, add_special_tokens=False),
+    )
+
+    prompts = build_prefixed_prompts(
+        sample=sample,
+        tokenizer=tokenizer,
+        window_size=window_size,
+        mode=mode,
+        dataset_type=dataset_type,
+    )
+    return prompts
+
+
+def _build_prompts_parallel(
+    samples: list,
+    model_id: str,
+    window_size: int,
+    mode,
+    dataset_type: str,
+    num_workers: int = 16,        # 0 = auto (cpu_count / 2)
+) -> list:
+    """Build all prefixed prompts in parallel using ProcessPoolExecutor.
+
+    Each worker loads its own tokenizer instance (necessary because
+    HuggingFace tokenizers are not fork-safe).  Workers are spawned fresh,
+    so GPU memory from the main process is not duplicated.
+    """
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    if num_workers <= 0:
+        num_workers = max(1, multiprocessing.cpu_count() // 2)
+
+    print(f"Building prompts for {len(samples)} questions "
+          f"(parallel, {num_workers} workers)...")
+
+    args_list = [
+        (
+            s.question_id, s.question, s.options, s.gold_answer,
+            s.thinking_text, model_id, window_size, mode, dataset_type,
+        )
+        for s in samples
+    ]
+
+    all_prompts = []
+    with ProcessPoolExecutor(max_workers=num_workers,
+                              mp_context=__import__("multiprocessing").get_context("spawn")) as pool:
+        futures = {pool.submit(_build_one_sample, a): i for i, a in enumerate(args_list)}
+        done = 0
+        for fut in tqdm(as_completed(futures), total=len(futures), desc="Building prompts"):
+            all_prompts.extend(fut.result())
+            done += 1
+
+    print(f"  Built {len(all_prompts)} prompts total.")
+    return all_prompts
 
 # ---------------------------------------------------------------------------
 # Runner
@@ -241,19 +309,13 @@ class VLLMEntropyRunner:
         all_prompts = _load_prompt_cache(cache_path)
 
         if all_prompts is None:
-            print(f"Building prompts for {len(remaining)} questions...")
-            all_prompts = []
-            for sample in tqdm(remaining, desc="Building prompts"):
-                sample.thinking_token_ids = tokenizer.encode(
-                    sample.thinking_text, add_special_tokens=False
-                )
-                all_prompts.extend(build_prefixed_prompts(
-                    sample=sample,
-                    tokenizer=tokenizer,
-                    window_size=self.config.window_size,
-                    mode=self.config.mode,
-                    dataset_type=self.config.dataset_type,
-                ))
+            all_prompts = _build_prompts_parallel(
+                samples=remaining,
+                model_id=model_cfg.model_id,
+                window_size=self.config.window_size,
+                mode=self.config.mode,
+                dataset_type=self.config.dataset_type,
+            )
             _save_prompt_cache(cache_path, all_prompts)
         else:
             before = len(all_prompts)
@@ -336,9 +398,10 @@ class VLLMEntropyRunner:
         for batch_start in range(0, total, CHECKPOINT_EVERY):
             batch_prompts = all_prompts[batch_start:batch_start + CHECKPOINT_EVERY]
             batch_token_ids = [p.input_ids for p in batch_prompts]
+            vllm_inputs = [TokensPrompt(prompt_token_ids=ids) for ids in batch_token_ids]
 
             batch_outputs = llm.generate(
-                prompt_token_ids=batch_token_ids,
+                prompts=vllm_inputs,
                 sampling_params=sampling_params,
                 use_tqdm=True,
             )

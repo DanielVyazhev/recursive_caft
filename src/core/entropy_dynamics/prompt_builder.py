@@ -115,6 +115,11 @@ def _tokenize_with_assistant_prefix(
     base_ids = tokenizer.apply_chat_template(
         messages, tokenize=True, add_generation_prompt=True
     )
+    
+    # FIX: Flatten BatchEncoding if necessary
+    if not isinstance(base_ids, list):
+        base_ids = base_ids.input_ids[0] if isinstance(base_ids.input_ids[0], list) else list(base_ids.input_ids)
+
     prefix_ids = tokenizer.encode(assistant_prefix, add_special_tokens=False)
     return base_ids + prefix_ids
 
