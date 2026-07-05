@@ -21,16 +21,17 @@ from core.utils.seed import set_seed
 
 @dataclass
 class StepResult:
-    """Single measurement: one student × one question × one k."""
+    """Single measurement: one model × one question × one k."""
     question_id: str
-    student_label: str
+    model_label: str          # was "student_label" — now generic
+    role: str                 # "student" or "proxy"
     k: int
     num_reasoning_tokens: int
     total_reasoning_tokens: int
     mode: str
     answer_entropy: float
-    student_answer: str
-    student_correct: bool
+    model_answer: str         # was "student_answer"
+    model_correct: bool       # was "student_correct"
     gold_answer: str
 
 
@@ -50,7 +51,7 @@ class ExperimentResults:
 
 
 class EntropyDynamicsRunner:
-    """Runs the full entropy dynamics experiment."""
+    """Runs the full entropy dynamics experiment for any role (student or proxy)."""
 
     def __init__(self, config: EntropyDynamicsConfig):
         self.config = config
@@ -58,10 +59,8 @@ class EntropyDynamicsRunner:
     def run(self) -> pd.DataFrame:
         set_seed()
 
-        # Load teacher reasoning with a lightweight tokenizer
-        # (any tokenizer sharing the vocab works for slicing)
-        first_student_id = self.config.students[0].model_id
-        loader_tokenizer = AutoTokenizer.from_pretrained(first_student_id)
+        first_model_id = self.config.students[0].model_id
+        loader_tokenizer = AutoTokenizer.from_pretrained(first_model_id)
 
         print(f"Loading teacher reasoning from {self.config.teacher_reasoning_path}...")
         samples = load_teacher_reasoning(
@@ -73,48 +72,53 @@ class EntropyDynamicsRunner:
 
         all_results = ExperimentResults()
 
-        for student_cfg in self.config.students:
-            self._run_single_student(student_cfg, samples, all_results)
+        for model_cfg in self.config.students:
+            self._run_single_model(model_cfg, samples, all_results)
 
-        out_path = self.config.out_path / "entropy_dynamics_results.parquet"
+        # ── Use unique filename to prevent overwrites ──
+        out_path = self.config.out_path / self.config.results_filename
         all_results.save(out_path)
         print(f"All results saved to {out_path}")
 
         return all_results.to_dataframe()
 
-    def _run_single_student(
+    def _run_single_model(
         self,
-        student_cfg: StudentModelConfig,
+        model_cfg: StudentModelConfig,
         samples: list[TeacherReasoning],
         results: ExperimentResults,
     ):
+        role = self.config.role.value
         print(f"\n{'='*60}")
-        print(f"Student: {student_cfg.label} ({student_cfg.model_id})")
+        print(f"[{role}] {model_cfg.label} ({model_cfg.model_id})")
         print(f"{'='*60}")
 
-        tokenizer = AutoTokenizer.from_pretrained(student_cfg.model_id)
+        tokenizer = AutoTokenizer.from_pretrained(model_cfg.model_id)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
         model = AutoModelForCausalLM.from_pretrained(
-            student_cfg.model_id,
+            model_cfg.model_id,
             device_map=DEVICE_MAP,
             torch_dtype=torch.bfloat16,
         )
         model.eval()
 
+        # ── Checkpoint includes role to avoid collision ──
         checkpoint_path = (
-            self.config.out_path / f"checkpoint_{student_cfg.label}_{self.config.mode.value}.parquet"
+            self.config.out_path
+            / f"checkpoint_{role}_{model_cfg.label}_{self.config.mode.value}.parquet"
         )
         processed_ids = _load_processed_ids(checkpoint_path)
         print(f"Resuming: {len(processed_ids)} questions already processed.")
 
         t_start = time.perf_counter()
 
-        for i, sample in enumerate(tqdm(samples, desc=f"[{student_cfg.label}]")):
+        for i, sample in enumerate(tqdm(samples, desc=f"[{role}/{model_cfg.label}]")):
             if sample.question_id in processed_ids:
                 continue
 
+            # Re-tokenize with this model's tokenizer
             sample.thinking_token_ids = tokenizer.encode(
                 sample.thinking_text, add_special_tokens=False
             )
@@ -128,19 +132,19 @@ class EntropyDynamicsRunner:
             )
 
             for prompt in prefixed_prompts:
-                step_result = self._run_single_step(model, tokenizer, prompt, student_cfg.label)
+                step_result = self._run_single_step(
+                    model, tokenizer, prompt, model_cfg.label, role
+                )
                 results.append(step_result)
 
-            # Checkpoint
             if (i + 1) % self.config.batch_save_every == 0:
                 results.save(checkpoint_path)
                 elapsed = time.perf_counter() - t_start
-                print(f"  [{student_cfg.label}] {i+1}/{len(samples)} "
+                print(f"  [{role}/{model_cfg.label}] {i+1}/{len(samples)} "
                       f"({elapsed:.0f}s elapsed)")
 
         results.save(checkpoint_path)
 
-        # Free 
         del model
         gc.collect()
         if torch.cuda.is_available():
@@ -152,25 +156,25 @@ class EntropyDynamicsRunner:
         model,
         tokenizer: PreTrainedTokenizer,
         prompt: PrefixedPrompt,
-        student_label: str,
+        model_label: str,
+        role: str,
     ) -> StepResult:
         """Run one forward pass and extract entropy."""
-
         input_ids = torch.tensor([prompt.input_ids], device=DEVICE)
         attention_mask = torch.ones_like(input_ids)
 
         if prompt.mode == InferenceMode.FORCED:
             return self._step_forced(
-                model, tokenizer, input_ids, attention_mask, prompt, student_label
+                model, tokenizer, input_ids, attention_mask, prompt, model_label, role
             )
         else:
             return self._step_continuation(
-                model, tokenizer, input_ids, attention_mask, prompt, student_label
+                model, tokenizer, input_ids, attention_mask, prompt, model_label, role
             )
 
     def _step_forced(
         self, model, tokenizer, input_ids, attention_mask,
-        prompt: PrefixedPrompt, student_label: str,
+        prompt: PrefixedPrompt, model_label: str, role: str,
     ) -> StepResult:
         """Mode A: generate 1 token, measure its entropy."""
         outputs = model.generate(
@@ -188,26 +192,27 @@ class EntropyDynamicsRunner:
         entropy = compute_entropy_from_logits(first_token_logits).item()
 
         generated_id = outputs.sequences[0, input_ids.shape[1]].item()
-        student_answer = tokenizer.decode([generated_id]).strip().lower()
+        answer = tokenizer.decode([generated_id]).strip().lower()
 
         return StepResult(
             question_id=prompt.question_id,
-            student_label=student_label,
+            model_label=model_label,
+            role=role,
             k=prompt.k,
             num_reasoning_tokens=prompt.num_reasoning_tokens,
             total_reasoning_tokens=prompt.total_reasoning_tokens,
             mode=prompt.mode.value,
             answer_entropy=entropy,
-            student_answer=student_answer,
-            student_correct=(student_answer == prompt.gold_answer),
+            model_answer=answer,
+            model_correct=(answer == prompt.gold_answer),
             gold_answer=prompt.gold_answer,
         )
 
     def _step_continuation(
         self, model, tokenizer, input_ids, attention_mask,
-        prompt: PrefixedPrompt, student_label: str,
+        prompt: PrefixedPrompt, model_label: str, role: str,
     ) -> StepResult:
-        """Mode B: student continues generating, measure avg entropy of tail."""
+        """Mode B: model continues generating, measure avg entropy of tail."""
         outputs = model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -222,11 +227,11 @@ class EntropyDynamicsRunner:
         gen_ids = outputs.sequences[0, input_ids.shape[1]:]
         gen_text = tokenizer.decode(gen_ids, skip_special_tokens=True)
 
-        student_answer = ""
-        marker_pos = gen_text.find(answer_marker[1])  # find "]]"
+        answer = ""
+        marker_pos = gen_text.find(answer_marker[1])
         marker_start = gen_text.rfind(answer_marker[0], 0, marker_pos if marker_pos != -1 else None)
         if marker_start != -1 and marker_pos != -1:
-            student_answer = gen_text[marker_start + len(answer_marker[0]):marker_pos].strip().lower()
+            answer = gen_text[marker_start + len(answer_marker[0]):marker_pos].strip().lower()
 
         scores = outputs.scores
         if not scores:
@@ -243,20 +248,20 @@ class EntropyDynamicsRunner:
 
         return StepResult(
             question_id=prompt.question_id,
-            student_label=student_label,
+            model_label=model_label,
+            role=role,
             k=prompt.k,
             num_reasoning_tokens=prompt.num_reasoning_tokens,
             total_reasoning_tokens=prompt.total_reasoning_tokens,
             mode=prompt.mode.value,
             answer_entropy=entropy,
-            student_answer=student_answer,
-            student_correct=(student_answer == prompt.gold_answer),
+            model_answer=answer,
+            model_correct=(answer == prompt.gold_answer),
             gold_answer=prompt.gold_answer,
         )
 
 
 def _load_processed_ids(checkpoint_path: Path) -> set[str]:
-    """Load question_ids already processed from a checkpoint parquet."""
     if not checkpoint_path.exists():
         return set()
     try:
