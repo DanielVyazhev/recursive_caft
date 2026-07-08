@@ -2,6 +2,7 @@ from typing import override
 
 import pandas as pd
 from datasets import Dataset, concatenate_datasets
+from transformers import PreTrainedTokenizer
 
 from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter
 from core.datasets.base_dataset_adapter import BaseDatasetAdapter
@@ -17,8 +18,7 @@ class MergedDatasetAdapter(AbstractDatasetAdapter):
         # parquet) when given, otherwise each adapter's own configured path. Each applies its own
         # sampler / target builder, then the results are concatenated.
         datasets = [
-            adapter.process_dataset(path_override=path_override, strict=True)
-            for adapter in self.dataset_adapters
+            adapter.process_dataset(path_override=path_override, strict=True) for adapter in self.dataset_adapters
         ]
 
         ds = concatenate_datasets(datasets)
@@ -46,3 +46,8 @@ class MergedDatasetAdapter(AbstractDatasetAdapter):
         raise NotImplementedError(
             "Saving is not implemented for MergedDatasetAdapter. Please save individual datasets separately."
         )
+
+    @override
+    def override_tokenizer(self, tokenizer: PreTrainedTokenizer) -> None:
+        for adapter in self.dataset_adapters:
+            adapter.override_tokenizer(tokenizer)
