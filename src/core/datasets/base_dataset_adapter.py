@@ -5,6 +5,7 @@ from typing import override
 import pandas as pd
 from datasets import Dataset, load_dataset
 from pydantic import BaseModel
+from transformers import PreTrainedTokenizer
 
 from core.dataset_samplers.base_sampler import BaseDatasetSampler
 from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter
@@ -82,3 +83,7 @@ class BaseDatasetAdapter[D: BaseDataset](AbstractDatasetAdapter):
     def save_processed_dataset(self, df: pd.DataFrame, path: str, tmp: bool) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(path=path, index=False, compression=None if tmp else "snappy")
+
+    @override
+    def override_tokenizer(self, tokenizer: PreTrainedTokenizer) -> None:
+        self.dataset.tokenizer = tokenizer

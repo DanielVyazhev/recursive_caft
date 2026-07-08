@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 import pandas as pd
 from datasets import Dataset
+from transformers import PreTrainedTokenizer
 
 
 class AbstractDatasetAdapter(ABC):
@@ -20,3 +21,6 @@ class AbstractDatasetAdapter(ABC):
         """How many rows each sampler would actually select from `df`, keyed by dataset_id.
         Empty when there is no sampler (nothing to report)."""
         return {}
+
+    @abstractmethod
+    def override_tokenizer(self, tokenizer: PreTrainedTokenizer) -> None: ...
