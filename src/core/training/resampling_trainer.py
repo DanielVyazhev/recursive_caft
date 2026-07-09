@@ -10,6 +10,7 @@ from typing import override
 
 import pandas as pd
 import torch
+from pydantic import model_validator
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
 from transformers.modeling_utils import PreTrainedModel
@@ -23,6 +24,8 @@ from core.complexity_estimation.complexity_estimation_runner import (
     QADatasetAdapter,
 )
 from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter
+from core.datasets.sequence_packing import IGNORE_LABEL, pack_dataset, sequence_length_stats
+from core.training.base_trainer import PackingConfig
 from core.training.callbacks.save_thinking_token_rows import write_thinking_token_rows
 from core.training.lora_trainer import LoRATrainer, LoRATrainerConfig
 from core.utils.logger import logger
@@ -64,6 +67,146 @@ class ResamplingDataset(IterableDataset):
             self._logged_samples = True
 
         yield from dataset
+
+
+# Null packs are tiny, NOT budget-sized: their forward cost must be negligible (an epoch can
+# hold ~1000 of them). 8 matches the pad_to_multiple_of=8 convention elsewhere; torch.compile
+# just sees one extra static shape besides `budget`.
+NULL_PACK_LENGTH = 8
+
+
+def make_null_pack(pad_token_id: int, length: int = NULL_PACK_LENGTH) -> dict:
+    """An all-ignored block: pad input_ids, IGNORE_LABEL labels, position_ids restarting at 0
+    (the same convention pack_dataset uses for a block's pad segment, so FA2 varlen treats it
+    as one isolated, loss-ignored segment)."""
+    return {
+        "input_ids": [pad_token_id] * length,
+        "labels": [IGNORE_LABEL] * length,
+        "position_ids": list(range(length)),
+    }
+
+
+def pad_pack_indices(num_packs: int, updates_per_epoch: int, supervised_token_counts: list[int]) -> list[int]:
+    """Pack indices for an epoch with fewer packs than accumulation chunks.
+
+    interleave_pack_slots needs >= 1 real pack per chunk (see its NaN rationale), so when the
+    sampler selected so few docs that num_packs < updates_per_epoch, the pack with the fewest
+    supervised tokens is duplicated up to that minimum. Duplicated packs are trained more than
+    once that epoch -- bounded, rare (late-run selection collapse), and loudly logged."""
+    assert num_packs > 0, "Cannot pad an epoch with zero packs"
+    indices = list(range(num_packs))
+    if num_packs >= updates_per_epoch:
+        return indices
+
+    smallest = min(range(num_packs), key=lambda i: supervised_token_counts[i])
+    duplicates = updates_per_epoch - num_packs
+    logger.warning(
+        f"Resampling packing: only {num_packs} packs for {updates_per_epoch} accumulation chunks; "
+        f"duplicating the smallest pack ({supervised_token_counts[smallest]} supervised tokens) "
+        f"{duplicates}x so no chunk is all-null."
+    )
+    return indices + [smallest] * duplicates
+
+
+def interleave_pack_slots(pack_indices: list[int], total_slots: int, updates_per_epoch: int) -> list[int | None]:
+    """Lay out one epoch as exactly total_slots slots: a real-pack index or None (null pack).
+
+    HF's Trainer splits the epoch into updates_per_epoch gradient-accumulation chunks of
+    total_slots/updates_per_epoch rows and counts num_items_in_batch (labels != -100) per
+    chunk. An all-null chunk would make the model divide a zero loss-sum by zero items ->
+    NaN gradients, so every chunk gets its contiguous share of real packs first, then nulls.
+    Requires updates_per_epoch <= len(pack_indices) <= total_slots (see pad_pack_indices)."""
+    num_packs = len(pack_indices)
+    assert total_slots % updates_per_epoch == 0, (
+        f"total_slots {total_slots} must be divisible by updates_per_epoch {updates_per_epoch}"
+    )
+    assert updates_per_epoch <= num_packs <= total_slots, (
+        f"Need updates_per_epoch {updates_per_epoch} <= num_packs {num_packs} <= total_slots {total_slots}"
+    )
+
+    chunk_size = total_slots // updates_per_epoch
+    slots: list[int | None] = []
+    for chunk in range(updates_per_epoch):
+        chunk_packs = pack_indices[num_packs * chunk // updates_per_epoch : num_packs * (chunk + 1) // updates_per_epoch]
+        assert 1 <= len(chunk_packs) <= chunk_size
+        slots.extend(chunk_packs)
+        slots.extend([None] * (chunk_size - len(chunk_packs)))
+    return slots
+
+
+class PackedResamplingDataset(ResamplingDataset):
+    """ResamplingDataset that sequence-packs each epoch's re-sample while keeping the
+    pessimistic constant __len__ (the sampler's top_k doc count).
+
+    HF's Trainer fixes steps_in_epoch from len(dataset) at the top of every epoch, BEFORE
+    on_epoch_begin sets the epoch's parquet path (transformers 4.52.3 trainer.py:2478->2483,
+    iter at 2497), and every resampling callback keys on int(state.epoch), which stays
+    integral only if the iterator yields exactly len(dataset) rows. Packing merges docs
+    (num_packs <= num_docs <= top_k), so the doc count is a valid constant: each epoch yields
+    the real packs padded up to it with tiny "null" packs. Nulls carry zero supervised
+    tokens -> exactly zero gradient under the Trainer's token-normalized loss
+    (model_accepts_loss_kwargs, asserted at trainer build). Updates/epoch, resume arithmetic
+    and the LR schedule stay byte-identical to the non-packed path. Side effect: epochs where
+    drop_non_positive selects fewer than top_k docs no longer desync HF's epoch accounting --
+    the nulls absorb the shortfall."""
+
+    def __init__(
+        self,
+        dataset: AbstractDatasetAdapter,
+        tokenizer: PreTrainedTokenizer,
+        packing: PackingConfig,
+        gradient_accumulation_steps: int,
+    ):
+        super().__init__(dataset, tokenizer)
+        assert dataset.sampled_size() is not None, (
+            "Packed resampling needs a sampler-defined size: __len__ must be a constant "
+            "independent of the per-epoch parquet (packs vary per epoch; docs-slots may not)."
+        )
+        assert len(self) % gradient_accumulation_steps == 0, (
+            f"Sampled size {len(self)} must be divisible by gradient_accumulation_steps "
+            f"{gradient_accumulation_steps} so accumulation chunks align with the null interleave."
+        )
+        self.packing = packing
+        self.gradient_accumulation_steps = gradient_accumulation_steps
+
+    @override
+    def __iter__(self):
+        dataset = self.dataset.process_dataset(path_override=self.dataset_path)
+        assert len(dataset) > 0, "Packed resampling got an empty epoch sample"
+
+        lengths = [len(ids) for ids in dataset["input_ids"]]
+        sequence_length_stats(lengths)
+        pad_token_id = self.tokenizer.pad_token_id
+        assert isinstance(pad_token_id, int), "Tokenizer must have an integer pad_token_id for packing"
+        # pack_dataset also enforces budget >= the longest sequence.
+        packed = pack_dataset(dataset, budget=self.packing.budget, pad_token_id=pad_token_id)
+
+        if not self._logged_samples:
+            first = packed[0]
+            logger.info("Dataset samples")
+            logger.info("Train (first pack)")
+            logger.info(f"Input: {self.tokenizer.decode(first['input_ids'])}")
+            labels = [tok for tok in first["labels"] if tok != IGNORE_LABEL]
+            logger.info(f"Labels: {self.tokenizer.decode(labels)}")
+            self._logged_samples = True
+
+        total_slots = len(self)
+        updates_per_epoch = total_slots // self.gradient_accumulation_steps
+        if len(packed) < updates_per_epoch:
+            counts = [sum(1 for tok in labs if tok != IGNORE_LABEL) for labs in packed["labels"]]
+            pack_indices = pad_pack_indices(len(packed), updates_per_epoch, counts)
+        else:
+            pack_indices = list(range(len(packed)))
+        slots = interleave_pack_slots(pack_indices, total_slots, updates_per_epoch)
+        logger.info(
+            f"Resampling packing: {len(dataset)} docs -> {len(packed)} packs + "
+            f"{slots.count(None)} null slots = {total_slots} rows "
+            f"({updates_per_epoch} updates x {self.gradient_accumulation_steps} accumulation steps)"
+        )
+
+        null_pack = make_null_pack(pad_token_id)
+        for slot in slots:
+            yield null_pack if slot is None else packed[slot]
 
 
 class EstimateComplexityCallback(TrainerCallback):
@@ -359,6 +502,17 @@ class ResamplingTrainerConfig(LoRATrainerConfig):
     # in an epoch (the model drifting to chain-of-thought output).
     max_failed_estimation_fraction: float = 0.1
 
+    @model_validator(mode="after")
+    def _validate_packing_batching(self):
+        # PackedResamplingDataset yields one variable-length block per row (real packs at
+        # `budget`, null packs tiny); both its slot accounting and PackedSequenceCollator's
+        # stack assume one block per device batch.
+        if self.packing is not None:
+            assert self.training_args.per_device_train_batch_size == 1, (
+                "ResamplingTrainer with packing requires per_device_train_batch_size=1"
+            )
+        return self
+
 
 class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
     @override
@@ -372,12 +526,42 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
 
     @override
     def _prepare_data(self):
+        if self.config.packing is not None:
+            # per_device_train_batch_size=1 (validated), so accumulation steps == the
+            # docs-denominated effective batch resolved below.
+            return PackedResamplingDataset(
+                self.config.train_dataset,
+                self.tokenizer,
+                packing=self.config.packing,
+                gradient_accumulation_steps=self.config.training_args.effective_train_batch_size
+                // self.config.training_args.per_device_train_batch_size,
+            )
         train_ds = ResamplingDataset(self.config.train_dataset, self.tokenizer)
         return train_ds
 
     @override
+    def _resolve_effective_train_batch_size(self) -> int:
+        # PackedResamplingDataset keeps len() at the DOC count and null-pads each epoch up
+        # to it, so the base packs/docs rescale must not apply: updates/epoch and docs per
+        # update stay exactly as configured. This also bypasses the base _packing_stats
+        # assert -- packing happens per epoch inside __iter__, not in _prepare_data.
+        if self.config.packing is not None:
+            return self.config.training_args.effective_train_batch_size
+        return super()._resolve_effective_train_batch_size()
+
+    @override
     def _build_trainer(self, train_ds):
         trainer = super()._build_trainer(train_ds)
+
+        if self.config.packing is not None:
+            # Null packs are harmless only on the token-normalized loss path: the per-chunk
+            # num_items_in_batch divides a sum-CE, so an all-ignored block contributes exactly
+            # zero. On the legacy mean-CE path each null block would be 0/0 = NaN and poison
+            # the gradients -- fail at build time instead of at step one.
+            assert trainer.model_accepts_loss_kwargs, (
+                "Packed resampling requires the token-normalized loss path "
+                "(Trainer.model_accepts_loss_kwargs); this base model's forward does not accept it."
+            )
 
         self._estimate_complexity_callback = EstimateComplexityCallback(
             complexity_evaluation_dataset=self.config.complexity_evaluation_dataset,

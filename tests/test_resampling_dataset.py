@@ -108,6 +108,9 @@ class _EmptyAdapter(AbstractDatasetAdapter):
     def save_processed_dataset(self, df, path, tmp):
         raise NotImplementedError
 
+    def override_tokenizer(self, tokenizer):
+        pass
+
 
 def test_iter_does_not_crash_on_empty_dataset(thinking_tokenizer):
     # The one-time sample logging does dataset[0]; on an empty post-filter dataset that must not
