@@ -24,8 +24,10 @@ def evaluate_base_model(base_model_id: str, model_name: str, type: Literal["sing
 
     if type == "single_token":
         dataset_cls = MMLUSingleTokenResponseDataset
+        max_new_tokens = 10
     else:
         dataset_cls = MMLUCoTResponseDataset
+        max_new_tokens = 8192
 
     out_path = str(BASE_OUT_PATH / f"{model_name}_{type}")
 
@@ -44,7 +46,7 @@ def evaluate_base_model(base_model_id: str, model_name: str, type: Literal["sing
             add_thinking_start_token=False,
         ),
         out_path=out_path,
-        generation=GenerationConfig(max_new_tokens=8192, max_batch_size=256),
+        generation=GenerationConfig(max_new_tokens=max_new_tokens, max_batch_size=256),
     )
     base_results = Evaluator(base_config, tokenizer).evaluate()
 
