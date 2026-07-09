@@ -370,10 +370,9 @@ class EstimateComplexityCallback(TrainerCallback):
 
     def _reconcile_estimation(self, epoch: int) -> None:
         # After a LoRA epoch the model may emit a thinking token instead of a single answer letter,
-        # so those rows fail to measure (entropy_value is NaN). Abort if too many fail this epoch;
-        # otherwise reuse the previous epoch's last-known-good entropy for the failed rows. Any
-        # residual NaN (epoch 0, or rows that failed every epoch) is harmlessly dropped by the
-        # sampler (NaN scores sort to the bottom).
+        # so those rows fail to measure (entropy_value is NaN). Reuse the previous epoch's
+        # last-known-good entropy for the failed rows. Any residual NaN (epoch 0, or rows that
+        # failed every epoch) is harmlessly dropped by the sampler (NaN scores sort to the bottom).
         path = self.out_path_for_epoch(epoch)
         df = pd.read_parquet(path)
 
@@ -385,26 +384,56 @@ class EstimateComplexityCallback(TrainerCallback):
         failed_count = int(failed.sum())
         total_rows = int(len(df))
         failure_rate = float(failed.mean())
-        if failure_rate > self._max_failed_estimation_fraction:
-            raise RuntimeError(
+
+        # Too many failures is usually transient: the model drifts to chain-of-thought output for one
+        # epoch, then recovers. Tolerate ONE such epoch -- the backfill below carries its failed rows on
+        # the previous epoch's entropy. Two in a row means it is not recovering, so abort.
+        exceeded = failure_rate > self._max_failed_estimation_fraction
+        if exceeded:
+            preamble = (
                 f"Complexity estimation failed for {failure_rate:.1%} of rows at epoch {epoch} "
-                f"(> {self._max_failed_estimation_fraction:.0%} allowed); aborting training."
+                f"(> {self._max_failed_estimation_fraction:.0%} allowed)"
+            )
+            if epoch == 0:
+                raise RuntimeError(f"{preamble}; no previous epoch to backfill from, aborting training.")
+            if self._previous_epoch_exceeded(epoch):
+                raise RuntimeError(
+                    f"{preamble}, and epoch {epoch - 1} exceeded it too; the grace epoch did not "
+                    f"recover. Aborting training."
+                )
+            logger.warning(
+                f"{preamble}. Granting one grace epoch: backfilling from epoch {epoch - 1} and "
+                f"continuing. Training aborts if epoch {epoch + 1} also exceeds the threshold."
             )
 
         backfilled = 0
-        if epoch > 0 and failed.any():
+        has_backfill = epoch > 0 and bool(failed.any())
+        if has_backfill:
             prev = pd.read_parquet(self.out_path_for_epoch(epoch - 1))
             prev_entropy = prev.dropna(subset=["entropy_value"]).set_index("question_id")["entropy_value"]
             df.loc[failed, "entropy_value"] = df.loc[failed, "question_id"].map(prev_entropy)
-            df.to_parquet(path, index=False)
             backfilled = int(failed_count - df["entropy_value"].isna().sum())
-            logger.info(f"Backfilled {backfilled} failed entropy rows from epoch {epoch - 1}.")
 
         # Count how many rows the train sampler(s) will actually select from this finalized parquet
         # (after the non-positive-score drop). Computed here, after backfill, so `df` matches exactly
         # what SetResamplingPathCallback feeds the samplers for this same epoch.
         by_dataset = self._train_dataset.selected_sample_counts(df) if self._train_dataset is not None else {}
         selected_total = sum(by_dataset.values()) if by_dataset else None
+
+        # A grace epoch must not hand training an empty sample: without this the collapse resurfaces
+        # later as an opaque "all candidate rows scored <= 0" from BaseDatasetSampler.create_sample.
+        # `selected_total` is None (not 0) when no train_dataset was wired up, so compare explicitly.
+        # Raised before the parquet is rewritten below, so a resume re-reads the same unbackfilled
+        # rows and reaches this same verdict instead of sailing past a now-low failure rate.
+        if exceeded and selected_total == 0:
+            raise RuntimeError(
+                f"Grace epoch {epoch}: backfill left no rows with a positive score, so no training "
+                f"samples would remain. Aborting training."
+            )
+
+        if has_backfill:
+            df.to_parquet(path, index=False)
+            logger.info(f"Backfilled {backfilled} failed entropy rows from epoch {epoch - 1}.")
 
         # Persist how many rows could not be measured this epoch (failed_count, before backfill).
         # This file is also the per-epoch "finalized" marker used by on_epoch_begin to skip
@@ -417,6 +446,7 @@ class EstimateComplexityCallback(TrainerCallback):
             residual_failed=int(df["entropy_value"].isna().sum()),
             selected_samples=selected_total,
             selected_samples_by_dataset=by_dataset or None,
+            exceeded_threshold=exceeded,
         )
 
     def out_path_for_epoch(self, epoch: int) -> Path:
@@ -443,6 +473,16 @@ class EstimateComplexityCallback(TrainerCallback):
         # reloads them exactly). Non-checkpointed epochs are re-trained -> the dump is stale -> recompute.
         return self._is_checkpoint_epoch(epoch) and self._stats_path_for_epoch(epoch).exists()
 
+    def _previous_epoch_exceeded(self, epoch: int) -> bool:
+        # Read the grace bit off the previous epoch's finalized stats marker rather than tracking it in
+        # memory: _should_reuse can skip reconcile entirely for a checkpointed epoch on resume, so an
+        # instance counter would silently re-arm the grace after every restart.
+        path = self._stats_path_for_epoch(epoch - 1)
+        if not path.exists():
+            # Pre-feature dump, or a data dir wiped between runs. Be permissive rather than fatal.
+            return False
+        return bool(json.loads(path.read_text()).get("exceeded_threshold", False))
+
     def _estimation_complete(self, epoch: int) -> bool:
         # estimate() writes out_path only at the very end and deletes its .tmp right after, so a
         # parquet with no sibling .tmp means estimation finished (reconcile may still be pending).
@@ -458,6 +498,7 @@ class EstimateComplexityCallback(TrainerCallback):
         residual_failed: int,
         selected_samples: int | None = None,
         selected_samples_by_dataset: dict[str, int] | None = None,
+        exceeded_threshold: bool = False,
     ) -> None:
         stats = {
             "epoch": epoch,
@@ -466,6 +507,9 @@ class EstimateComplexityCallback(TrainerCallback):
             "failure_rate": (failed_rows / total_rows) if total_rows else 0.0,
             "backfilled": backfilled,
             "residual_failed": residual_failed,
+            # Whether this epoch blew past max_failed_estimation_fraction and was let through as the
+            # one allowed grace epoch. Read back by _previous_epoch_exceeded on the next epoch.
+            "exceeded_threshold": exceeded_threshold,
             # Number of rows the train sampler(s) actually select this epoch after dropping
             # non-positive scores (shrinks over time as the student catches the teacher).
             "selected_samples": selected_samples,
@@ -619,6 +663,7 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
                     # Pre-feature stats files lack selected_samples; surface as None rather than KeyError.
                     entry.setdefault("selected_samples", None)
                     entry.setdefault("selected_samples_by_dataset", None)
+                    entry.setdefault("exceeded_threshold", None)
                 else:
                     # A dump produced before this feature: its pre-backfill count is gone (reconcile
                     # overwrote the parquet), so report the post-backfill residual as a best effort.
@@ -638,6 +683,8 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
                         # dataset_id, not the train adapters' top_k(s)/scoring. Leave unknown.
                         "selected_samples": None,
                         "selected_samples_by_dataset": None,
+                        # The grace bit lived only in the stats file; the parquet cannot recover it.
+                        "exceeded_threshold": None,
                         "source": "derived",
                     }
                 details.append(entry)
@@ -646,6 +693,8 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
                 "total_failed_rows": sum(d["failed_rows"] for d in details),
                 "failed_rows_by_epoch": {str(d["epoch"]): d["failed_rows"] for d in details},
                 "selected_samples_by_epoch": {str(d["epoch"]): d.get("selected_samples") for d in details},
+                # Epochs that were let through as a grace epoch -- their scores are partly stale.
+                "grace_epochs": [d["epoch"] for d in details if d.get("exceeded_threshold")],
                 "details": details,
             }
             out_path = base / "complexity_estimation_failures.json"
