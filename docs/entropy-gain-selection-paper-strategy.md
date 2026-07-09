@@ -53,7 +53,7 @@ Right now "entropy gain" is a heuristic. Give it a story:
 Report end-to-end: teacher trace-generation tokens (per method, cumulative-unique), per-epoch selection cost (a 1-token forward pass over 9,626 questions — cheap, but say so with numbers), training FLOPs/tokens, and eval cost. The prior paper's "81% less data" framing was attack-proof because it counted tokens; do the same here.
 
 ### 1.5 Method hygiene before the long runs
-- **Unify normalization**: pick one (recommend rank/quantile normalization per model — robust to outliers and to vocab-size differences between student and proxy; raw-nat differences across different tokenizers/vocabs are not comparable) and use it in both analysis and training.
+- **Unify normalization**: pick one (recommend rank/quantile normalization per model — robust to outliers and to vocab-size differences between student and proxy; raw-nat differences across different tokenizers/vocabs are not comparable) and use it in both analysis and training. Full treatment in §7.
 - Fix the LR-schedule/`__len__` mismatch, the duplicate class name, and dedupe the two adapters' pools (or make the overlap a deliberate, documented choice).
 - Decide on the metric-objective mismatch: either measure selection entropy in the CoT regime (e.g., entropy of the answer token after a forced short `<think>` prefix, or first-token entropy after `<think>`), or keep single-token and *show* it still tracks CoT correctness as training progresses (plot per-epoch failed-estimation fraction and ROC-AUC of the online entropy vs current-student CoT correctness). Right now this is the biggest internal-validity hole.
 - **Corrected-answer leakage**: the best result uses traces where the teacher was told the gold answer. Either (a) regenerate with answer-hidden prompting + rejection sampling to correctness, or (b) keep both trace types as an explicit ablation axis with the caveat stated. Don't let the headline number silently depend on it.
@@ -146,9 +146,133 @@ Rough budget: the P0 grid at 20 epochs × 1024 samples is ~1/5 the cost of one 5
 
 ---
 
+## 6. The signal-processing treatment (`active_learning_analysis`) — critical evaluation
+
+*Added after an in-depth read of `all_models_analysis.ipynb` and `using_larger_model_as_techer_proxy.ipynb`, including all output tables.*
+
+### 6.1 What the treatment is
+Both notebooks score examples with 2D functions of max-normalized student entropy `Ĥs` and proxy entropy `Ĥt`, several framed in signal-processing terms:
+- `Hs_var = Ĥs(1−Ĥs)` — labeled the "Fisher Information signal term" (signal power, peaked at mid-uncertainty);
+- `Window-Wiener = Hs_var/(Hs_var+Ĥt)` — Wiener filter gain S/(S+N), with proxy entropy as noise power;
+- `ER = Ĥs²/Ĥt²` (ex-"SNR") and `Window-Ratio = Hs_var/Ĥt` — SNR power ratios;
+- `Window-Log (IDS) = log(1+Hs_var/Ĥt)` — the Shannon–Hartley capacity form log(1+S/N);
+- plus `EG`, `LI = EG·(1−Ĥt)`, `Window-Product = Hs_var·(1−Ĥt)`.
+Surrogate objective: HV rate (teacher correct ∧ student wrong) in the top-k selection, vs Random.
+
+### 6.2 The decisive empirical fact: the two notebooks contradict each other, and the contradiction is explainable
+**Notebook 1** (`all_models_analysis`): the *same* medium/large model provides both `Ĥt` and the "teacher correct" label. Averaged over all pairs at top-10%: **Window-Wiener/Log/Ratio win** (HV 44.4/44.2/44.2%, +62% lift), ER 43.7%, EG only 33.4% (+21.9%), and **plain student entropy H is worse than Random** (23.6% vs 27.4%).
+
+**Notebook 2** (`using_larger_model_as_techer_proxy`): entropy from proxies, correctness labels from decoupled *true teachers* (gpt-oss-120B / Qwen3-235B, ~79% accurate, n=11,282). The ranking **inverts**: **H(s) wins** (HV 68.9%, +36.7%), H(t) 65.7%, EG 65.0% (+29.0%), LI 63.9% … and the **Wiener/SNR metrics fall below Random** (42.7–42.9%, −15%), actively selecting items the student already answers correctly (S.Acc ≈ 48% in their subsets vs 14.7% for H(s)). Consistent across both true teachers and both proxy ensembles.
+
+**Why the flip:** in Notebook 1 the metrics that divide by `Ĥt` mechanically prefer items where the *label provider* is confident — inflating teacher-correctness in the subset (T.Acc 88% vs 79%) and therefore HV, by construction. It is label–metric circularity, not signal recovery. With decoupled labels from a strong teacher, that shortcut disappears: HV is then dominated by "find items the student gets wrong," which raw student entropy does best. **The SP metrics' apparent win is an evaluation artifact.** Anyone on the team still treating Window-Wiener as the best metric is optimizing the artifact.
+
+Two secondary observations that survive the correction:
+- **EG's real value is noise avoidance, not HV:** under true-teacher labels EG selects only 2.2% uncertainty-noise items vs 8.7% for H(s), at a modest HV cost. If wrong/noisy traces hurt training (plausible; unverified), EG could still win downstream — but that's a *different mechanism* than the one the lab measures.
+- **The optimal metric depends on teacher reliability.** Weak label source (Notebook 1's 24–70B "teachers", 30–50% accurate on hard items) → proxy-confidence-seeking metrics pay; near-oracle teacher (Notebook 2, ~80%) → pure student uncertainty pays. This reconciles the two notebooks and is itself a publishable finding: a *phase diagram of selection metrics over teacher accuracy*.
+
+### 6.3 Critique of the signal-processing formalism itself
+1. **Semantic mismatch:** `Ĥs(1−Ĥs)` applies a Bernoulli-variance form to a normalized *entropy*, which is not a probability. The principled version of the "window" is in probability space: p(1−p) with p = student's probability of the gold answer — this is the actual variance/Fisher/gradient-signal quantity, it's computable from logits you already store, and it connects to established theory (expected gradient signal of CE/RL on an item peaks at p≈0.5; the same "learnability window" used in RL data selection by pass rate and matching Hypothesis 2 and Sorscher et al.).
+2. **"Proxy entropy = noise power" is empirically false here.** Wiener/SNR require signal and noise to be additive and uncorrelated; H_s and H_t are strongly correlated (both track question difficulty), and H_t mixes aleatoric difficulty with the proxy's own epistemic gaps. Notebook 2 is a direct falsification of the noise model: metrics built on it drop below Random.
+3. **No process, no spectrum:** each item contributes one static scalar pair; there is no ensemble/time structure over which Wiener filtering or channel capacity is defined. These are monotone 2D scoring heuristics wearing SP names — an SP-literate reviewer will say exactly this. Either formalize (see 6.4) or rename.
+4. **Normalization fragility:** max-normalization makes every score dataset- and outlier-relative; `CONF_THR=0.30` and the noise taxonomy are defined on this fragile scale, and the taxonomy uses the same variable the metrics rank by (H(t)-based metrics get "0% confident noise" by construction — descriptive, not evidence).
+5. **No uncertainty quantification:** at top-10% of n≈10–11k, k≈1k, HV differences of 1–3 pts are ~1–1.5 SE; several reported rank differences are within noise (and GPQA at n=546 → k=54 is pure noise).
+
+### 6.4 What is salvageable — and genuinely promising
+Ranked by value:
+1. **Residualized student entropy (the "Wiener idea" done right).** The legitimate core intuition is *denoising*: remove the intrinsic-difficulty component from student uncertainty. The statistically sound version: regress `H_s` on `H_p` (isotonic or quantile regression across the pool) and select by the **residual** `H_s − E[H_s|H_p]`. This is scale-free (fixes the raw-nats vs normalized inconsistency and cross-vocab comparability), needs no clamping, has a shrinkage/BLUE interpretation, and is a strict generalization of entropy gain. One afternoon offline + one training run. This is the most promising SP-derived direction.
+2. **Expected-utility factorization instead of formula zoo.** HV-optimal selection is by `P(student wrong | H_s) × P(teacher correct | H_t)` — estimate both calibration curves on a held-out slice and multiply. Every hand-crafted metric (EG, LI, Window-*) is an ad-hoc approximation of this product; the calibrated version is principled, interpretable, and extends naturally with a third factor for trainability (p(1−p) in probability space). Cheap, offline-testable.
+3. **Learned 2D skyline:** fit a tiny logistic model on (Ĥs, Ĥt) → HV on held-out data to upper-bound what *any* hand-crafted 2D formula can achieve. If the skyline ≈ H(s), stop engineering metrics; if it's well above, the gap tells you what to design.
+4. **The teacher-reliability phase diagram (original contribution):** systematically vary label-source accuracy (weak proxies → true teachers, or synthetic label corruption) and map which metric family wins where. Turns the notebooks' contradiction into a figure and answers a question practitioners actually have ("my teacher is imperfect — should I still chase student uncertainty?").
+5. **Probability-space window p(1−p)** as the trainability term (see 6.3.1) — test as a selection score alongside the grid.
+
+### 6.5 Gaps this analysis exposes (additions to §5)
+- **The deployed metric contradicts the lab's own cleaner protocol.** Under true-teacher labels the design lab ranks H(s) ≥ EG on HV — yet `distillation_by_metrics` deployed EG and never ran H(s). Either EG's noise-avoidance advantage is real downstream (then say so and show it), or the production bet was placed on the wrong metric. The P0 grid adjudicates this; the lab evidence currently *predicts student entropy may win*, raising the stakes of risk #2 in §5.
+- **The surrogate is unvalidated.** No artifact links HV@10% to downstream trained accuracy. With even 4–6 training runs from the grid, plot HV-of-selected-set vs final accuracy per metric — if the correlation is weak, the entire offline lab needs a different surrogate (e.g., one-epoch loss decrease on selected items).
+- **Notebook 1's protocol should be retired or relabeled** (circular labels), and its GPQA slice (n=546) dropped from any averaged claim.
+- **No CIs anywhere in the lab tables;** add binomial/bootstrap intervals before using HV rankings to make decisions.
+- **Code hygiene:** ~500 duplicated lines between the two notebooks with divergent configs (DATA_DIR, metric sets) — one drifting copy already produced the normalized-vs-raw EG mismatch with the trainer; consolidate into `src/core` before the grid.
+
+### 6.6 Paper framing consequence
+Don't present the SP metric zoo as a contribution — present the **diagnosis** as one: "hand-crafted uncertainty-fusion metrics are unstable under label-source changes; a calibrated expected-utility score (or residualized entropy) is stable." That converts an embarrassing internal contradiction into the paper's most defensible analytical section, and it differentiates you from LARK/RHO-LOSS-style single-formula methods.
+
+---
+
+## 7. Entropy measurement and normalization — the proper way
+
+*Current state: notebooks divide by the per-pool max (`H/(H.max()+eps)`); the trainer uses raw nats. Both are wrong in different ways.*
+
+### 7.1 Why the current schemes fail
+- **Per-pool max normalization** is set by a single outlier, is dataset-relative, and — fatally for the online loop — is recomputed each epoch on a drifting student, so the scale (and the `drop_non_positive` threshold riding on it) wobbles epoch to epoch.
+- **Raw nats across models** are not comparable: Llama (128k vocab), Qwen (152k), Phi-4-mini (200k) have different supports, tokenizations of the option letters (`a` vs ` a` vs `A`), and formatting habits, all of which move entropy for reasons unrelated to question difficulty. Entropy gain *subtracts* two such numbers.
+
+### 7.2 Why "divide by log |V|" is not the fix
+`H/log|V|` (info-theoretic "efficiency") corrects the theoretical maximum, but log is slow: ln|V| = 11.76 / 11.93 / 12.21 for 128k/152k/200k — a ≤4% scale correction. Measured single-token entropies live at 0–2.5 nats and their cross-model differences are driven by **tail mass** scattered over the ~10⁵ non-answer tokens, which log|V| normalization leaves untouched. It is cosmetic here.
+
+### 7.3 The recommended measurement stack
+1. **Alphabet-restricted entropy (the base fix).** Sum first-token probability over all tokenizations of each valid option (a–j incl. leading-space/case variants), renormalize over the K options, compute the K-way entropy, divide by log K. Properties: bounded in [0,1]; semantically identical support across all tokenizers (student−proxy subtraction becomes meaningful); absolutely stable across epochs (no pool-relative rescaling); and the discarded mass P(valid answer token) becomes a free **format-compliance signal** — the quantity that currently degrades silently into NaN backfills as the student turns CoT-native. Caveat: verify option tokenization (numeric options collide, e.g. "1" vs "10" share a first token; letters a–j are safe).
+2. **Temperature calibration (optional rigor layer).** Entropies of two models are only comparable if similarly calibrated; fit one temperature per model on a held-out slice (align confidence with accuracy), then compute the K-way entropy. Do this if calibrated vs uncalibrated EG rankings disagree; otherwise appendix. In depth in §7.5.
+3. **Quantile normalization for the gain metric** — in depth below (§7.4).
+4. **Residualization on the quantile scale (the unifying recipe).** Quantile-transform both entropies, then regress q_s on q_p (isotonic) and select by the residual. Strictly generalizes quantile-EG (which implicitly assumes the identity map q_p ↦ q_s is the right baseline) and absorbs asymmetric copula shape.
+
+### 7.4 Quantile normalization, in depth
+
+**Definition.** For model m with entropies {H_1..H_N} over the pool, replace each value by its empirical CDF position: `q_i = F̂_m(H_i)`. Implementation with mid-rank tie handling:
+```python
+from scipy.stats import rankdata
+def ecdf_quantiles(h):                      # h: entropies over the pool
+    return (rankdata(h, method="average") - 0.5) / len(h)   # in (0,1)
+q_s = ecdf_quantiles(H_s)   # student: re-fit each epoch on the current pool
+q_p = ecdf_quantiles(H_p)   # proxy: computed once, same question set
+score = q_s - q_p           # quantile entropy-gain
+```
+(For out-of-sample items — eval sets, resumed epochs — map through the fitted ECDF by interpolating against the sorted training values, not by re-ranking a mixed pool. Never pool train and test when fitting.)
+
+**What it buys.**
+- *Invariance:* any strictly monotone transform of the raw score (units, log, max-scaling) leaves quantiles unchanged. All model-specific scale/offset/shape differences — vocab size, tail mass, sharpness — vanish. `q_s − q_p` asks the right question: "is this item unusually uncertain **for the student**, relative to how unusual it is **for the proxy**."
+- *Copula view:* the pair (q_s, q_p) is exactly the copula of (H_s, H_p) — the dependence structure with both margins stripped. Quantile-EG selects the upper-left region of the copula plot. This is the clean formalization of what the Window/SNR metrics were groping toward.
+- *Bounded, interpretable scores:* q_s − q_p ∈ (−1, 1); top-k thresholds are percentile statements that transfer across datasets and models.
+
+**The key design decision in the online loop — re-fit vs fixed reference.** Re-fitting the student ECDF each epoch makes q_s *relative to the current epoch*: the top decile is always the top decile even as absolute entropies collapse. Consequences: (a) selection always has full dynamic range — no LR-schedule/`__len__` mismatch from a shrinking pool; (b) but the convergence signal (`selected_samples` shrinking as the student catches the proxy) disappears — with symmetric ranks, roughly half the items have q_s − q_p > 0 forever, so `drop_non_positive` no longer terminates. Recommendation: **re-fit per epoch for selection; monitor convergence separately with the absolute alphabet-normalized entropy** (mean, and P(valid-answer) mass). If instead you map every epoch through the *epoch-0* ECDF, you keep an absolute progress meter but reintroduce pool-shrinkage; that variant is better as a logged diagnostic than as the selector.
+
+**Pitfalls to engineer around.**
+1. *Ties and atoms:* single-token entropies pile up near 0 (easy items). Use mid-ranks (`method="average"`) so an atom maps to one quantile instead of arbitrary ordering; expect compressed resolution inside the atom.
+2. *Loss of absolute meaning:* quantiles always nominate a "top 10%", even when the student has nothing left to learn. Pair the selector with an absolute floor (e.g., alphabet-entropy > ε) so the method can stop.
+3. *Density distortion:* rank differences weight raw differences by local density — in crowded regions of the distribution, differences at the measurement-noise level become large rank jumps (churn in the selected set). If churn is high (check the §2 Jaccard diagnostic), smooth by averaging entropy over prompt paraphrases or option permutations before ranking.
+4. *Dynamic range is governed by rank correlation:* for uniform margins, Var(q_s − q_p) = (1 − ρ_S)/6 where ρ_S is the Spearman correlation between student and proxy entropy. At ρ_S = 0.9 the score's SD is ≈0.13 on a (−1,1) range — selection then operates on small differences that may be noise-dominated. **Measure ρ_S first (Week-1 task):** it quantifies, in one number, how much information the proxy adds over plain student entropy — the crisp version of risk #2 in §5.
+5. *Tail noise:* ECDF estimates at extreme quantiles carry the most sampling noise; at N≈9.6k the top-1% boundary is fuzzy — irrelevant at k=10%, relevant if you shrink the budget.
+6. *Alignment:* rank within the question_id intersection of the two models' tables; if per-category coverage skew matters (§5.6), rank within category (stratified quantiles) so top-k cannot be monopolized by one subject's entropy distribution.
+
+### 7.5 Temperature calibration, in depth
+
+**What it is.** Temperature scaling (Guo et al. 2017, arXiv:1706.04599): divide the logits by a single scalar T before the softmax, `p(T) = softmax(z/T)`, with T fit on held-out labeled data to minimize NLL of the gold answers. T > 1 flattens an overconfident model; T < 1 sharpens an underconfident one. It has one parameter, is fit in seconds, and **never changes the argmax or the within-item token ranking** — accuracy is untouched; only the confidence profile moves.
+
+**Why entropy gain needs it.** Entropy is a function of the probability vector's *shape*, and modern instruction-tuned LLMs are systematically miscalibrated — usually overconfident, and by amounts that differ across families (Phi vs Qwen vs Llama) and across training stages. If the student is more overconfident than the proxy, raw H_s is deflated relative to H_p, EG = H_s − H_p is biased downward, and `drop_non_positive` silently discards genuinely learnable items; an underconfident student inflates EG everywhere. After calibrating both models, "confidence ≈ probability of being correct" holds on both sides, so the subtraction compares *predictive uncertainty about the same event* rather than two sharpness idiosyncrasies. This is also what makes the §1.1 theory story well-founded: **calibrated** EG approximates the gap in expected correctness — the headroom a teacher trace can actually close. Uncalibrated EG approximates nothing in particular.
+
+**Why quantile normalization does not subsume it.** Quantiles are invariant to monotone transforms of the entropy *value across items* — but temperature is not such a transform: it re-shapes each item's distribution individually and can **reorder items by entropy**. Example: item A = {0.9, 0.1} over two live options has H = 0.33 nats; item B = {0.97, 6×0.005} over seven has H = 0.19 — A ranks as more uncertain. Flatten both (large T): A → ln 2 = 0.69, B → ln 7 = 1.95 — the order inverts, because B's uncertainty is *wide but sharp* and A's is *narrow but soft*. Calibration decides which regime you are in before ranks are taken; quantiles then strip the remaining marginal shape. The layers are complementary: calibrate per item, quantile across items.
+
+**Recipe for this codebase.**
+1. Operate on the **alphabet-restricted K-way distribution** (§7.3.1) — calibrate the decision that matters, not the 150k-token tail.
+2. Fit on the **validation split only** (never test, and not the selection pool itself — mild circularity otherwise). A 1-parameter fit is low-variance: ~500–1,000 labeled items suffice; your 10% val split (~1.2k) is enough.
+3. Solve `T* = argmin_T Σ_i −log softmax(z_i/T)[y_i]` — a smooth 1-D problem; `scipy.optimize.minimize_scalar` over log T. Gold label = correct option.
+4. Recompute the K-way probabilities at z/T*, take entropy, divide by log K. Then apply the quantile/residual layer (§7.4).
+5. **Proxy: fit once. Student: re-fit every epoch.** Fine-tuning is known to *worsen* calibration (SFT on hard targets sharpens the answer distribution), so T_s drifts during training. The re-fit is one 1-token forward pass over the val slice — piggyback it on the existing per-epoch estimation subprocess; cost is negligible. The T_s trajectory itself is a diagnostic worth logging: strong drift means raw per-epoch entropies of the *same* student aren't comparable across epochs either, contaminating any fixed-reference analysis and the raw-nat `drop_non_positive` semantics.
+
+**Decision rule — is the layer needed at all?** Compute per-model reliability diagrams/ECE on the K-way distributions, and the Jaccard overlap between the EG top-k selected with and without calibration. If the overlap stays ≳0.9 across epochs, calibration doesn't change selection → one appendix paragraph and move on. If it drops, the layer is load-bearing and belongs in the method. Either result is reportable.
+
+**Limits and pitfalls.**
+- A single T cannot fix *difficulty-dependent* miscalibration (models are typically most overconfident exactly on hard items). The residual miscalibration is one more reason to keep the quantile/residual layer on top rather than trusting calibrated absolute values alone. (Vector/matrix scaling or per-category temperatures exist, but with ~1.2k val items and K=10 they overfit; don't.)
+- T fit on val is only valid under the same distribution — fine here (random split of one dataset), but re-fit if you move to a new dataset or a mid-training student (hence step 5).
+- Items with near-zero mass on the valid alphabet can't be meaningfully calibrated — exclude them from the T fit and let the P(valid) signal handle them.
+
+**Order of operations (final):** restrict to alphabet → temperature-calibrate (if the decision rule says it matters) → K-way entropy ÷ log K → per-epoch quantile transform → select by quantile difference or isotonic residual, with an absolute-entropy floor for stopping.
+
+**Bottom line:** alphabet-restricted, log-K-normalized entropy as the measurement; per-epoch quantile transform (mid-ranks) for both models; select by q_s − q_p or, better, by the isotonic residual of q_s on q_p; keep an absolute-entropy floor and log P(valid answer) + Spearman ρ_S as diagnostics. Temperature calibration is the layer that makes *absolute* EG values meaningful (theory claims, stopping rules, cross-epoch monitoring); the ECE + top-k-Jaccard decision rule determines whether it graduates from appendix to method.
+
+---
+
 ## Suggested sequencing (10–11 weeks, part-time, 2×H100)
 
-1. **Week 1 (no GPU):** offline sanity — score-correlation/Jaccard analysis (risk #2), per-category coverage, cumulative-unique-selected accounting from existing artifacts; fix sampler hygiene (normalization, LR/len bug, duplicate class); seed everything.
+1. **Week 1 (no GPU):** offline sanity — score-correlation/Jaccard analysis (risk #2), per-category coverage, cumulative-unique-selected accounting from existing artifacts; fix sampler hygiene (normalization, LR/len bug, duplicate class); seed everything. From §6: compute residualized-entropy and calibrated expected-utility scores offline, add CIs to the HV tables, and re-run the lab with the circular protocol retired — this decides which 1–2 extra scorers join the P0 grid.
 2. **Weeks 2–4:** P0 grid (6 strategies × 3 seeds × 20 epochs, Qwen/direct traces) + static-vs-adaptive + RHO-LOSS row. This decides the paper's thesis.
 3. **Weeks 4–6:** proxy-size ablation (offline + 3–4 runs); harmful-data demonstration; answer-hidden regeneration of corrected traces (API work, no GPU).
 4. **Weeks 6–9:** winning method on GSM8K + second student (Phi-4-mini); OOD evals; 50-epoch extended runs for the headline configs only.
