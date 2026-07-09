@@ -3,6 +3,9 @@ from pathlib import Path
 from transformers import AutoTokenizer
 
 from core.complexity_estimation.entropy.single_token_entropy_estimator import SingleTokenEntropyEstimator
+from core.dataset_samplers.base_sampler import BaseDatasetSampler, BaseDatasetSamplerConfig
+from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
+from core.datasets.merged_dataset_adapter import MergedDatasetAdapter
 from core.datasets.mmlu.mmlu_reasoning_response_dataset import MMLUReasoningResponseDataset
 from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset
 from core.datasets.qa_dataset import QADatasetConfig
@@ -123,3 +126,34 @@ def run(
             tokenizer=tokenizer,
         )
         cot_evaluator.evaluate_all()
+
+
+def get_merged_adapter_with_data_mix(sampler_cls: type[BaseDatasetSampler]) -> MergedDatasetAdapter:
+    return MergedDatasetAdapter(
+        [
+            CausalDatasetAdapter(
+                dataset=MMLUReasoningResponseDataset(
+                    config=QADatasetConfig(
+                        path="should be overridden by SetResamplingPathCallback",
+                        dataset_id="train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192",
+                    ),
+                    # Will be overridden
+                    tokenizer=None,  # type: ignore
+                ),
+                dataset_sampler=sampler_cls(BaseDatasetSamplerConfig(top_k=1024)),
+            ),
+            # Mix in a smaller single-token-answer set (hardest by gain) so the model keeps
+            # answering with a single letter, keeping the per-epoch entropy estimation stable.
+            CausalDatasetAdapter(
+                dataset=MMLUSingleTokenResponseDataset(
+                    config=QADatasetConfig(
+                        path="should be overridden by SetResamplingPathCallback",
+                        dataset_id="mmlu_single_token_train",
+                    ),
+                    # Will be overridden
+                    tokenizer=None,  # type: ignore
+                ),
+                dataset_sampler=sampler_cls(BaseDatasetSamplerConfig(top_k=256)),
+            ),
+        ]
+    )
