@@ -1,6 +1,9 @@
-"""EstimateComplexityCallback._reconcile_estimation: abort when too many rows fail to
-measure single-token entropy in an epoch, otherwise backfill the failures from the
-previous epoch's last-known-good values (joined on question_id)."""
+"""EstimateComplexityCallback._reconcile_estimation: backfill rows that failed to measure
+single-token entropy from the previous epoch's last-known-good values (joined on question_id).
+
+An epoch whose failure rate exceeds max_failed_estimation_fraction is tolerated once -- the
+backfill carries it -- and aborts training only if the next epoch exceeds the threshold too.
+Epoch 0 has no previous epoch to backfill from, so it aborts immediately."""
 
 import json
 from math import nan
@@ -87,14 +90,103 @@ def test_reconcile_backfills_from_previous_epoch(thinking_tokenizer, tmp_path):
 
 
 def test_reconcile_aborts_above_threshold(thinking_tokenizer, tmp_path):
+    # Epoch 0 gets no grace epoch: there is no previous epoch to backfill the failed rows from.
     cb = _callback(thinking_tokenizer, tmp_path, max_failed=0.1)
     entropy = [0.5] * 10
     entropy[0] = nan
     entropy[1] = nan  # 2/10 = 20% > 10%
     _write_epoch(cb, 0, entropy)
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="no previous epoch to backfill from"):
         cb._reconcile_estimation(0)
+
+
+def _failing_epoch(n=10, failed=3, value=0.9):
+    # `failed`/`n` > the default max_failed=0.1 threshold.
+    entropy = [value] * n
+    for i in range(failed):
+        entropy[i] = nan
+    return entropy
+
+
+def test_reconcile_tolerates_single_exceedance(thinking_tokenizer, tmp_path):
+    cb = _callback(thinking_tokenizer, tmp_path, max_failed=0.1)
+    _write_epoch(cb, 0, [0.5] * 10)
+    cb._reconcile_estimation(0)
+    path1 = _write_epoch(cb, 1, _failing_epoch())  # 30% > 10%
+
+    cb._reconcile_estimation(1)  # grace epoch: no raise
+
+    out = pd.read_parquet(path1)
+    assert out["entropy_value"].notna().all()  # all three failures backfilled from epoch 0
+    assert (out.loc[out["question_id"] < 3, "entropy_value"] == 0.5).all()
+    stats = _read_stats(cb, 1)
+    assert stats["exceeded_threshold"] is True
+    assert stats["failed_rows"] == 3  # pre-backfill count
+    assert stats["residual_failed"] == 0
+    assert _read_stats(cb, 0)["exceeded_threshold"] is False
+
+
+def test_reconcile_aborts_on_two_consecutive_exceedances(thinking_tokenizer, tmp_path):
+    cb = _callback(thinking_tokenizer, tmp_path, max_failed=0.1)
+    _write_epoch(cb, 0, [0.5] * 10)
+    cb._reconcile_estimation(0)
+    _write_epoch(cb, 1, _failing_epoch())
+    cb._reconcile_estimation(1)  # grace consumed
+    _write_epoch(cb, 2, _failing_epoch())
+
+    with pytest.raises(RuntimeError, match="grace epoch did not recover"):
+        cb._reconcile_estimation(2)
+
+
+def test_reconcile_grace_rearms_after_recovery(thinking_tokenizer, tmp_path):
+    # Exceed at epoch 1, recover at epoch 2 -> epoch 3 may exceed again without aborting.
+    cb = _callback(thinking_tokenizer, tmp_path, max_failed=0.1)
+    _write_epoch(cb, 0, [0.5] * 10)
+    cb._reconcile_estimation(0)
+    _write_epoch(cb, 1, _failing_epoch())
+    cb._reconcile_estimation(1)
+    _write_epoch(cb, 2, [0.7] * 10)
+    cb._reconcile_estimation(2)
+    _write_epoch(cb, 3, _failing_epoch())
+
+    cb._reconcile_estimation(3)  # no raise: epoch 2 recovered, so the grace is re-armed
+
+    assert _read_stats(cb, 2)["exceeded_threshold"] is False
+    assert _read_stats(cb, 3)["exceeded_threshold"] is True
+
+
+def test_reconcile_missing_prev_stats_grants_grace(thinking_tokenizer, tmp_path):
+    # Epoch 0's parquet exists (so backfill works) but its stats marker does not -- a pre-feature
+    # dump or a wiped data dir. Be permissive rather than fatal.
+    cb = _callback(thinking_tokenizer, tmp_path, max_failed=0.1)
+    _write_epoch(cb, 0, [0.5] * 10)
+    _write_epoch(cb, 1, _failing_epoch())
+    assert not cb._stats_path_for_epoch(0).exists()
+
+    cb._reconcile_estimation(1)  # no raise
+
+    assert _read_stats(cb, 1)["exceeded_threshold"] is True
+
+
+def test_grace_epoch_aborts_when_no_rows_selected(thinking_tokenizer, tmp_path):
+    # Every row's entropy equals the teacher's -> zero gain -> the sampler drops all of them. A grace
+    # epoch must not hand training an empty sample; fail here rather than deep inside create_sample.
+    train = _train_dataset(thinking_tokenizer, [("t", 100)])
+    cb = _callback(thinking_tokenizer, tmp_path, train_dataset=train)
+    _write_epoch(cb, 0, [0.2] * 10, teacher=0.2)
+    cb._reconcile_estimation(0)  # 0% failed: not a grace epoch, so no guard despite 0 selected
+    assert _read_stats(cb, 0)["selected_samples"] == 0
+    path1 = _write_epoch(cb, 1, _failing_epoch(value=0.2), teacher=0.2)
+
+    with pytest.raises(RuntimeError, match="no rows with a positive score"):
+        cb._reconcile_estimation(1)
+
+    # The parquet keeps its unbackfilled NaNs, so a resume re-derives the same high failure rate and
+    # aborts again rather than sailing past the guard into an opaque create_sample error.
+    assert pd.read_parquet(path1)["entropy_value"].isna().sum() == 3
+    with pytest.raises(RuntimeError, match="no rows with a positive score"):
+        cb._reconcile_estimation(1)
 
 
 def test_reconcile_epoch0_keeps_residual_nan(thinking_tokenizer, tmp_path):
@@ -206,3 +298,4 @@ def test_aggregate_carries_selected_samples_and_tolerates_missing(tmp_path):
 
     summary = json.loads((base / "complexity_estimation_failures.json").read_text())
     assert summary["selected_samples_by_epoch"] == {"0": 40, "1": None}
+    assert summary["grace_epochs"] == []  # neither stats file carries exceeded_threshold
