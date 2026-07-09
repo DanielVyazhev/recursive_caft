@@ -1,43 +1,10 @@
-from core.dataset_samplers.entropy_ratio_sampler import BaseDatasetSamplerConfig
 from core.dataset_samplers.student_entropy_sampler import StudentEntropySampler
-from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
-from core.datasets.merged_dataset_adapter import MergedDatasetAdapter
-from core.datasets.mmlu.mmlu_reasoning_response_dataset import MMLUReasoningResponseDataset
-from core.datasets.mmlu.mmlu_single_token_response_dataset import MMLUSingleTokenResponseDataset
-from core.datasets.qa_dataset import QADatasetConfig
-from experiments.distillation_by_metrics.mmlu.shared import run
+from experiments.distillation_by_metrics.mmlu.shared import get_merged_adapter_with_data_mix, run
 
 run(
     model_name="llama_3b",
     relative_out_path="./student_entropy/llama_3b_head_truncated8192",
     train_dataset="train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192",
-    train_dataset_adapter=MergedDatasetAdapter(
-        [
-            CausalDatasetAdapter(
-                dataset=MMLUReasoningResponseDataset(
-                    config=QADatasetConfig(
-                        path="should be overridden by SetResamplingPathCallback",
-                        dataset_id="train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192",
-                    ),
-                    # Will be overridden
-                    tokenizer=None,  # type: ignore
-                ),
-                dataset_sampler=StudentEntropySampler(BaseDatasetSamplerConfig(top_k=1024)),
-            ),
-            # Mix in a smaller single-token-answer set (hardest by gain) so the model keeps
-            # answering with a single letter, keeping the per-epoch entropy estimation stable.
-            CausalDatasetAdapter(
-                dataset=MMLUSingleTokenResponseDataset(
-                    config=QADatasetConfig(
-                        path="should be overridden by SetResamplingPathCallback",
-                        dataset_id="mmlu_single_token_train",
-                    ),
-                    # Will be overridden
-                    tokenizer=None,  # type: ignore
-                ),
-                dataset_sampler=StudentEntropySampler(BaseDatasetSamplerConfig(top_k=256)),
-            ),
-        ]
-    ),
+    train_dataset_adapter=get_merged_adapter_with_data_mix(StudentEntropySampler),
     save_schedule=[5, 10, 20, 40, 60, 80, 100],
 )
