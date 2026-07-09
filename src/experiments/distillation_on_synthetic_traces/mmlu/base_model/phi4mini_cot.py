@@ -1,3 +1,3 @@
 from shared import evaluate_base_model
 
-evaluate_base_model(base_model_id="microsoft/Phi-4-mini-instruct", model_name="phi_4_mini", type="cot")
+evaluate_base_model(base_model_id="microsoft/Phi-4-mini-instruct", model_name="phi4_mini", type="cot")
