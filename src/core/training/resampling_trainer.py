@@ -127,7 +127,9 @@ def interleave_pack_slots(pack_indices: list[int], total_slots: int, updates_per
     chunk_size = total_slots // updates_per_epoch
     slots: list[int | None] = []
     for chunk in range(updates_per_epoch):
-        chunk_packs = pack_indices[num_packs * chunk // updates_per_epoch : num_packs * (chunk + 1) // updates_per_epoch]
+        chunk_packs = pack_indices[
+            num_packs * chunk // updates_per_epoch : num_packs * (chunk + 1) // updates_per_epoch
+        ]
         assert 1 <= len(chunk_packs) <= chunk_size
         slots.extend(chunk_packs)
         slots.extend([None] * (chunk_size - len(chunk_packs)))
@@ -332,9 +334,7 @@ class EstimateComplexityCallback(TrainerCallback):
                         protocol=pickle.HIGHEST_PROTOCOL,
                     )
                 except Exception as ex:
-                    raise RuntimeError(
-                        f"Failed to pickle complexity-estimation spec for epoch {epoch}: {ex}"
-                    ) from ex
+                    raise RuntimeError(f"Failed to pickle complexity-estimation spec for epoch {epoch}: {ex}") from ex
 
             if offload:
                 model.to("cpu")
@@ -376,6 +376,10 @@ class EstimateComplexityCallback(TrainerCallback):
         # sampler (NaN scores sort to the bottom).
         path = self.out_path_for_epoch(epoch)
         df = pd.read_parquet(path)
+
+        if "entropy_value" not in df.columns:
+            logger.warning(f"Complexity estimation parquet {path} has no entropy_value column; skipping reconcile.")
+            return
 
         failed = df["entropy_value"].isna()
         failed_count = int(failed.sum())
