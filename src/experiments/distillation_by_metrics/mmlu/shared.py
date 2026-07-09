@@ -2,6 +2,7 @@ from pathlib import Path
 
 from transformers import AutoTokenizer
 
+from core.complexity_estimation.complexity_estimator import BaseComplexityEstimator
 from core.complexity_estimation.entropy.single_token_entropy_estimator import SingleTokenEntropyEstimator
 from core.dataset_samplers.base_sampler import BaseDatasetSampler, BaseDatasetSamplerConfig
 from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
@@ -34,6 +35,7 @@ def run(
     train_dataset_adapter: AbstractDatasetAdapter,
     save_schedule: list[int],
     skip_missing_checkpoints: bool = False,
+    complexity_estimator_override: BaseComplexityEstimator | None = None,
 ):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
@@ -89,7 +91,7 @@ def run(
                     tokenizer=tokenizer,
                 )
             ),
-            complexity_estimator=SingleTokenEntropyEstimator(),
+            complexity_estimator=complexity_estimator_override or SingleTokenEntropyEstimator(),
             complexity_estimation_runner_generation_config=ModelGenerateConfig(max_new_tokens=1),
         ),
         tokenizer=tokenizer,
