@@ -23,3 +23,7 @@ class BaseComplexityEstimator[T: BaseModel](ABC):
         answer_correctness: bool,
         tokenizer: PreTrainedTokenizer,
     ) -> T: ...
+
+    @property
+    def verify_model_output(self) -> bool:
+        return True

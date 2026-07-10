@@ -104,9 +104,12 @@ class ComplexityEstimationRunner:
             response = dataset_adapter.dataset.tokenizer.decode(response_raw, skip_special_tokens=True).strip()
 
             try:
-                parsed_answer, answer_correctness = dataset_adapter.dataset.verify_assistant_response(
-                    df_row.to_dict(), response
-                )
+                if self.complexity_estimator.verify_model_output:
+                    parsed_answer, answer_correctness = dataset_adapter.dataset.verify_assistant_response(
+                        df_row.to_dict(), response
+                    )
+                else:
+                    parsed_answer, answer_correctness = response, False
 
                 df.at[index, self.config.answer_field_name] = parsed_answer
                 df.at[index, self.config.answer_correctness_field_name] = answer_correctness
