@@ -31,3 +31,8 @@ class RandomEstimator(BaseComplexityEstimator[RandomEstimatorSchema]):
         tokenizer: PreTrainedTokenizer,
     ) -> RandomEstimatorSchema:
         return RandomEstimatorSchema(random_value=random())
+
+    @property
+    @override
+    def verify_model_output(self) -> bool:
+        return False
