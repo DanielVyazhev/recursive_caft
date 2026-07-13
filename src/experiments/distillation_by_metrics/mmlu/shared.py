@@ -16,13 +16,12 @@ from core.evaluation.multi_checkpoint_evaluator import (
     MultiCheckpointEvaluator,
     MultiCheckpointEvaluatorConfig,
 )
-from core.training.base_trainer import AbstractDatasetAdapter, PackingConfig
+from core.training.base_trainer import AbstractDatasetAdapter
 from core.training.lora_trainer import (
     LoRASpecificTrainingArgs,
     LoRATrainingArgs,
     phi4_mini_lora_target_modules,
 )
-from core.training.packing_budgets import packing_budget
 from core.training.resampling_trainer import ModelGenerateConfig, ResamplingTrainer, ResamplingTrainerConfig
 from core.training.thinking_tokens import setup_thinking_tokens
 from core.utils.datasets import add_average_column, merge_mmlu_on_question_id
@@ -75,9 +74,9 @@ def run(
 
     trainer = ResamplingTrainer(
         config=ResamplingTrainerConfig(
-            training_args=LoRATrainingArgs(num_train_epochs=save_schedule[-1], per_device_train_batch_size=1),
+            training_args=LoRATrainingArgs(num_train_epochs=save_schedule[-1], per_device_train_batch_size=2),
             lora_training_args=lora_training_args,
-            packing=PackingConfig(budget=packing_budget(model_name)),
+            # packing=PackingConfig(budget=packing_budget(model_name)),
             save_schedule=save_schedule,
             out_path=OUT_PATH.as_posix(),
             model_id=MODEL_NAME,

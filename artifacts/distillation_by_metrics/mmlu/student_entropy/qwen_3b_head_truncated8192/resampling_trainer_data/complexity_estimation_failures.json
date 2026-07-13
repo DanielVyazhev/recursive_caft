@@ -1,0 +1,1710 @@
+{
+  "total_failed_rows": 4787,
+  "failed_rows_by_epoch": {
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 172,
+    "12": 0,
+    "13": 0,
+    "14": 0,
+    "15": 0,
+    "16": 0,
+    "17": 0,
+    "18": 0,
+    "19": 0,
+    "20": 621,
+    "21": 13,
+    "22": 0,
+    "23": 0,
+    "24": 208,
+    "25": 7,
+    "26": 8,
+    "27": 204,
+    "28": 0,
+    "29": 21,
+    "30": 441,
+    "31": 113,
+    "32": 0,
+    "33": 253,
+    "34": 1,
+    "35": 39,
+    "36": 575,
+    "37": 0,
+    "38": 99,
+    "39": 454,
+    "40": 8,
+    "41": 71,
+    "42": 26,
+    "43": 23,
+    "44": 269,
+    "45": 36,
+    "46": 43,
+    "47": 80,
+    "48": 231,
+    "49": 2,
+    "50": 140,
+    "51": 49,
+    "52": 5,
+    "53": 30,
+    "54": 48,
+    "55": 12,
+    "56": 91,
+    "57": 51,
+    "58": 8,
+    "59": 70,
+    "60": 35,
+    "61": 34,
+    "62": 8,
+    "63": 24,
+    "64": 36,
+    "65": 19,
+    "66": 5,
+    "67": 11,
+    "68": 5,
+    "69": 6,
+    "70": 3,
+    "71": 4,
+    "72": 4,
+    "73": 3,
+    "74": 7,
+    "75": 8,
+    "76": 3,
+    "77": 1,
+    "78": 5,
+    "79": 5,
+    "80": 2,
+    "81": 3,
+    "82": 4,
+    "83": 5,
+    "84": 1,
+    "85": 3,
+    "86": 2,
+    "87": 1,
+    "88": 2,
+    "89": 0,
+    "90": 1,
+    "91": 3,
+    "92": 4,
+    "93": 1,
+    "94": 2,
+    "95": 2,
+    "96": 1,
+    "97": 1,
+    "98": 0,
+    "99": 1
+  },
+  "selected_samples_by_epoch": {
+    "0": 1280,
+    "1": 1280,
+    "2": 1280,
+    "3": 1280,
+    "4": 1280,
+    "5": 1280,
+    "6": 1280,
+    "7": 1280,
+    "8": 1280,
+    "9": 1280,
+    "10": 1280,
+    "11": 1280,
+    "12": 1280,
+    "13": 1280,
+    "14": 1280,
+    "15": 1280,
+    "16": 1280,
+    "17": 1280,
+    "18": 1280,
+    "19": 1280,
+    "20": 1280,
+    "21": 1280,
+    "22": 1280,
+    "23": 1280,
+    "24": 1280,
+    "25": 1280,
+    "26": 1280,
+    "27": 1280,
+    "28": 1280,
+    "29": 1280,
+    "30": 1280,
+    "31": 1280,
+    "32": 1280,
+    "33": 1280,
+    "34": 1280,
+    "35": 1280,
+    "36": 1280,
+    "37": 1280,
+    "38": 1280,
+    "39": 1280,
+    "40": 1280,
+    "41": 1280,
+    "42": 1280,
+    "43": 1280,
+    "44": 1280,
+    "45": 1280,
+    "46": 1280,
+    "47": 1280,
+    "48": 1280,
+    "49": 1280,
+    "50": 1280,
+    "51": 1280,
+    "52": 1280,
+    "53": 1280,
+    "54": 1280,
+    "55": 1280,
+    "56": 1280,
+    "57": 1280,
+    "58": 1280,
+    "59": 1280,
+    "60": 1280,
+    "61": 1280,
+    "62": 1280,
+    "63": 1280,
+    "64": 1280,
+    "65": 1280,
+    "66": 1280,
+    "67": 1280,
+    "68": 1280,
+    "69": 1280,
+    "70": 1280,
+    "71": 1280,
+    "72": 1280,
+    "73": 1280,
+    "74": 1280,
+    "75": 1280,
+    "76": 1280,
+    "77": 1280,
+    "78": 1280,
+    "79": 1280,
+    "80": 1280,
+    "81": 1280,
+    "82": 1280,
+    "83": 1280,
+    "84": 1280,
+    "85": 1280,
+    "86": 1280,
+    "87": 1280,
+    "88": 1280,
+    "89": 1280,
+    "90": 1280,
+    "91": 1280,
+    "92": 1280,
+    "93": 1280,
+    "94": 1280,
+    "95": 1280,
+    "96": 1280,
+    "97": 1280,
+    "98": 1280,
+    "99": 1280
+  },
+  "grace_epochs": [],
+  "details": [
+    {
+      "epoch": 0,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 1,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 2,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 3,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 4,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 5,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 6,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 7,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 8,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 9,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 10,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 11,
+      "total_rows": 9626,
+      "failed_rows": 172,
+      "failure_rate": 0.017868273426137546,
+      "backfilled": 172,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 12,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 13,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 14,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 15,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 16,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 17,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 18,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 19,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 20,
+      "total_rows": 9626,
+      "failed_rows": 621,
+      "failure_rate": 0.0645127778932059,
+      "backfilled": 621,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 21,
+      "total_rows": 9626,
+      "failed_rows": 13,
+      "failure_rate": 0.0013505090380220236,
+      "backfilled": 13,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 22,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 23,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 24,
+      "total_rows": 9626,
+      "failed_rows": 208,
+      "failure_rate": 0.021608144608352378,
+      "backfilled": 208,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 25,
+      "total_rows": 9626,
+      "failed_rows": 7,
+      "failure_rate": 0.0007271971743195513,
+      "backfilled": 7,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 26,
+      "total_rows": 9626,
+      "failed_rows": 8,
+      "failure_rate": 0.0008310824849366299,
+      "backfilled": 8,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 27,
+      "total_rows": 9626,
+      "failed_rows": 204,
+      "failure_rate": 0.021192603365884063,
+      "backfilled": 204,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 28,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 29,
+      "total_rows": 9626,
+      "failed_rows": 21,
+      "failure_rate": 0.0021815915229586535,
+      "backfilled": 21,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 30,
+      "total_rows": 9626,
+      "failed_rows": 441,
+      "failure_rate": 0.04581342198213172,
+      "backfilled": 441,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 31,
+      "total_rows": 9626,
+      "failed_rows": 113,
+      "failure_rate": 0.011739040099729899,
+      "backfilled": 113,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 32,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 33,
+      "total_rows": 9626,
+      "failed_rows": 253,
+      "failure_rate": 0.026282983586120922,
+      "backfilled": 253,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 34,
+      "total_rows": 9626,
+      "failed_rows": 1,
+      "failure_rate": 0.00010388531061707874,
+      "backfilled": 1,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 35,
+      "total_rows": 9626,
+      "failed_rows": 39,
+      "failure_rate": 0.004051527114066071,
+      "backfilled": 39,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 36,
+      "total_rows": 9626,
+      "failed_rows": 575,
+      "failure_rate": 0.05973405360482028,
+      "backfilled": 575,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 37,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 38,
+      "total_rows": 9626,
+      "failed_rows": 99,
+      "failure_rate": 0.010284645751090796,
+      "backfilled": 99,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 39,
+      "total_rows": 9626,
+      "failed_rows": 454,
+      "failure_rate": 0.04716393102015375,
+      "backfilled": 454,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 40,
+      "total_rows": 9626,
+      "failed_rows": 8,
+      "failure_rate": 0.0008310824849366299,
+      "backfilled": 8,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 41,
+      "total_rows": 9626,
+      "failed_rows": 71,
+      "failure_rate": 0.007375857053812591,
+      "backfilled": 71,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 42,
+      "total_rows": 9626,
+      "failed_rows": 26,
+      "failure_rate": 0.0027010180760440473,
+      "backfilled": 26,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 43,
+      "total_rows": 9626,
+      "failed_rows": 23,
+      "failure_rate": 0.0023893621441928112,
+      "backfilled": 23,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 44,
+      "total_rows": 9626,
+      "failed_rows": 269,
+      "failure_rate": 0.02794514855599418,
+      "backfilled": 269,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 45,
+      "total_rows": 9626,
+      "failed_rows": 36,
+      "failure_rate": 0.003739871182214835,
+      "backfilled": 36,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 46,
+      "total_rows": 9626,
+      "failed_rows": 43,
+      "failure_rate": 0.0044670683565343865,
+      "backfilled": 43,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 47,
+      "total_rows": 9626,
+      "failed_rows": 80,
+      "failure_rate": 0.0083108248493663,
+      "backfilled": 80,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 48,
+      "total_rows": 9626,
+      "failed_rows": 231,
+      "failure_rate": 0.02399750675254519,
+      "backfilled": 231,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 49,
+      "total_rows": 9626,
+      "failed_rows": 2,
+      "failure_rate": 0.00020777062123415748,
+      "backfilled": 2,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 50,
+      "total_rows": 9626,
+      "failed_rows": 140,
+      "failure_rate": 0.014543943486391025,
+      "backfilled": 140,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 51,
+      "total_rows": 9626,
+      "failed_rows": 49,
+      "failure_rate": 0.0050903802202368585,
+      "backfilled": 49,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 52,
+      "total_rows": 9626,
+      "failed_rows": 5,
+      "failure_rate": 0.0005194265530853937,
+      "backfilled": 5,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 53,
+      "total_rows": 9626,
+      "failed_rows": 30,
+      "failure_rate": 0.0031165593185123624,
+      "backfilled": 30,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 54,
+      "total_rows": 9626,
+      "failed_rows": 48,
+      "failure_rate": 0.00498649490961978,
+      "backfilled": 48,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 55,
+      "total_rows": 9626,
+      "failed_rows": 12,
+      "failure_rate": 0.001246623727404945,
+      "backfilled": 12,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 56,
+      "total_rows": 9626,
+      "failed_rows": 91,
+      "failure_rate": 0.009453563266154166,
+      "backfilled": 91,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 57,
+      "total_rows": 9626,
+      "failed_rows": 51,
+      "failure_rate": 0.005298150841471016,
+      "backfilled": 51,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 58,
+      "total_rows": 9626,
+      "failed_rows": 8,
+      "failure_rate": 0.0008310824849366299,
+      "backfilled": 8,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 59,
+      "total_rows": 9626,
+      "failed_rows": 70,
+      "failure_rate": 0.007271971743195512,
+      "backfilled": 70,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 60,
+      "total_rows": 9626,
+      "failed_rows": 35,
+      "failure_rate": 0.003635985871597756,
+      "backfilled": 35,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 61,
+      "total_rows": 9626,
+      "failed_rows": 34,
+      "failure_rate": 0.0035321005609806775,
+      "backfilled": 34,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 62,
+      "total_rows": 9626,
+      "failed_rows": 8,
+      "failure_rate": 0.0008310824849366299,
+      "backfilled": 8,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 63,
+      "total_rows": 9626,
+      "failed_rows": 24,
+      "failure_rate": 0.00249324745480989,
+      "backfilled": 24,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 64,
+      "total_rows": 9626,
+      "failed_rows": 36,
+      "failure_rate": 0.003739871182214835,
+      "backfilled": 36,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 65,
+      "total_rows": 9626,
+      "failed_rows": 19,
+      "failure_rate": 0.001973820901724496,
+      "backfilled": 19,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 66,
+      "total_rows": 9626,
+      "failed_rows": 5,
+      "failure_rate": 0.0005194265530853937,
+      "backfilled": 5,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 67,
+      "total_rows": 9626,
+      "failed_rows": 11,
+      "failure_rate": 0.0011427384167878663,
+      "backfilled": 11,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 68,
+      "total_rows": 9626,
+      "failed_rows": 5,
+      "failure_rate": 0.0005194265530853937,
+      "backfilled": 5,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 69,
+      "total_rows": 9626,
+      "failed_rows": 6,
+      "failure_rate": 0.0006233118637024725,
+      "backfilled": 6,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 70,
+      "total_rows": 9626,
+      "failed_rows": 3,
+      "failure_rate": 0.00031165593185123624,
+      "backfilled": 3,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 71,
+      "total_rows": 9626,
+      "failed_rows": 4,
+      "failure_rate": 0.00041554124246831497,
+      "backfilled": 4,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 72,
+      "total_rows": 9626,
+      "failed_rows": 4,
+      "failure_rate": 0.00041554124246831497,
+      "backfilled": 4,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 73,
+      "total_rows": 9626,
+      "failed_rows": 3,
+      "failure_rate": 0.00031165593185123624,
+      "backfilled": 3,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 74,
+      "total_rows": 9626,
+      "failed_rows": 7,
+      "failure_rate": 0.0007271971743195513,
+      "backfilled": 7,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 75,
+      "total_rows": 9626,
+      "failed_rows": 8,
+      "failure_rate": 0.0008310824849366299,
+      "backfilled": 8,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 76,
+      "total_rows": 9626,
+      "failed_rows": 3,
+      "failure_rate": 0.00031165593185123624,
+      "backfilled": 3,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 77,
+      "total_rows": 9626,
+      "failed_rows": 1,
+      "failure_rate": 0.00010388531061707874,
+      "backfilled": 1,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 78,
+      "total_rows": 9626,
+      "failed_rows": 5,
+      "failure_rate": 0.0005194265530853937,
+      "backfilled": 5,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 79,
+      "total_rows": 9626,
+      "failed_rows": 5,
+      "failure_rate": 0.0005194265530853937,
+      "backfilled": 5,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 80,
+      "total_rows": 9626,
+      "failed_rows": 2,
+      "failure_rate": 0.00020777062123415748,
+      "backfilled": 2,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 81,
+      "total_rows": 9626,
+      "failed_rows": 3,
+      "failure_rate": 0.00031165593185123624,
+      "backfilled": 3,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 82,
+      "total_rows": 9626,
+      "failed_rows": 4,
+      "failure_rate": 0.00041554124246831497,
+      "backfilled": 4,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 83,
+      "total_rows": 9626,
+      "failed_rows": 5,
+      "failure_rate": 0.0005194265530853937,
+      "backfilled": 5,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 84,
+      "total_rows": 9626,
+      "failed_rows": 1,
+      "failure_rate": 0.00010388531061707874,
+      "backfilled": 1,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 85,
+      "total_rows": 9626,
+      "failed_rows": 3,
+      "failure_rate": 0.00031165593185123624,
+      "backfilled": 3,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 86,
+      "total_rows": 9626,
+      "failed_rows": 2,
+      "failure_rate": 0.00020777062123415748,
+      "backfilled": 2,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 87,
+      "total_rows": 9626,
+      "failed_rows": 1,
+      "failure_rate": 0.00010388531061707874,
+      "backfilled": 1,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 88,
+      "total_rows": 9626,
+      "failed_rows": 2,
+      "failure_rate": 0.00020777062123415748,
+      "backfilled": 2,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 89,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 90,
+      "total_rows": 9626,
+      "failed_rows": 1,
+      "failure_rate": 0.00010388531061707874,
+      "backfilled": 1,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 91,
+      "total_rows": 9626,
+      "failed_rows": 3,
+      "failure_rate": 0.00031165593185123624,
+      "backfilled": 3,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 92,
+      "total_rows": 9626,
+      "failed_rows": 4,
+      "failure_rate": 0.00041554124246831497,
+      "backfilled": 4,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 93,
+      "total_rows": 9626,
+      "failed_rows": 1,
+      "failure_rate": 0.00010388531061707874,
+      "backfilled": 1,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 94,
+      "total_rows": 9626,
+      "failed_rows": 2,
+      "failure_rate": 0.00020777062123415748,
+      "backfilled": 2,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 95,
+      "total_rows": 9626,
+      "failed_rows": 2,
+      "failure_rate": 0.00020777062123415748,
+      "backfilled": 2,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 96,
+      "total_rows": 9626,
+      "failed_rows": 1,
+      "failure_rate": 0.00010388531061707874,
+      "backfilled": 1,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 97,
+      "total_rows": 9626,
+      "failed_rows": 1,
+      "failure_rate": 0.00010388531061707874,
+      "backfilled": 1,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 98,
+      "total_rows": 9626,
+      "failed_rows": 0,
+      "failure_rate": 0.0,
+      "backfilled": 0,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    },
+    {
+      "epoch": 99,
+      "total_rows": 9626,
+      "failed_rows": 1,
+      "failure_rate": 0.00010388531061707874,
+      "backfilled": 1,
+      "residual_failed": 0,
+      "exceeded_threshold": false,
+      "selected_samples": 1280,
+      "selected_samples_by_dataset": {
+        "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192": 1024,
+        "mmlu_single_token_train": 256
+      },
+      "source": "recorded"
+    }
+  ]
+}
