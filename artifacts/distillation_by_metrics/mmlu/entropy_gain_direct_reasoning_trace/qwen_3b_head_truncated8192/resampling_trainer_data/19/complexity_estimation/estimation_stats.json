@@ -1,0 +1,8 @@
+{
+  "epoch": 19,
+  "total_rows": 9626,
+  "failed_rows": 2,
+  "failure_rate": 0.00020777062123415748,
+  "backfilled": 2,
+  "residual_failed": 0
+}
