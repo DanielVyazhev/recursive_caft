@@ -56,3 +56,13 @@ def add_average_column(
     df = df.copy()
     df[new_col] = (df[col_a].astype(float) + df[col_b].astype(float)) / 2.0
     return df
+
+
+def truncate_column(
+    df: DataFrame,
+    col: str,
+    max_len: int,
+) -> DataFrame:
+    df = df.copy()
+    df[col] = df[col].str.slice(0, max_len)
+    return df
