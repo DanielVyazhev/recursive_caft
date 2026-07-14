@@ -21,7 +21,7 @@ from core.training.lora_trainer import (
 )
 from core.training.packing_budgets import packing_budget
 from core.training.thinking_tokens import setup_thinking_tokens
-from core.utils.datasets import merge_mmlu_on_question_id
+from core.utils.datasets import merge_mmlu_on_question_id, truncate_column
 from core.utils.logger import logger
 
 
@@ -67,6 +67,7 @@ def run(model_name: str, save_schedule: list[int] = [5, 10, 20, 35, 50], max_thi
                 },
             ],
             save_path=train_dataset_path,
+            aggregation_function=lambda df: truncate_column(df, col="distill_reasoning", max_len=8192),
         )
 
         trainer = LoRATrainer(
