@@ -1,9 +1,9 @@
 {
   "epoch": 94,
   "total_rows": 9626,
-  "failed_rows": 10,
-  "failure_rate": 0.0010388531061707874,
-  "backfilled": 10,
+  "failed_rows": 0,
+  "failure_rate": 0.0,
+  "backfilled": 0,
   "residual_failed": 0,
   "exceeded_threshold": false,
   "selected_samples": 1280,
