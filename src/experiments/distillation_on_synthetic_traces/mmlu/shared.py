@@ -30,6 +30,7 @@ def run(
     save_schedule: list[int],
     max_thinking_tokens: int = 8192,
     skip_missing_checkpoints: bool = False,
+    run_evaluation: bool = True,
 ):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
@@ -73,6 +74,9 @@ def run(
     )
     trainer.train()
     trainer.unload()
+
+    if not run_evaluation:
+        return
 
     eval_dataset_id = "mmlu_random_test"
     summary_filename = "summary_reasoning_evals.json"
