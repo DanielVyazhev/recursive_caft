@@ -59,8 +59,12 @@ def run(
     merge_mmlu_on_question_id(
         main_path=Path(__file__).parent.joinpath(f"../../../../data/out/splits/random/mmlu/{train_dataset}.parquet"),
         extra_paths=[
-            Path(__file__).parent.joinpath("../../../../data/out/single_token_entropy/mmlu_llama_70b.parquet"),
-            Path(__file__).parent.joinpath("../../../../data/out/single_token_entropy/mmlu_qwen_72b.parquet"),
+            Path(__file__).parent.joinpath(
+                "../../../../data/out/single_token_entropy_normalized/mmlu_llama_70b.parquet"
+            ),
+            Path(__file__).parent.joinpath(
+                "../../../../data/out/single_token_entropy_normalized/mmlu_qwen_72b.parquet"
+            ),
         ],
         extra_columns=[
             {"entropy_value": "llama_70b_entropy_value"},
