@@ -1,14 +1,6 @@
 {
   "mmlu_random_test_cap4096": [
     {
-      "epoch": 5.0,
-      "checkpoint": "checkpoint-100",
-      "accuracy": 0.0024937655860349127,
-      "total": 2406,
-      "correct": 6,
-      "num_truncated": 616
-    },
-    {
       "epoch": 10.0,
       "checkpoint": "checkpoint-200",
       "accuracy": 0.4231088944305902,
