@@ -1,0 +1,7 @@
+{
+  "accuracy": 0.4842061512884456,
+  "total": 2406,
+  "correct": 1165,
+  "num_truncated": 7,
+  "model_path": "/src/recursive_caft/src/experiments/distillation_by_metrics/mmlu/../../../../artifacts/distillation_by_metrics/mmlu/entropy_gain_proportional/qwen_3b_head_truncated8192/checkpoint-200"
+}
