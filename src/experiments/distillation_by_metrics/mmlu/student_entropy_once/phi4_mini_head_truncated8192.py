@@ -20,6 +20,6 @@ run(
         ),
         dataset_sampler=StudentEntropySampler(BaseDatasetSamplerConfig(top_k=1024)),
     ),
-    save_schedule=[5, 10, 20, 50, 80, 100],
+    save_schedule=[10, 20, 50, 80, 100],
     resampling_schedule=[0],
 )
