@@ -222,6 +222,7 @@ class EstimateComplexityCallback(TrainerCallback):
         save_schedule: list[int] | None = None,
         train_dataset: AbstractDatasetAdapter | None = None,
         new_ids: list[int] | None = None,
+        resampling_schedule: list[int] | None = None,
     ) -> None:
         super().__init__()
 
@@ -231,6 +232,9 @@ class EstimateComplexityCallback(TrainerCallback):
         self._out_path = out_path
         self._max_failed_estimation_fraction = max_failed_estimation_fraction
         self._save_schedule = save_schedule
+        # Epochs that actually (re)draw the training sample. None == re-estimate and re-sample every
+        # epoch. See ResamplingTrainerConfig.resampling_schedule and resampling_epoch_for.
+        self._resampling_schedule = resampling_schedule
         # Used to record, per epoch, how many rows the train sampler(s) actually select from the
         # finalized complexity parquet (after the non-positive-score drop). Optional so the callback
         # can be constructed standalone (e.g. in tests) without the count.
@@ -250,6 +254,17 @@ class EstimateComplexityCallback(TrainerCallback):
         # `epoch in save_schedule`. (e.g. with schedule [1,3]: dir "1" is model-after-1 == checkpoint
         # epoch=1; dir "2" is model-after-2, which is NOT checkpointed.)
         epoch = int(state.epoch)
+
+        # Frozen epoch: the sample stays whatever the last scheduled epoch drew, and
+        # SetResamplingPathCallback keeps the dataset pointed at that epoch's parquet. Nothing to
+        # estimate or reconcile -- returning here is what makes a frozen schedule cheap (no weight
+        # snapshot, no estimation subprocess). Must precede the kwargs["model"] access below.
+        resampling_epoch = self.resampling_epoch_for(epoch)
+        if resampling_epoch != epoch:
+            logger.info(
+                f"Epoch {epoch} not in resampling_schedule; reusing the epoch {resampling_epoch} sample."
+            )
+            return
 
         # Resume: only reuse a dumped complexity when the weights it was measured on were checkpointed,
         # so resume reloads exactly that model. A non-checkpointed epoch is re-trained from an earlier
@@ -376,6 +391,11 @@ class EstimateComplexityCallback(TrainerCallback):
         path = self.out_path_for_epoch(epoch)
         df = pd.read_parquet(path)
 
+        # The epoch to backfill from is the previous epoch that actually produced a dump, which is
+        # `epoch - 1` only on the default every-epoch path. Under a sparse resampling_schedule the
+        # intervening epochs have no parquet at all.
+        prev_epoch = self._previous_resampling_epoch(epoch)
+
         if "entropy_value" not in df.columns:
             logger.warning(f"Complexity estimation parquet {path} has no entropy_value column; skipping reconcile.")
             return
@@ -394,22 +414,22 @@ class EstimateComplexityCallback(TrainerCallback):
                 f"Complexity estimation failed for {failure_rate:.1%} of rows at epoch {epoch} "
                 f"(> {self._max_failed_estimation_fraction:.0%} allowed)"
             )
-            if epoch == 0:
+            if prev_epoch is None:
                 raise RuntimeError(f"{preamble}; no previous epoch to backfill from, aborting training.")
-            if self._previous_epoch_exceeded(epoch):
+            if self._previous_epoch_exceeded(prev_epoch):
                 raise RuntimeError(
-                    f"{preamble}, and epoch {epoch - 1} exceeded it too; the grace epoch did not "
+                    f"{preamble}, and epoch {prev_epoch} exceeded it too; the grace epoch did not "
                     f"recover. Aborting training."
                 )
             logger.warning(
-                f"{preamble}. Granting one grace epoch: backfilling from epoch {epoch - 1} and "
-                f"continuing. Training aborts if epoch {epoch + 1} also exceeds the threshold."
+                f"{preamble}. Granting one grace epoch: backfilling from epoch {prev_epoch} and "
+                f"continuing. Training aborts if the next resampling epoch also exceeds the threshold."
             )
 
         backfilled = 0
-        has_backfill = epoch > 0 and bool(failed.any())
+        has_backfill = prev_epoch is not None and bool(failed.any())
         if has_backfill:
-            prev = pd.read_parquet(self.out_path_for_epoch(epoch - 1))
+            prev = pd.read_parquet(self.out_path_for_epoch(prev_epoch))
             prev_entropy = prev.dropna(subset=["entropy_value"]).set_index("question_id")["entropy_value"]
             df.loc[failed, "entropy_value"] = df.loc[failed, "question_id"].map(prev_entropy)
             backfilled = int(failed_count - df["entropy_value"].isna().sum())
@@ -433,7 +453,7 @@ class EstimateComplexityCallback(TrainerCallback):
 
         if has_backfill:
             df.to_parquet(path, index=False)
-            logger.info(f"Backfilled {backfilled} failed entropy rows from epoch {epoch - 1}.")
+            logger.info(f"Backfilled {backfilled} failed entropy rows from epoch {prev_epoch}.")
 
         # Persist how many rows could not be measured this epoch (failed_count, before backfill).
         # This file is also the per-epoch "finalized" marker used by on_epoch_begin to skip
@@ -460,6 +480,33 @@ class EstimateComplexityCallback(TrainerCallback):
     def _stats_path_for_epoch(self, epoch: int) -> Path:
         return self.out_path_for_epoch(epoch).parent / "estimation_stats.json"
 
+    def resampling_epoch_for(self, epoch: int) -> int:
+        """The epoch whose complexity dump (and therefore whose sample) `epoch` trains on.
+
+        Without a schedule that is `epoch` itself: every epoch re-estimates and re-samples. With one
+        it is the latest scheduled epoch <= `epoch`, so the sample stays frozen in between. Phrasing
+        it as "latest <=" rather than "did this epoch resample" is what makes resume work: a run
+        restarted at epoch 7 under schedule [0] sees on_epoch_begin(7) as its FIRST callback and
+        must still resolve to epoch 0's parquet, which was written by the original run."""
+        if self._resampling_schedule is None:
+            return epoch
+        eligible = [e for e in self._resampling_schedule if e <= epoch]
+        assert eligible, (
+            f"No resampling epoch <= {epoch} in {self._resampling_schedule}; the schedule must start at 0."
+        )
+        return max(eligible)
+
+    def _previous_resampling_epoch(self, epoch: int) -> int | None:
+        """The last epoch strictly before `epoch` that produced a dump, or None if there is none.
+
+        `epoch - 1` on the default (every-epoch) path; under a sparse schedule the intervening
+        epochs wrote no parquet, so backfill and the grace-epoch check must skip back to the real
+        previous estimation instead."""
+        if self._resampling_schedule is None:
+            return epoch - 1 if epoch > 0 else None
+        earlier = [e for e in self._resampling_schedule if e < epoch]
+        return max(earlier) if earlier else None
+
     def _is_checkpoint_epoch(self, epoch: int) -> bool:
         # `epoch` == int(state.epoch) at on_epoch_begin == number of completed epochs. The previous
         # training epoch saved its checkpoint under trainer_state.epoch == epoch (when that value is in
@@ -473,11 +520,12 @@ class EstimateComplexityCallback(TrainerCallback):
         # reloads them exactly). Non-checkpointed epochs are re-trained -> the dump is stale -> recompute.
         return self._is_checkpoint_epoch(epoch) and self._stats_path_for_epoch(epoch).exists()
 
-    def _previous_epoch_exceeded(self, epoch: int) -> bool:
+    def _previous_epoch_exceeded(self, prev_epoch: int) -> bool:
         # Read the grace bit off the previous epoch's finalized stats marker rather than tracking it in
         # memory: _should_reuse can skip reconcile entirely for a checkpointed epoch on resume, so an
-        # instance counter would silently re-arm the grace after every restart.
-        path = self._stats_path_for_epoch(epoch - 1)
+        # instance counter would silently re-arm the grace after every restart. Takes the previous
+        # *resampling* epoch (see _previous_resampling_epoch), not the current one.
+        path = self._stats_path_for_epoch(prev_epoch)
         if not path.exists():
             # Pre-feature dump, or a data dir wiped between runs. Be permissive rather than fatal.
             return False
@@ -537,8 +585,12 @@ class SetResamplingPathCallback(TrainerCallback):
     def on_epoch_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs) -> None:
         assert state.epoch is not None
 
-        self.resampling_ds.dataset_path = self.estimation_complexity_callback.out_path_for_epoch(
-            int(state.epoch)
+        # Route through resampling_epoch_for so both callbacks agree on the effective epoch by
+        # construction: on a frozen epoch EstimateComplexityCallback wrote nothing, and the dataset
+        # must keep reading the last scheduled epoch's parquet.
+        callback = self.estimation_complexity_callback
+        self.resampling_ds.dataset_path = callback.out_path_for_epoch(
+            callback.resampling_epoch_for(int(state.epoch))
         ).as_posix()
 
 
@@ -549,6 +601,25 @@ class ResamplingTrainerConfig(LoRATrainerConfig):
     # Abort training if more than this fraction of rows fail single-token entropy measurement
     # in an epoch (the model drifting to chain-of-thought output).
     max_failed_estimation_fraction: float = 0.1
+    # Epochs at which the training sample is (re)drawn. None (the default) re-estimates complexity
+    # and re-samples at the start of every epoch. A list freezes the sample between scheduled epochs
+    # and skips estimation entirely on the frozen ones -- [0] draws once, on the untrained student,
+    # and trains on that set for the whole run.
+    resampling_schedule: list[int] | None = None
+
+    @model_validator(mode="after")
+    def _validate_resampling_schedule(self):
+        if self.resampling_schedule is not None:
+            assert self.resampling_schedule, "resampling_schedule must be non-empty (pass None to resample every epoch)"
+            # Epoch 0 is the only epoch with no earlier dump to fall back on, so a schedule that
+            # skips it would leave the dataset with no parquet to read at all.
+            assert self.resampling_schedule[0] == 0, (
+                f"resampling_schedule must start at epoch 0, got {self.resampling_schedule}"
+            )
+            assert self.resampling_schedule == sorted(set(self.resampling_schedule)), (
+                f"resampling_schedule must be strictly increasing with no duplicates, got {self.resampling_schedule}"
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_packing_batching(self):
@@ -623,6 +694,7 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
             # because super()._build_trainer already constructed the model). Lets the estimation
             # subprocess persist/reload the trained <think> rows that PEFT's save_pretrained omits.
             new_ids=self._snapshot.new_ids if self._snapshot else None,
+            resampling_schedule=self.config.resampling_schedule,
         )
         trainer.add_callback(self._estimate_complexity_callback)
         trainer.add_callback(

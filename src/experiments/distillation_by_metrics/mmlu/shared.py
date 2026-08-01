@@ -35,6 +35,7 @@ def run(
     save_schedule: list[int],
     skip_missing_checkpoints: bool = False,
     complexity_estimator_override: BaseComplexityEstimator | None = None,
+    resampling_schedule: list[int] | None = None,
 ):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
@@ -82,6 +83,7 @@ def run(
             lora_training_args=lora_training_args,
             # packing=PackingConfig(budget=packing_budget(model_name)),
             save_schedule=save_schedule,
+            resampling_schedule=resampling_schedule,
             out_path=OUT_PATH.as_posix(),
             model_id=MODEL_NAME,
             train_dataset=train_dataset_adapter,
