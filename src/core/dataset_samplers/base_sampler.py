@@ -13,6 +13,11 @@ class BaseDatasetSamplerConfig(PydraConfig):
     # teacher's entropy), so it is dropped — even if that leaves fewer than top_k rows. This also
     # drops NaN-score rows (NaN > 0 is False), e.g. rows whose entropy could not be measured.
     drop_non_positive: bool = True
+    # Shuffle the selected rows instead of presenting them in easy-to-hard score order. Selection
+    # membership is unchanged. Each create_sample call uses shuffle_seed + the call index, giving
+    # successive epochs different permutations while keeping a fresh run reproducible.
+    shuffle: bool = False
+    shuffle_seed: int = 42
 
 
 class BaseDatasetSampler(ABC):
@@ -49,6 +54,13 @@ class BaseDatasetSampler(ABC):
                 f"{type(self).__name__}: all {len(df)} candidate rows scored <= 0 "
                 f"(drop_non_positive={self.config.drop_non_positive}); no training samples remain."
             )
+
+        if self.config.shuffle:
+            sampled_df = sampled_df.sample(
+                frac=1,
+                random_state=self.config.shuffle_seed + self._sample_calls,
+            )
+        self._sample_calls += 1
 
         sampled_ds = Dataset.from_pandas(sampled_df)
         return sampled_ds
