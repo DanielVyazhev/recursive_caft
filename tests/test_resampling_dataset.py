@@ -119,6 +119,27 @@ def test_iter_does_not_crash_on_empty_dataset(thinking_tokenizer):
     assert list(ds) == []
 
 
+def test_shuffle_is_deterministic_within_epoch_and_changes_across_epochs(
+    thinking_tokenizer, tmp_path, make_resampling_df
+):
+    parquet = tmp_path / "ds.parquet"
+    source = make_resampling_df(8)
+    source.to_parquet(parquet)
+    adapter = _adapter(thinking_tokenizer, None)
+    ds = ResamplingDataset(adapter, thinking_tokenizer, shuffle=True, data_seed=123)
+    ds.dataset_path = str(parquet)
+
+    ds.epoch = 4
+    first = [row["row_id"] for row in ds]
+    replay = [row["row_id"] for row in ds]
+    ds.epoch = 5
+    next_epoch = [row["row_id"] for row in ds]
+
+    assert first == replay
+    assert first != next_epoch
+    assert set(first) == set(next_epoch) == set(source["question_id"])
+
+
 def test_out_path_for_epoch_uses_dataset_id(thinking_tokenizer):
     # The per-epoch complexity-estimation path is built from the complexity
     # dataset's dataset_id; it must not reference a nonexistent `config.id`.

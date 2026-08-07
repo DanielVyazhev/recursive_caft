@@ -137,6 +137,17 @@ def test_no_schedule_path_tracks_the_epoch(tmp_path):
     assert _set_path(cb, 4) == cb.out_path_for_epoch(4).as_posix()
 
 
+def test_set_path_callback_records_training_epoch_for_shuffle(tmp_path):
+    cb = _callback(tmp_path, resampling_schedule=[0])
+    ds = types.SimpleNamespace(dataset_path=None, epoch=None)
+    SetResamplingPathCallback(estimation_complexity_callback=cb, resampling_ds=ds).on_epoch_begin(
+        None, types.SimpleNamespace(epoch=7.0), None
+    )
+
+    assert ds.epoch == 7
+    assert ds.dataset_path == cb.out_path_for_epoch(0).as_posix()
+
+
 # --- schedule-aware backfill ----------------------------------------------------------------
 
 

@@ -10,6 +10,7 @@ from typing import override
 
 import pandas as pd
 import torch
+from datasets import Dataset
 from pydantic import model_validator
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
@@ -36,9 +37,18 @@ _COMPLEXITY_WORKER = str(Path(__file__).with_name("_complexity_worker.py"))
 
 
 class ResamplingDataset(IterableDataset):
-    def __init__(self, dataset: AbstractDatasetAdapter, tokenizer: PreTrainedTokenizer):
+    def __init__(
+        self,
+        dataset: AbstractDatasetAdapter,
+        tokenizer: PreTrainedTokenizer,
+        shuffle: bool = False,
+        data_seed: int = 42,
+    ):
         self.dataset = dataset
         self.tokenizer = tokenizer
+        self.shuffle = shuffle
+        self.data_seed = data_seed
+        self.epoch = 0
         self._logged_samples = False
 
         self.dataset_path: str | None = None
@@ -56,6 +66,7 @@ class ResamplingDataset(IterableDataset):
     def __iter__(self):
         # Calling process_dataset to re-sample dataset after EstimateComplexityCallback runs
         dataset = self.dataset.process_dataset(path_override=self.dataset_path)
+        dataset = self._shuffle_for_epoch(dataset)
 
         if not self._logged_samples and len(dataset) > 0:
             first_sample = dataset[0]
@@ -67,6 +78,11 @@ class ResamplingDataset(IterableDataset):
             self._logged_samples = True
 
         yield from dataset
+
+    def _shuffle_for_epoch(self, dataset: Dataset) -> Dataset:
+        if not self.shuffle:
+            return dataset
+        return dataset.shuffle(seed=self.data_seed + self.epoch)
 
 
 # Null packs are tiny, NOT budget-sized: their forward cost must be negligible (an epoch can
@@ -158,8 +174,10 @@ class PackedResamplingDataset(ResamplingDataset):
         tokenizer: PreTrainedTokenizer,
         packing: PackingConfig,
         gradient_accumulation_steps: int,
+        shuffle: bool = False,
+        data_seed: int = 42,
     ):
-        super().__init__(dataset, tokenizer)
+        super().__init__(dataset, tokenizer, shuffle=shuffle, data_seed=data_seed)
         assert dataset.sampled_size() is not None, (
             "Packed resampling needs a sampler-defined size: __len__ must be a constant "
             "independent of the per-epoch parquet (packs vary per epoch; docs-slots may not)."
@@ -182,6 +200,7 @@ class PackedResamplingDataset(ResamplingDataset):
         assert isinstance(pad_token_id, int), "Tokenizer must have an integer pad_token_id for packing"
         # pack_dataset also enforces budget >= the longest sequence.
         packed = pack_dataset(dataset, budget=self.packing.budget, pad_token_id=pad_token_id)
+        packed = self._shuffle_for_epoch(packed)
 
         if not self._logged_samples:
             first = packed[0]
@@ -589,6 +608,7 @@ class SetResamplingPathCallback(TrainerCallback):
         # construction: on a frozen epoch EstimateComplexityCallback wrote nothing, and the dataset
         # must keep reading the last scheduled epoch's parquet.
         callback = self.estimation_complexity_callback
+        self.resampling_ds.epoch = int(state.epoch)
         self.resampling_ds.dataset_path = callback.out_path_for_epoch(
             callback.resampling_epoch_for(int(state.epoch))
         ).as_posix()
@@ -606,6 +626,9 @@ class ResamplingTrainerConfig(LoRATrainerConfig):
     # and skips estimation entirely on the frozen ones -- [0] draws once, on the untrained student,
     # and trains on that set for the whole run.
     resampling_schedule: list[int] | None = None
+    # ResamplingDataset is iterable, so HF Trainer cannot attach its usual RandomSampler. Opt in
+    # here to shuffle the finalized sample deterministically with data_seed + training epoch.
+    shuffle: bool = False
 
     @model_validator(mode="after")
     def _validate_resampling_schedule(self):
@@ -654,8 +677,15 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
                 packing=self.config.packing,
                 gradient_accumulation_steps=self.config.training_args.effective_train_batch_size
                 // self.config.training_args.per_device_train_batch_size,
+                shuffle=self.config.shuffle,
+                data_seed=self.config.training_args.data_seed,
             )
-        train_ds = ResamplingDataset(self.config.train_dataset, self.tokenizer)
+        train_ds = ResamplingDataset(
+            self.config.train_dataset,
+            self.tokenizer,
+            shuffle=self.config.shuffle,
+            data_seed=self.config.training_args.data_seed,
+        )
         return train_ds
 
     @override

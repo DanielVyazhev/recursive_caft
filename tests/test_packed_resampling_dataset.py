@@ -178,6 +178,36 @@ def test_second_epoch_identical(packed_ds):
     assert list(ds) == list(ds)
 
 
+def test_packed_shuffle_is_epoch_seeded(thinking_tokenizer, tmp_path, make_resampling_df):
+    from core.training.base_trainer import PackingConfig
+
+    parquet = tmp_path / "shuffled.parquet"
+    source = make_resampling_df(6)
+    source["question"] = [f"Unique question {i}?" for i in range(len(source))]
+    source.to_parquet(parquet)
+    adapter = _adapter(thinking_tokenizer, top_k=TOP_K)
+    docs = adapter.process_dataset(path_override=str(parquet))
+    budget = max(len(ids) for ids in docs["input_ids"])
+    ds = PackedResamplingDataset(
+        adapter,
+        thinking_tokenizer,
+        packing=PackingConfig(budget=budget),
+        gradient_accumulation_steps=ACCUM,
+        shuffle=True,
+        data_seed=123,
+    )
+    ds.dataset_path = str(parquet)
+
+    ds.epoch = 4
+    first = list(ds)
+    replay = list(ds)
+    ds.epoch = 5
+    next_epoch = list(ds)
+
+    assert first == replay
+    assert first != next_epoch
+
+
 def test_len_must_divide_accumulation(thinking_tokenizer):
     from core.training.base_trainer import PackingConfig
 
