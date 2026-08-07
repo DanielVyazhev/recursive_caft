@@ -31,6 +31,7 @@ def run(
     max_thinking_tokens: int = 8192,
     skip_missing_checkpoints: bool = False,
     run_evaluation: bool = True,
+    lora_training_args: LoRASpecificTrainingArgs | None = None,
 ):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
@@ -46,7 +47,8 @@ def run(
         .as_posix()
     )
 
-    lora_training_args = LoRASpecificTrainingArgs(train_thinking_token_embeddings=True)
+    lora_training_args = lora_training_args or LoRASpecificTrainingArgs()
+    lora_training_args.train_thinking_token_embeddings = True
     if model_name == "phi4_mini":
         lora_training_args.target_modules = phi4_mini_lora_target_modules
 

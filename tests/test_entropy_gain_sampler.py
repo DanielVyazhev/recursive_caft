@@ -43,6 +43,43 @@ def test_create_sample_selects_top_k_by_gain():
     assert set(result["id"]) == {"a", "c"}
 
 
+def test_shuffle_changes_only_selected_order():
+    df = _df([0.9, 0.8, 0.7, 0.6, 0.5], teacher=0.1)
+    sampler = EntropyGainSampler(BaseDatasetSamplerConfig(top_k=4, shuffle=True, shuffle_seed=7))
+
+    result = sampler.create_sample(Dataset.from_pandas(df))
+
+    assert set(result["id"]) == {"r0", "r1", "r2", "r3"}
+    assert list(result["id"]) != ["r3", "r2", "r1", "r0"]
+
+
+def test_shuffle_is_reproducible_and_varies_by_sample_call():
+    df = _df([0.9, 0.8, 0.7, 0.6, 0.5, 0.4], teacher=0.1)
+    config = BaseDatasetSamplerConfig(top_k=6, shuffle=True, shuffle_seed=123)
+    first_sampler = EntropyGainSampler(config)
+    second_sampler = EntropyGainSampler(config)
+
+    first_epoch = list(first_sampler.create_sample(Dataset.from_pandas(df))["id"])
+    second_epoch = list(first_sampler.create_sample(Dataset.from_pandas(df))["id"])
+
+    assert first_epoch == list(second_sampler.create_sample(Dataset.from_pandas(df))["id"])
+    assert second_epoch == list(second_sampler.create_sample(Dataset.from_pandas(df))["id"])
+    assert first_epoch != second_epoch
+
+
+def test_count_selected_does_not_advance_shuffle_sequence():
+    df = _df([0.9, 0.8, 0.7, 0.6], teacher=0.1)
+    config = BaseDatasetSamplerConfig(top_k=4, shuffle=True, shuffle_seed=99)
+    counted_sampler = EntropyGainSampler(config)
+    fresh_sampler = EntropyGainSampler(config)
+
+    assert counted_sampler.count_selected(df) == 4
+
+    counted_order = list(counted_sampler.create_sample(Dataset.from_pandas(df))["id"])
+    fresh_order = list(fresh_sampler.create_sample(Dataset.from_pandas(df))["id"])
+    assert counted_order == fresh_order
+
+
 def test_drop_non_positive_drops_zero_and_negative_gain():
     # drop_non_positive is on by default. r0 gain=+0.4 (kept); r1 gain=0 (entropy==teacher, dropped);
     # r2 gain<0 -> clamped to 0 (dropped).
