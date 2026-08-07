@@ -37,6 +37,7 @@ def run(
     complexity_estimator_override: BaseComplexityEstimator | None = None,
     resampling_schedule: list[int] | None = None,
     lora_training_args: LoRASpecificTrainingArgs | None = None,
+    shuffle: bool = False,
 ):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
@@ -86,6 +87,7 @@ def run(
             # packing=PackingConfig(budget=packing_budget(model_name)),
             save_schedule=save_schedule,
             resampling_schedule=resampling_schedule,
+            shuffle=shuffle,
             out_path=OUT_PATH.as_posix(),
             model_id=MODEL_NAME,
             train_dataset=train_dataset_adapter,
