@@ -13,12 +13,25 @@ class MergedDatasetAdapter(AbstractDatasetAdapter):
         self.dataset_adapters = dataset_adapters
 
     @override
-    def process_dataset(self, path_override: str | None = None) -> Dataset:
+    def process_dataset(
+        self,
+        path_override: str | None = None,
+        shuffle: bool = False,
+        shuffle_seed: int | None = None,
+    ) -> Dataset:
         # Every sub-adapter reads the same source: path_override (e.g. the resampling per-epoch
         # parquet) when given, otherwise each adapter's own configured path. Each applies its own
-        # sampler / target builder, then the results are concatenated.
+        # sampler / target builder and optional shuffle, then the results are concatenated in
+        # adapter order. Offset the seed so equally sized children do not receive the same
+        # permutation.
         datasets = [
-            adapter.process_dataset(path_override=path_override, strict=True) for adapter in self.dataset_adapters
+            adapter.process_dataset(
+                path_override=path_override,
+                strict=True,
+                shuffle=shuffle,
+                shuffle_seed=None if shuffle_seed is None else shuffle_seed + adapter_index,
+            )
+            for adapter_index, adapter in enumerate(self.dataset_adapters)
         ]
 
         ds = concatenate_datasets(datasets)

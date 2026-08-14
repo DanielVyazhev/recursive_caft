@@ -10,7 +10,6 @@ from typing import override
 
 import pandas as pd
 import torch
-from datasets import Dataset
 from pydantic import model_validator
 from torch.utils.data import IterableDataset
 from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
@@ -65,8 +64,11 @@ class ResamplingDataset(IterableDataset):
 
     def __iter__(self):
         # Calling process_dataset to re-sample dataset after EstimateComplexityCallback runs
-        dataset = self.dataset.process_dataset(path_override=self.dataset_path)
-        dataset = self._shuffle_for_epoch(dataset)
+        dataset = self.dataset.process_dataset(
+            path_override=self.dataset_path,
+            shuffle=self.shuffle,
+            shuffle_seed=self.data_seed + self.epoch,
+        )
 
         if not self._logged_samples and len(dataset) > 0:
             first_sample = dataset[0]
@@ -78,11 +80,6 @@ class ResamplingDataset(IterableDataset):
             self._logged_samples = True
 
         yield from dataset
-
-    def _shuffle_for_epoch(self, dataset: Dataset) -> Dataset:
-        if not self.shuffle:
-            return dataset
-        return dataset.shuffle(seed=self.data_seed + self.epoch)
 
 
 # Null packs are tiny, NOT budget-sized: their forward cost must be negligible (an epoch can
@@ -191,7 +188,11 @@ class PackedResamplingDataset(ResamplingDataset):
 
     @override
     def __iter__(self):
-        dataset = self.dataset.process_dataset(path_override=self.dataset_path)
+        dataset = self.dataset.process_dataset(
+            path_override=self.dataset_path,
+            shuffle=self.shuffle,
+            shuffle_seed=self.data_seed + self.epoch,
+        )
         assert len(dataset) > 0, "Packed resampling got an empty epoch sample"
 
         lengths = [len(ids) for ids in dataset["input_ids"]]
@@ -200,7 +201,6 @@ class PackedResamplingDataset(ResamplingDataset):
         assert isinstance(pad_token_id, int), "Tokenizer must have an integer pad_token_id for packing"
         # pack_dataset also enforces budget >= the longest sequence.
         packed = pack_dataset(dataset, budget=self.packing.budget, pad_token_id=pad_token_id)
-        packed = self._shuffle_for_epoch(packed)
 
         if not self._logged_samples:
             first = packed[0]
@@ -280,9 +280,7 @@ class EstimateComplexityCallback(TrainerCallback):
         # snapshot, no estimation subprocess). Must precede the kwargs["model"] access below.
         resampling_epoch = self.resampling_epoch_for(epoch)
         if resampling_epoch != epoch:
-            logger.info(
-                f"Epoch {epoch} not in resampling_schedule; reusing the epoch {resampling_epoch} sample."
-            )
+            logger.info(f"Epoch {epoch} not in resampling_schedule; reusing the epoch {resampling_epoch} sample.")
             return
 
         # Resume: only reuse a dumped complexity when the weights it was measured on were checkpointed,
@@ -421,7 +419,7 @@ class EstimateComplexityCallback(TrainerCallback):
 
         failed = df["entropy_value"].isna()
         failed_count = int(failed.sum())
-        total_rows = int(len(df))
+        total_rows = len(df)
         failure_rate = float(failed.mean())
 
         # Too many failures is usually transient: the model drifts to chain-of-thought output for one
@@ -510,9 +508,7 @@ class EstimateComplexityCallback(TrainerCallback):
         if self._resampling_schedule is None:
             return epoch
         eligible = [e for e in self._resampling_schedule if e <= epoch]
-        assert eligible, (
-            f"No resampling epoch <= {epoch} in {self._resampling_schedule}; the schedule must start at 0."
-        )
+        assert eligible, f"No resampling epoch <= {epoch} in {self._resampling_schedule}; the schedule must start at 0."
         return max(eligible)
 
     def _previous_resampling_epoch(self, epoch: int) -> int | None:
@@ -627,7 +623,8 @@ class ResamplingTrainerConfig(LoRATrainerConfig):
     # and trains on that set for the whole run.
     resampling_schedule: list[int] | None = None
     # ResamplingDataset is iterable, so HF Trainer cannot attach its usual RandomSampler. Opt in
-    # here to shuffle the finalized sample deterministically with data_seed + training epoch.
+    # here to shuffle each finalized adapter sample independently and deterministically with
+    # data_seed + training epoch, before a merged adapter concatenates its children.
     shuffle: bool = False
 
     @model_validator(mode="after")
@@ -776,7 +773,7 @@ class ResamplingTrainer(LoRATrainer[ResamplingTrainerConfig]):
                     residual = int(col.isna().sum())
                     entry = {
                         "epoch": epoch,
-                        "total_rows": int(len(col)),
+                        "total_rows": len(col),
                         "failed_rows": residual,
                         "failure_rate": (residual / len(col)) if len(col) else 0.0,
                         "backfilled": None,
