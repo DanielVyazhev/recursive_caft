@@ -7,7 +7,12 @@ from transformers import PreTrainedTokenizer
 
 class AbstractDatasetAdapter(ABC):
     @abstractmethod
-    def process_dataset(self, path_override: str | None = None) -> Dataset: ...
+    def process_dataset(
+        self,
+        path_override: str | None = None,
+        shuffle: bool = False,
+        shuffle_seed: int | None = None,
+    ) -> Dataset: ...
 
     @abstractmethod
     def save_processed_dataset(self, df: pd.DataFrame, path: str, tmp: bool) -> None: ...

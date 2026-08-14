@@ -48,7 +48,13 @@ class BaseDatasetAdapter[D: BaseDataset](AbstractDatasetAdapter):
         return ds["default"]
 
     @override
-    def process_dataset(self, path_override: str | None = None, strict: bool = True) -> Dataset:
+    def process_dataset(
+        self,
+        path_override: str | None = None,
+        strict: bool = True,
+        shuffle: bool = False,
+        shuffle_seed: int | None = None,
+    ) -> Dataset:
         if path_override is not None:
             ds = self._load_ds(
                 self.dataset.__class__(
@@ -76,6 +82,9 @@ class BaseDatasetAdapter[D: BaseDataset](AbstractDatasetAdapter):
             num_proc=4,
             remove_columns=ds.column_names if strict else None,
         )
+
+        if shuffle:
+            ds = ds.shuffle(seed=shuffle_seed)
 
         return ds
 

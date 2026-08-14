@@ -59,3 +59,32 @@ def test_process_dataset_shares_override_across_subadapters(thinking_tokenizer, 
     assert len(ds) == 6  # 4 reasoning + 2 single-token from the one shared source
     assert "input_ids" in ds.column_names
     assert "labels" in ds.column_names
+
+
+def test_process_dataset_shuffles_each_subadapter_without_mixing_blocks(
+    thinking_tokenizer, tmp_path, make_resampling_df
+):
+    parquet = tmp_path / "epoch.parquet"
+    source = make_resampling_df(8)
+    source.to_parquet(parquet)
+    merged = MergedDatasetAdapter(
+        [_reasoning_adapter(thinking_tokenizer, 8), _single_token_adapter(thinking_tokenizer, 8)]
+    )
+
+    ordered = merged.process_dataset(path_override=str(parquet))
+    shuffled = merged.process_dataset(path_override=str(parquet), shuffle=True, shuffle_seed=123)
+    replay = merged.process_dataset(path_override=str(parquet), shuffle=True, shuffle_seed=123)
+
+    # The entropy sampler may drop non-positive rows, so derive the actual block boundary.
+    block_size = len(ordered) // 2
+    ordered_reasoning = ordered["row_id"][:block_size]
+    ordered_single_token = ordered["row_id"][block_size:]
+    shuffled_reasoning = shuffled["row_id"][:block_size]
+    shuffled_single_token = shuffled["row_id"][block_size:]
+
+    assert shuffled["row_id"] == replay["row_id"]
+    assert shuffled_reasoning != ordered_reasoning
+    assert shuffled_single_token != ordered_single_token
+    assert set(shuffled_reasoning) == set(ordered_reasoning)
+    assert set(shuffled_single_token) == set(ordered_single_token)
+    assert shuffled_reasoning != shuffled_single_token
