@@ -9,7 +9,7 @@ run(
     relative_out_path="./entropy_gain_proportional/llama_3b_head_truncated8192_shuffle",
     train_dataset="train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192",
     train_dataset_adapter=get_merged_adapter_with_data_mix(EntropyGainProportionalSampler),
-    save_schedule=[10, 20, 50, 80, 100],
+    save_schedule=[10, 20, 50, 80, 100, 150, 200],
     complexity_estimator_override=SingleTokenEntropyWithRandomEstimator(),
     shuffle=True,
 )
