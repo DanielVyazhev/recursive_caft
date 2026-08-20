@@ -12,7 +12,6 @@ run(
     relative_out_path="./random/phi4_mini_head_truncated8192",
     train_dataset="train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192",
     train_dataset_adapter=get_merged_adapter_with_data_mix(RandomSampler),
-    save_schedule=[150, 200],
-    skip_missing_checkpoints=True,
+    save_schedule=[10, 20, 50, 80, 100, 150, 200],
     complexity_estimator_override=SingleTokenEntropyWithRandomEstimator(),
 )

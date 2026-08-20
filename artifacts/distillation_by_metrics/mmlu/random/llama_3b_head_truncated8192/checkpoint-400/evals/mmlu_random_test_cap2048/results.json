@@ -1,7 +1,0 @@
-{
-  "accuracy": 0.47215295095594345,
-  "total": 2406,
-  "correct": 1136,
-  "num_truncated": 0,
-  "model_path": "/workspace/src/experiments/distillation_by_metrics/mmlu/../../../../artifacts/distillation_by_metrics/mmlu/random/llama_3b_head_truncated8192/checkpoint-400"
-}
