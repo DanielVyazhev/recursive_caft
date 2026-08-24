@@ -1,9 +1,10 @@
 import random
-import torch
-import numpy
 
-def set_seed():
-    seed = 42
+import numpy
+import torch
+
+
+def set_seed(seed: int = 42):
     random.seed(seed)
     numpy.random.seed(seed=seed)
     torch.manual_seed(seed)

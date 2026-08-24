@@ -85,7 +85,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
             logger.error("BaseTrainerConfig.train -> out_path not empty", self.config.out_path)
             return None
 
-        set_seed()
+        set_seed(self.config.training_args.seed)
 
         logger.info(subprocess.run(["nvidia-smi"], capture_output=True, text=True).stdout)
 

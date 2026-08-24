@@ -38,6 +38,7 @@ def run(
     resampling_schedule: list[int] | None = None,
     lora_training_args: LoRASpecificTrainingArgs | None = None,
     shuffle: bool = False,
+    seed: int = 42,
 ):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
@@ -82,7 +83,9 @@ def run(
 
     trainer = ResamplingTrainer(
         config=ResamplingTrainerConfig(
-            training_args=LoRATrainingArgs(num_train_epochs=save_schedule[-1], per_device_train_batch_size=2),
+            training_args=LoRATrainingArgs(
+                num_train_epochs=save_schedule[-1], per_device_train_batch_size=2, seed=seed, data_seed=seed
+            ),
             lora_training_args=lora_training_args,
             # packing=PackingConfig(budget=packing_budget(model_name)),
             save_schedule=save_schedule,
