@@ -3,66 +3,58 @@
     {
       "epoch": 10.0,
       "checkpoint": "checkpoint-200",
-      "accuracy": 0.5361596009975063,
+      "accuracy": 0.46633416458852867,
       "total": 2406,
-      "correct": 1290,
-      "num_truncated": 412
+      "correct": 1122,
+      "num_truncated": 774
     },
     {
       "epoch": 20.0,
       "checkpoint": "checkpoint-400",
-      "accuracy": 0.5523690773067331,
+      "accuracy": 0.4368246051537822,
       "total": 2406,
-      "correct": 1329,
-      "num_truncated": 397
+      "correct": 1051,
+      "num_truncated": 975
     },
     {
-      "epoch": 40.0,
-      "checkpoint": "checkpoint-800",
-      "accuracy": 0.541978387364921,
-      "total": 2406,
-      "correct": 1304,
-      "num_truncated": 584
-    },
-    {
-      "epoch": 60.0,
-      "checkpoint": "checkpoint-1200",
+      "epoch": 50.0,
+      "checkpoint": "checkpoint-1000",
       "accuracy": 0.5349127182044888,
       "total": 2406,
       "correct": 1287,
-      "num_truncated": 625
-    },
-    {
-      "epoch": 40.0,
-      "checkpoint": "checkpoint-1600",
-      "accuracy": 0.5120532003325021,
-      "total": 2406,
-      "correct": 1232,
-      "num_truncated": 750
-    },
-    {
-      "epoch": 60.0,
-      "checkpoint": "checkpoint-2400",
-      "accuracy": 0.5631753948462178,
-      "total": 2406,
-      "correct": 1355,
-      "num_truncated": 466
+      "num_truncated": 634
     },
     {
       "epoch": 80.0,
-      "checkpoint": "checkpoint-3200",
-      "accuracy": 0.5785536159600998,
+      "checkpoint": "checkpoint-1600",
+      "accuracy": 0.5315876974231089,
       "total": 2406,
-      "correct": 1392,
-      "num_truncated": 418
+      "correct": 1279,
+      "num_truncated": 582
     },
     {
       "epoch": 100.0,
-      "checkpoint": "checkpoint-4000",
-      "accuracy": 0.5922693266832918,
+      "checkpoint": "checkpoint-2000",
+      "accuracy": 0.5814630091438071,
       "total": 2406,
-      "correct": 1425,
-      "num_truncated": 371
+      "correct": 1399,
+      "num_truncated": 366
+    },
+    {
+      "epoch": 150.0,
+      "checkpoint": "checkpoint-3000",
+      "accuracy": 0.5989193682460515,
+      "total": 2406,
+      "correct": 1441,
+      "num_truncated": 289
+    },
+    {
+      "epoch": 200.0,
+      "checkpoint": "checkpoint-4000",
+      "accuracy": 0.559850374064838,
+      "total": 2406,
+      "correct": 1347,
+      "num_truncated": 546
     }
   ]
 }

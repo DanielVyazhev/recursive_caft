@@ -1,60 +1,60 @@
 {
   "mmlu_random_test_cap2048": [
     {
-      "epoch": 5.0,
-      "checkpoint": "checkpoint-100",
-      "accuracy": 0.41562759767248547,
-      "total": 2406,
-      "correct": 1000,
-      "num_truncated": 6
-    },
-    {
       "epoch": 10.0,
       "checkpoint": "checkpoint-200",
-      "accuracy": 0.4829592684954281,
+      "accuracy": 0.46508728179551123,
       "total": 2406,
-      "correct": 1162,
-      "num_truncated": 21
+      "correct": 1119,
+      "num_truncated": 0
     },
     {
       "epoch": 20.0,
       "checkpoint": "checkpoint-400",
-      "accuracy": 0.5369908561928513,
+      "accuracy": 0.5211970074812967,
       "total": 2406,
-      "correct": 1292,
+      "correct": 1254,
       "num_truncated": 0
     },
     {
-      "epoch": 40.0,
-      "checkpoint": "checkpoint-800",
-      "accuracy": 0.5465502909393184,
+      "epoch": 50.0,
+      "checkpoint": "checkpoint-1000",
+      "accuracy": 0.5536159600997507,
       "total": 2406,
-      "correct": 1315,
+      "correct": 1332,
       "num_truncated": 0
-    },
-    {
-      "epoch": 60.0,
-      "checkpoint": "checkpoint-1200",
-      "accuracy": 0.5594347464671654,
-      "total": 2406,
-      "correct": 1346,
-      "num_truncated": 1
     },
     {
       "epoch": 80.0,
       "checkpoint": "checkpoint-1600",
-      "accuracy": 0.5760598503740648,
+      "accuracy": 0.5660847880299252,
       "total": 2406,
-      "correct": 1386,
+      "correct": 1362,
       "num_truncated": 0
     },
     {
       "epoch": 100.0,
       "checkpoint": "checkpoint-2000",
-      "accuracy": 0.5793848711554447,
+      "accuracy": 0.5577722360764755,
       "total": 2406,
-      "correct": 1394,
+      "correct": 1342,
+      "num_truncated": 0
+    },
+    {
+      "epoch": 150.0,
+      "checkpoint": "checkpoint-3000",
+      "accuracy": 0.5822942643391521,
+      "total": 2406,
+      "correct": 1401,
       "num_truncated": 1
+    },
+    {
+      "epoch": 200.0,
+      "checkpoint": "checkpoint-4000",
+      "accuracy": 0.5752285951787198,
+      "total": 2406,
+      "correct": 1384,
+      "num_truncated": 0
     }
   ]
 }

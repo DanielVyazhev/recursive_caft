@@ -31,14 +31,6 @@
       "total": 2406,
       "correct": 1358,
       "num_truncated": 28
-    },
-    {
-      "epoch": 50.0,
-      "checkpoint": "checkpoint-1600",
-      "accuracy": 0.007896924355777223,
-      "total": 2406,
-      "correct": 19,
-      "num_truncated": 402
     }
   ]
 }

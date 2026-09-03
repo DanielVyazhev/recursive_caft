@@ -102,7 +102,7 @@ def test_save_processed_dataset_creates_parent_dir(thinking_tokenizer, tmp_path)
 class _EmptyAdapter(AbstractDatasetAdapter):
     """Minimal adapter whose post-sampling dataset is empty, to exercise __iter__'s guard."""
 
-    def process_dataset(self, path_override=None):
+    def process_dataset(self, path_override=None, shuffle=False, shuffle_seed=None):
         return Dataset.from_dict({"input_ids": [], "attention_mask": [], "labels": [], "row_id": []})
 
     def save_processed_dataset(self, df, path, tmp):
