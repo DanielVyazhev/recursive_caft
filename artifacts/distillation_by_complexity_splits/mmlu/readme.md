@@ -20,7 +20,7 @@ mmlu/<model>/random_seed42/
 Every summary lists accuracy per checkpoint (epochs 5, 10, 20, 35, 50) with generation capped at 2048 tokens.
 `probe_binK` test sets have 100 questions each; `random600` has 600.
 
-Models: `Phi-4-mini-instruct`, `Qwen2.5-3B-Instruct`, `Llama-3.2-3B-Instruct`.
+Models: `Phi-4-mini-instruct`, `Qwen2.5-3B-Instruct`, `llama_3b`.
 Random-bin baselines (`random_seed42`) are available for Qwen and Llama.
 
 ## Charts
@@ -64,7 +64,7 @@ Cells are `best accuracy over epochs (epoch) / accuracy at epoch 50`.
 | group5 | 0.65 (ep5) / 0.59 | 0.46 (ep5) / 0.43 | 0.37 (ep35) / 0.23 | 0.36 (ep10) / 0.26 | 0.36 (ep10) / 0.33 | 0.22 (ep20) / 0.21 | 0.36 (ep10) / 0.32 |
 | random (seed42) | 0.61 (ep5) / 0.59 | 0.43 (ep10) / 0.35 | 0.35 (ep35) / 0.30 | 0.34 (ep10) / 0.27 | 0.35 (ep5) / 0.33 | 0.28 (ep5) / 0.27 | 0.36 (ep5) / 0.33 |
 
-### Llama-3.2-3B-Instruct
+### llama_3b
 
 | trained on | bin0 | bin1 | bin2 | bin3 | bin4 | bin5 | random600 |
 |---|---|---|---|---|---|---|---|
