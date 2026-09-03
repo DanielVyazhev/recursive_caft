@@ -23,6 +23,20 @@ Every summary lists accuracy per checkpoint (epochs 5, 10, 20, 35, 50) with gene
 Models: `Phi-4-mini-instruct`, `Qwen2.5-3B-Instruct`, `Llama-3.2-3B-Instruct`.
 Random-bin baselines (`random_seed42`) are available for Qwen and Llama.
 
+## Charts
+
+Chart-only HTML pages (open `charts/index.html`; each page loads `charts/common.js`, which holds the data):
+
+- `charts/common_test_accuracy_by_epoch.html` — random600 and balanced600 accuracy by epoch, one panel per model, colour = training bin.
+- `charts/common_test_best_epoch.html` — best epoch per training bin on random600 and balanced600.
+- `charts/in_bin_accuracy_by_epoch.html` — in-bin test accuracy by epoch, one panel per bin (cap2048 / cap4096).
+- `charts/best_epoch_accuracy_vs_bin.html` — best-epoch in-bin accuracy vs complexity bin.
+- `charts/training_gain_by_bin.html` — training gain (best epoch − epoch 10) per bin and difficulty × gain map.
+- `charts/generation_cap.html` — Δ accuracy cap4096 − cap2048 and Phi-4-mini truncation rate.
+- `charts/training_bin_transfer.html` — balanced600: gain on own bin vs transfer to the other bins.
+- `charts/training_bin_ranking.html` — mean rank of training bins across models/tests and advantage vs cross-bin mean.
+- `charts/best_bin_vs_random.html` — best bin vs random seed42 (same size) and the repository random-arm.
+
 ## Summary
 
 Cells are `best accuracy over epochs (epoch) / accuracy at epoch 50`.
