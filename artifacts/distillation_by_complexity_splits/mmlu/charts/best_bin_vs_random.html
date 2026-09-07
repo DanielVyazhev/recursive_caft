@@ -32,7 +32,7 @@
 <script>
 (function(){
   const RND={llama:{10:.4621779,20:.5058188,50:.5033250},qwen:{10:.4650873,20:.5211970,50:.5536160},phi:{10:.5752286,20:.6396509,50:.6600166}};
-  const MR={llama:RB_L.rand,qwen:RB_Q.rand,phi:null};
+  const MR={llama:RB_L.rand,qwen:RB_Q.rand,phi:RB_P.rand};
   const BINS={llama:CR_L.map(a=>Math.max(...a)),qwen:CR_Q.map(a=>Math.max(...a)),phi:CR_P.map(a=>Math.max(...a.slice(1)))};
   const MD=[['llama','Llama-3B'],['qwen','Qwen2.5-3B'],['phi','Phi-4-mini']];
   const w=1000,h=400,L=76,R=940,T0=34,B=300;const s=svg(w,h);
@@ -53,7 +53,7 @@
     g2.appendChild(el('rect',{x:CX(i)-gw*.36,y:dy-9,width:gw*.72,height:18,fill:'transparent'}));
     tipOn(g2,'<b>'+nm+' · random seed42, same size</b><br>best point ≤50 epochs: '+(mv*100).toFixed(1)+'% @ ep'+me+' · random600<br>best bin '+(bb*100).toFixed(1)+'% ('+((bb-mv)*100>=0?'+':'')+((bb-mv)*100).toFixed(1)+' pp) · mean over bins '+(bm*100).toFixed(1)+'% ('+((bm-mv)*100>=0?'+':'')+((bm-mv)*100).toFixed(1)+' pp)');
     s.appendChild(g2);
-    txt(s,dx+13,dy+4,(mv*100).toFixed(1)+'%',{a:'start',f:'#6b7385',w:600,fs:10.5});}
+    txt(s,dx+13,dy-5,(mv*100).toFixed(1)+'%',{a:'start',f:'#6b7385',w:600,fs:10.5});}
     else txt(s,CX(i),B-8,'random seed42: pending recompute',{f:'#6b7385',fs:10.5});
     BINS[k].forEach((v,b)=>{const x=CX(i)+(b-2.5)*17,gg=el('g',{});
       gg.appendChild(el('circle',{cx:x,cy:Y(v),r:5.5,fill:GC[b],opacity:.9,stroke:'#fffdf8','stroke-width':1.4}));

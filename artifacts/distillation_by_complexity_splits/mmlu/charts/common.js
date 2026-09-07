@@ -32,7 +32,7 @@ const GAIN={},ACC={};['q','p','l'].forEach(m=>{GAIN[m]=[];ACC[m]=[];
     const e10=Math.max(...ks.map(k=>D[k][b][1]));
     GAIN[m].push((bs-e10)*100);ACC[m].push(bs*100);}});
 const GC=['#2a6fdb','#6b4edd','#c2563a','#d4a017','#0d9488','#8b6f47'];
-const RB_P=null; // Phi random seed42: pending recompute
+const RB_P={rand:[.0033,.2767,.33,.355,.4],bal:[0,.28,.3317,.365,.3817]};
 const RB_Q={rand:[.36,.3533,.3383,.3333,.3267],bal:[.3633,.385,.33,.3633,.3517]};
 const RB_L={rand:[.3117,.3567,.3267,.3333,.3167],bal:[.3733,.3567,.355,.2983,.3417]};
 const CR_L=[[.3233,.3217,.3117,.3317,.3217],[.3667,.3383,.3217,.3217,.3317],[.3133,.355,.32,.305,.3083],[.3417,.37,.34,.31,.3367],[.3233,.355,.3467,.3233,.3283],[.32,.375,.3667,.3167,.3517]];
@@ -118,10 +118,10 @@ function bestPanel(mount,title,dL,dQ,dP,lo,hi,tks,rbs){
     const hit=el('rect',{x:L,y:y-7,width:R-L,height:14,fill:'transparent'});g.appendChild(hit);
     tipOn(hit,'<b>'+r.nm+' · random seed42</b><br>best epoch '+e+' · '+(v*100).toFixed(1)+'%<br>fixed random sample of the same size, all bins mixed');
     s.appendChild(g);
-    const str='random · '+r.nm.split('-')[0].replace('2.5','')+' '+(v*100).toFixed(1)+'%',ww=str.length*6.2;
-    let ly=y-4,bx={x1:R-8-ww,x2:R-8,y1:ly-10,y2:ly+2};
-    if(obst.some(o=>o.x1<bx.x2&&bx.x1<o.x2&&o.y1<bx.y2&&bx.y1<o.y2)){ly=y+13;bx={x1:R-8-ww,x2:R-8,y1:ly-10,y2:ly+2};}
-    obst.push(bx);txt(s,R-8,ly,str,{a:'end',f:r.c,w:600,fs:10});});
+    obst.push({x1:L,x2:R,y1:y-3,y2:y+3});});
+  if(rbs&&rbs.length){let lx=R;rbs.slice().reverse().forEach(r=>{const a=r.skip5?r.arr.slice(1):r.arr,v=Math.max(...a);
+      const str=r.nm.split('-')[0].replace('2.5','')+' '+(v*100).toFixed(1)+'%';txt(s,lx,20,str,{a:'end',f:r.c,w:600,fs:10.5});lx-=str.length*6.6+10;});
+    txt(s,lx,20,'random seed42 (dashed):',{a:'end',fs:10.5});}
   const series=[['Llama-3B',dL,'#0d9488',1,0],['Qwen2.5-3B',dQ,'#2a6fdb',-1,0],['Phi-4-mini',dP,'#c2563a',1,1]].map(([nm,data,c,dir,skip5])=>({
     nm,c,dir,pts:data.map((arr,b)=>{const a=skip5?arr.map((v,i)=>i?v:-1):arr;const i=a.indexOf(Math.max(...a));return{b,v:arr[i],e:EPl[i]}})}));
   series.forEach(se=>s.appendChild(el('path',{d:se.pts.map((p,i)=>(i?'L':'M')+X(p.b)+' '+Y(p.v)).join(' '),fill:'none',stroke:se.c,'stroke-width':2.2,'stroke-linejoin':'round'})));

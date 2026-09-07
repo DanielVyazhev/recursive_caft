@@ -21,7 +21,7 @@ Every summary lists accuracy per checkpoint (epochs 5, 10, 20, 35, 50) with gene
 `probe_binK` test sets have 100 questions each; `random600` has 600.
 
 Models: `Phi-4-mini-instruct`, `Qwen2.5-3B-Instruct`, `llama_3b`.
-Random-bin baselines (`random_seed42`) are available for Qwen and Llama.
+Random-bin baselines (`random_seed42`) are available for all three models.
 
 ## Charts
 
@@ -51,6 +51,7 @@ Cells are `best accuracy over epochs (epoch) / accuracy at epoch 50`.
 | group3 | 0.68 (ep35) / 0.65 | 0.40 (ep35) / 0.37 | 0.31 (ep35) / 0.29 | 0.29 (ep20) / 0.23 | 0.32 (ep20) / 0.25 | 0.32 (ep35) / 0.29 | 0.36 (ep35) / 0.35 |
 | group4 | 0.60 (ep20) / 0.56 | 0.48 (ep20) / 0.42 | 0.34 (ep35) / 0.31 | 0.34 (ep50) / 0.34 | 0.33 (ep35) / 0.28 | 0.36 (ep35) / 0.36 | 0.38 (ep35) / 0.34 |
 | group5 | 0.61 (ep35) / 0.59 | 0.36 (ep35) / 0.35 | 0.28 (ep50) / 0.28 | 0.30 (ep50) / 0.30 | 0.37 (ep35) / 0.32 | 0.31 (ep50) / 0.31 | 0.39 (ep50) / 0.39 |
+| random (seed42) | 0.68 (ep50) / 0.68 | 0.46 (ep35) / 0.43 | 0.29 (ep50) / 0.29 | 0.30 (ep35) / 0.28 | 0.30 (ep50) / 0.30 | 0.31 (ep50) / 0.31 | 0.40 (ep50) / 0.40 |
 
 ### Qwen2.5-3B-Instruct
 

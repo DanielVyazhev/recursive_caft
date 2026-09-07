@@ -1,0 +1,44 @@
+{
+  "random_seed42_common_random600_cap2048": [
+    {
+      "epoch": 5.0,
+      "checkpoint": "checkpoint-125",
+      "accuracy": 0.0033333333333333335,
+      "total": 600,
+      "correct": 2,
+      "num_truncated": 108
+    },
+    {
+      "epoch": 10.0,
+      "checkpoint": "checkpoint-250",
+      "accuracy": 0.27666666666666667,
+      "total": 600,
+      "correct": 166,
+      "num_truncated": 34
+    },
+    {
+      "epoch": 20.0,
+      "checkpoint": "checkpoint-500",
+      "accuracy": 0.33,
+      "total": 600,
+      "correct": 198,
+      "num_truncated": 10
+    },
+    {
+      "epoch": 35.0,
+      "checkpoint": "checkpoint-875",
+      "accuracy": 0.355,
+      "total": 600,
+      "correct": 213,
+      "num_truncated": 1
+    },
+    {
+      "epoch": 50.0,
+      "checkpoint": "checkpoint-1250",
+      "accuracy": 0.4,
+      "total": 600,
+      "correct": 240,
+      "num_truncated": 0
+    }
+  ]
+}

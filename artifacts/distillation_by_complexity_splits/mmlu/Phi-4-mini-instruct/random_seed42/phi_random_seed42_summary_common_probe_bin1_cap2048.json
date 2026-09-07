@@ -1,0 +1,44 @@
+{
+  "random_seed42_common_probe_bin1_cap2048": [
+    {
+      "epoch": 5.0,
+      "checkpoint": "checkpoint-125",
+      "accuracy": 0.0,
+      "total": 100,
+      "correct": 0,
+      "num_truncated": 24
+    },
+    {
+      "epoch": 10.0,
+      "checkpoint": "checkpoint-250",
+      "accuracy": 0.32,
+      "total": 100,
+      "correct": 32,
+      "num_truncated": 8
+    },
+    {
+      "epoch": 20.0,
+      "checkpoint": "checkpoint-500",
+      "accuracy": 0.38,
+      "total": 100,
+      "correct": 38,
+      "num_truncated": 0
+    },
+    {
+      "epoch": 35.0,
+      "checkpoint": "checkpoint-875",
+      "accuracy": 0.46,
+      "total": 100,
+      "correct": 46,
+      "num_truncated": 0
+    },
+    {
+      "epoch": 50.0,
+      "checkpoint": "checkpoint-1250",
+      "accuracy": 0.43,
+      "total": 100,
+      "correct": 43,
+      "num_truncated": 0
+    }
+  ]
+}
