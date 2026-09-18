@@ -28,7 +28,7 @@ run(
         dataset_sampler=RandomSampler(BaseDatasetSamplerConfig(top_k=9600)),
     ),
     complexity_estimator_override=SingleTokenEntropyWithRandomEstimator(),
-    save_schedule=[20, 50, 100, 150, 200],
+    save_schedule=[2, 5, 10, 20],
     resampling_schedule=[0],
     shuffle=True,
 )
