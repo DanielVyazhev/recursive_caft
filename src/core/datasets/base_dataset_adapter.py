@@ -40,6 +40,11 @@ class BaseDatasetAdapter[D: BaseDataset](AbstractDatasetAdapter):
             return {}
         return {self.dataset.dataset_id: self.dataset_sampler.count_selected(df)}
 
+    @override
+    def set_epoch(self, epoch: int) -> None:
+        if self.dataset_sampler is not None:
+            self.dataset_sampler.set_epoch(epoch)
+
     def _load_ds(self, dataset: BaseDataset) -> Dataset:
         ds = load_dataset(
             "parquet",

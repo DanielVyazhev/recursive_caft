@@ -55,6 +55,11 @@ class MergedDatasetAdapter(AbstractDatasetAdapter):
         return counts
 
     @override
+    def set_epoch(self, epoch: int) -> None:
+        for adapter in self.dataset_adapters:
+            adapter.set_epoch(epoch)
+
+    @override
     def save_processed_dataset(self, df: pd.DataFrame, path: str, tmp: bool) -> None:
         raise NotImplementedError(
             "Saving is not implemented for MergedDatasetAdapter. Please save individual datasets separately."
