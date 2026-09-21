@@ -18,6 +18,13 @@ class BaseDatasetSamplerConfig(PydraConfig):
 class BaseDatasetSampler(ABC):
     def __init__(self, config: BaseDatasetSamplerConfig):
         self.config = config
+        self.epoch = 0
+
+    def set_epoch(self, epoch: int) -> None:
+        """Set the effective resampling epoch used by epoch-dependent samplers."""
+        if epoch < 0:
+            raise ValueError(f"Sampler epoch must be nonnegative, got {epoch}")
+        self.epoch = epoch
 
     @abstractmethod
     def _score_row(self, row: dict) -> float: ...

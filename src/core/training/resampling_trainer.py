@@ -48,6 +48,7 @@ class ResamplingDataset(IterableDataset):
         self.shuffle = shuffle
         self.data_seed = data_seed
         self.epoch = 0
+        self.selection_epoch = 0
         self._logged_samples = False
 
         self.dataset_path: str | None = None
@@ -64,6 +65,7 @@ class ResamplingDataset(IterableDataset):
 
     def __iter__(self):
         # Calling process_dataset to re-sample dataset after EstimateComplexityCallback runs
+        self.dataset.set_epoch(self.selection_epoch)
         dataset = self.dataset.process_dataset(
             path_override=self.dataset_path,
             shuffle=self.shuffle,
@@ -188,6 +190,7 @@ class PackedResamplingDataset(ResamplingDataset):
 
     @override
     def __iter__(self):
+        self.dataset.set_epoch(self.selection_epoch)
         dataset = self.dataset.process_dataset(
             path_override=self.dataset_path,
             shuffle=self.shuffle,
@@ -454,7 +457,11 @@ class EstimateComplexityCallback(TrainerCallback):
         # Count how many rows the train sampler(s) will actually select from this finalized parquet
         # (after the non-positive-score drop). Computed here, after backfill, so `df` matches exactly
         # what SetResamplingPathCallback feeds the samplers for this same epoch.
-        by_dataset = self._train_dataset.selected_sample_counts(df) if self._train_dataset is not None else {}
+        if self._train_dataset is not None:
+            self._train_dataset.set_epoch(epoch)
+            by_dataset = self._train_dataset.selected_sample_counts(df)
+        else:
+            by_dataset = {}
         selected_total = sum(by_dataset.values()) if by_dataset else None
 
         # A grace epoch must not hand training an empty sample: without this the collapse resurfaces
@@ -605,9 +612,9 @@ class SetResamplingPathCallback(TrainerCallback):
         # must keep reading the last scheduled epoch's parquet.
         callback = self.estimation_complexity_callback
         self.resampling_ds.epoch = int(state.epoch)
-        self.resampling_ds.dataset_path = callback.out_path_for_epoch(
-            callback.resampling_epoch_for(int(state.epoch))
-        ).as_posix()
+        effective_epoch = callback.resampling_epoch_for(int(state.epoch))
+        self.resampling_ds.selection_epoch = effective_epoch
+        self.resampling_ds.dataset_path = callback.out_path_for_epoch(effective_epoch).as_posix()
 
 
 class ResamplingTrainerConfig(LoRATrainerConfig):

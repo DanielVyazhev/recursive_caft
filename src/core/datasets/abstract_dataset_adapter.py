@@ -27,5 +27,9 @@ class AbstractDatasetAdapter(ABC):
         Empty when there is no sampler (nothing to report)."""
         return {}
 
+    def set_epoch(self, epoch: int) -> None:
+        """Forward the effective resampling epoch to any sampler owned by the adapter."""
+        return None
+
     @abstractmethod
     def override_tokenizer(self, tokenizer: PreTrainedTokenizer) -> None: ...

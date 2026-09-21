@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 
 from transformers import AutoTokenizer
@@ -143,6 +144,14 @@ def run(
 
 
 def get_merged_adapter_with_data_mix(sampler_cls: type[BaseDatasetSampler]) -> MergedDatasetAdapter:
+    return get_merged_adapter_with_data_mix_from_factory(
+        lambda top_k: sampler_cls(BaseDatasetSamplerConfig(top_k=top_k))
+    )
+
+
+def get_merged_adapter_with_data_mix_from_factory(
+    sampler_factory: Callable[[int], BaseDatasetSampler],
+) -> MergedDatasetAdapter:
     return MergedDatasetAdapter(
         [
             CausalDatasetAdapter(
@@ -154,10 +163,10 @@ def get_merged_adapter_with_data_mix(sampler_cls: type[BaseDatasetSampler]) -> M
                     # Will be overridden
                     tokenizer=None,  # type: ignore
                 ),
-                dataset_sampler=sampler_cls(BaseDatasetSamplerConfig(top_k=1024)),
+                dataset_sampler=sampler_factory(1024),
             ),
-            # Mix in a smaller single-token-answer set (hardest by gain) so the model keeps
-            # answering with a single letter, keeping the per-epoch entropy estimation stable.
+            # Mix in a smaller single-token-answer set selected by the same policy so the model
+            # keeps answering with a single letter, keeping per-epoch entropy estimation stable.
             CausalDatasetAdapter(
                 dataset=MMLUSingleTokenResponseDataset(
                     config=QADatasetConfig(
@@ -167,7 +176,7 @@ def get_merged_adapter_with_data_mix(sampler_cls: type[BaseDatasetSampler]) -> M
                     # Will be overridden
                     tokenizer=None,  # type: ignore
                 ),
-                dataset_sampler=sampler_cls(BaseDatasetSamplerConfig(top_k=256)),
+                dataset_sampler=sampler_factory(256),
             ),
         ]
     )

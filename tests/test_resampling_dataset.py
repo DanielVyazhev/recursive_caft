@@ -112,11 +112,28 @@ class _EmptyAdapter(AbstractDatasetAdapter):
         pass
 
 
+class _EpochRecordingAdapter(_EmptyAdapter):
+    def __init__(self):
+        self.seen_epochs = []
+
+    def set_epoch(self, epoch):
+        self.seen_epochs.append(epoch)
+
+
 def test_iter_does_not_crash_on_empty_dataset(thinking_tokenizer):
     # The one-time sample logging does dataset[0]; on an empty post-filter dataset that must not
     # raise IndexError before yielding (the guard `len(dataset) > 0`).
     ds = ResamplingDataset(_EmptyAdapter(), thinking_tokenizer)
     assert list(ds) == []
+
+
+def test_iter_sets_effective_selection_epoch():
+    adapter = _EpochRecordingAdapter()
+    ds = ResamplingDataset(adapter, tokenizer=None)  # type: ignore[arg-type]
+    ds.selection_epoch = 17
+
+    assert list(ds) == []
+    assert adapter.seen_epochs == [17]
 
 
 def test_shuffle_is_deterministic_within_epoch_and_changes_across_epochs(

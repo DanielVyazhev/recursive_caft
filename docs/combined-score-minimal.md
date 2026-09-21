@@ -1,6 +1,6 @@
 **One combined score for the remaining experiment**
 
-Updated 21 September 2026. Use an empirical diminishing proxy correction with uniform exploration. This specification uses normalized entropy directly, replacing percentile ranks and the earlier covariance-fitted residual method. It includes the full derivation; the [full report](adaptive-proxy-selection-report-2026-09-19.md) contains the experimental evidence and audit. Run one fixed configuration with multiple seeds. Selection uses only the existing scalar student and proxy entropies; student estimates update each round through the existing estimator and the proxy column remains precomputed.
+Updated 21 September 2026. Use an empirical diminishing proxy correction and sample in proportion to its positive part. This specification uses normalized entropy directly, replacing percentile ranks and the earlier covariance-fitted residual method. It includes the full derivation; the [full report](adaptive-proxy-selection-report-2026-09-19.md) contains the experimental evidence and audit. Run one fixed configuration with multiple seeds. Selection uses only the existing scalar student and proxy entropies; student estimates update each round through the existing estimator and the proxy column remains precomputed.
 
 **The score.** Use the saved normalized student and proxy entropies directly, with no centering:
 
@@ -8,14 +8,14 @@ Updated 21 September 2026. Use an empirical diminishing proxy correction with un
 s = saved_normalized_student_entropy
 p = saved_normalized_proxy_entropy
 
-progress     = t / (T - 1)            # t = 0,...,T-1; T >= 2
-proxy_weight = (1 - progress)^2
-score        = s - proxy_weight*p
+lambda_initial = 0.8
+lambda_t       = lambda_initial * exp(log(0.01) * t / 100)
+score_t        = s - lambda_t*p
 ```
 
-The initial weight 1 and exponent 2 are fixed empirical choices, not estimated optimal coefficients. They give weights 1, 0.5625, 0.25, 0.0625, and 0 at 0%, 25%, 50%, 75%, and 100% of training. No correctness labels, cross-entropy, probability vectors, calibration split, or coefficient sweep are used. Use the existing `H / log(vocabulary_size)` values, with each model's own vocabulary and consistent log bases; do not normalize them again. Retain the existing proxy column, the mean of the two proxies' normalized entropies. Do not apply percentile ranks or divide by per-round standard deviations. Normalization does not calibrate the models or align their vocabularies. The initial coefficient 1 remains an empirical choice on this representation, not a transferred optimum from ranks.
+Here `t` is the effective resampling epoch, starting at zero. The initial coefficient is supplied externally; the fixed experiment sets it to 0.8. The coefficient retains 1% of its initial value at epoch 100 and continues to decay. It is 0.8, 0.253, 0.08, 0.0253, 0.008, 0.0008, and 0.00008 at epochs 0, 25, 50, 75, 100, 150, and 200. These schedule values are empirical choices, not estimated optimal coefficients. No correctness labels, cross-entropy, probability vectors, calibration split, or coefficient sweep are used. Use the existing `H / log(vocabulary_size)` values, with each model's own vocabulary and consistent log bases; do not normalize them again. Retain the existing proxy column, the mean of the two proxies' normalized entropies. Do not apply percentile ranks or divide by per-round standard deviations. Normalization does not calibrate the models or align their vocabularies. The initial coefficient remains an empirical choice on this representation, not a transferred optimum from ranks.
 
-Scoring requires no pool means, ranks, or variances. Missing or nonfinite entropy pairs receive zero guided gain and remain eligible through uniform exploration. With no valid pairs, sample uniformly. The theoretical RMS quantities below describe magnitudes across questions, not tokens or seeds; they are not computed by the selector.
+Scoring requires no pool means, ranks, or variances. Missing or nonfinite entropy pairs and nonpositive gains are ineligible. If no positive gains remain, stop with an error rather than silently changing the policy. The theoretical RMS quantities below describe magnitudes across questions, not tokens or seeds; they are not computed by the selector.
 
 **Full rationale: imperfect aleatoric estimation and a relative-error budget.** The decomposition motivates subtraction; an additional acquisition principle motivates decay. Neither the decomposition nor improving AUROC alone proves that proxy weight should decrease.
 
@@ -51,7 +51,7 @@ For example, let A = 0.10 and E_proxy = 0.20:
 | Proxy normalized entropy | 0.30 | 0.30 |
 | Full-subtraction score | 0.40 | -0.10 |
 
-This is an illustrative configuration of the working model, not a measurement from the runs. Uniform exploration preserves eligibility when guided gain is zero; it does not repair the score's interpretation.
+This is an illustrative configuration of the working model, not a measurement from the runs. Positive-part clipping makes the late example ineligible; it does not repair the score's interpretation.
 
 **4. Expose the trade-off in partial subtraction.** For 0 <= lambda_t <= 1:
 
@@ -115,20 +115,19 @@ student learns and its epistemic RMS decreases
 
 The proxy does not deteriorate intrinsically. Its residual error becomes less tolerable relative to the student's remaining signal. Aggregate epistemic decline is an assumption; learning need not improve every question. Improving student AUROC does not establish this assumption because AUROC measures discrimination for a specified outcome, not epistemic magnitude. A changing valid pool can also change measured diagnostics without demonstrating learning on a fixed population.
 
-**8. Connect the unobservable ideal to the empirical schedule.** The latent RMS quantities are unavailable from the two entropy columns, so lambda_budget,t cannot be computed by the current method. We approximate its hypothesized decline with:
+**8. Connect the unobservable ideal to the empirical schedule.** The latent RMS quantities are unavailable from the two entropy columns, so lambda_budget,t cannot be computed by the current method. We approximate its hypothesized decline with a constant-rate multiplicative decay:
 
 ```text
-progress = t / (T - 1)                # t = 0,...,T-1; T >= 2
-lambda_t = (1 - progress)^2
+lambda_t = lambda_initial * exp(log(0.01) * t / 100)
 score_t  = saved_normalized_student_entropy_t
            - lambda_t*saved_normalized_proxy_entropy
 ```
 
-The decomposition and constrained criterion motivate the direction of decay conditionally. They do not derive the quadratic curve, initial weight 1, or zero endpoint. The ideal rule can have an initial plateau; the empirical curve does not. Finishing training does not establish zero student epistemic uncertainty. Do not claim that the empirical schedule is guaranteed to satisfy the latent budget.
+The experiment supplies `lambda_initial = 0.8`. Writing the schedule as `lambda_initial*r^t` and requiring `lambda_100 = 0.01*lambda_initial` gives `r^100 = 0.01`, hence `r = exp(log(0.01)/100)`. This derives the per-epoch rate from the chosen endpoint; the decomposition does not derive either 0.8 or the 1% endpoint. The ideal rule can have an initial plateau, while this empirical curve does not. Do not claim that the empirical schedule is guaranteed to satisfy the latent budget.
 
 Kappa belongs to the explanatory criterion; it is not an additional fitted parameter or required sweep in the practical method. The single scheduled coefficient remains the agreed configuration across seeds. Existing student estimates update each round, while proxy entropies remain precomputed. Selection needs no labels, additional proxy inference, probability vectors, ranks, or centering.
 
-**9. State the empirical claim and its limits.** The method accepts more aleatoric contamination to reduce relative over-subtraction. Whether that trade-off improves acquisition is the experimental question. Positive-part clipping and uniform exploration are additional practical choices, not derived optima. A random-baseline comparison tests the full policy, not the decomposition or the decay mechanism in isolation.
+**9. State the empirical claim and its limits.** The method accepts more aleatoric contamination to reduce relative over-subtraction. Whether that trade-off improves acquisition is the experimental question. Positive-part clipping and proportional sampling are additional practical choices, not derived optima. A random-baseline comparison tests the full policy, not the decomposition or the decay mechanism in isolation.
 
 The paper can say:
 
@@ -137,25 +136,20 @@ The paper can say:
 This is a conditional mathematical rationale for an empirical method. It does not establish that the proxy initially estimates a common uncertainty target better than the student, identify true aleatoric uncertainty, or prove superiority over random selection. The primary uncertainty literature provides context for these interpretive limits: [BALD](https://arxiv.org/abs/1112.5745), [Wimmer et al.](https://arxiv.org/abs/2209.03302), and [Bickford Smith et al.](https://arxiv.org/abs/2412.20892).
 
 
-**Sampling rule.** Let N count every candidate question, including those with missing measurements:
+**Sampling rule.** For each candidate question:
 
 ```text
-gain[i] = max(score[i], 0)            # zero for missing measurements
-
-if sum(gain) > 0:
-    weight[i] = 0.5/N + 0.5*gain[i]/sum(gain)
-else:
-    weight[i] = 1/N
-
-key[i] = weight[i] / (-log(random_uniform[i]))
-# fresh independent random_uniform[i] strictly between 0 and 1
+gain[i] = max(score[i], 0)
+key[i]  = gain[i] / (-log(random_uniform[i]))
+# random_uniform[i] is a reproducible draw in (0, 1), keyed by
+# (run seed, effective resampling epoch, question ID)
 # select the K largest keys, without replacement
 ```
 
-Every question remains eligible. Generate reproducible random keys independently of answer parsing. Do not center the score before clipping. Positive gain means the student entropy exceeds the weighted proxy entropy, not that the gap exceeds its pool mean. The uncertainty decomposition motivates subtraction, and the relative-error budget conditionally motivates decay. Neither establishes this zero threshold or these sampling weights as optimal.
+Rows with zero gain or nonfinite entropy are excluded. If fewer than K rows have positive gain, use all positive-gain rows; if none do, fail explicitly. Generate reproducible random keys independently of answer parsing. Do not center the score before clipping. Positive gain means the student entropy exceeds the weighted proxy entropy, not that the gap exceeds its pool mean. The uncertainty decomposition motivates subtraction, and the relative-error budget conditionally motivates decay. Neither establishes this zero threshold or proportional sampling as optimal.
 
-The 50% uniform mass and positive-part transformation are empirical sampling choices. They do not follow from the relative-error-budget argument or require exactly half the selected batch to be uniform. Weights describe first-draw probabilities, not marginal inclusion probabilities. At zero proxy weight, this becomes sampling proportional to normalized student entropy plus uniform exploration. Guided mass remains 50% whenever gains are nonzero, even if their magnitude becomes small.
+This exponential-race construction implements weighted sampling without replacement. The first draw has probability `gain[i]/sum(gain)`; later inclusion probabilities also depend on which rows were already drawn. At negligible proxy weight, it becomes sampling in proportion to positive normalized student entropy.
 
 Match the existing random reference's total rounds, learning-rate schedule, trace/direct-answer mixture, ordering, and evaluation caps. Log weights, valid-row counts, selected IDs, coverage, repeat exposure, target tokens, and scoring cost. Compare the same fixed checkpoint across seeds. Correctness-based AUROC is retrospective analysis only. A comparison with random tests the complete policy; it does not isolate the proxy correction or prove the latent mechanism.
 
-Suggested paper description: “Motivated by controlling proxy-induced over-subtraction relative to the student's remaining epistemic uncertainty, we empirically decrease proxy correction during training and retain uniform exploration.” The proposed mechanism and schedule remain unvalidated in training; no training code has been changed by this report update.
+Suggested paper description: “Motivated by controlling proxy-induced over-subtraction relative to the student's remaining epistemic uncertainty, we empirically decrease proxy correction during training and sample in proportion to the positive corrected entropy.” The new experiment implements this fixed policy with initial coefficient 0.8 and three seeds per student model.
