@@ -27,6 +27,17 @@ from core.training.resampling_trainer import ModelGenerateConfig, ResamplingTrai
 from core.training.thinking_tokens import setup_thinking_tokens
 from core.utils.datasets import add_average_column, merge_mmlu_on_question_id
 
+# dataset_id of the per-epoch complexity dump: resampling_trainer_data/<epoch>/complexity_estimation/<id>.parquet
+COMPLEXITY_EVALUATION_DATASET_ID = "mmlu_teacher_entropy"
+
+
+def out_path_for(relative_out_path: str) -> Path:
+    return (
+        Path(__file__)
+        .parent.joinpath("../../../../artifacts/distillation_by_metrics/mmlu/")
+        .joinpath(relative_out_path)
+    )
+
 
 def run(
     model_name: str,
@@ -50,11 +61,7 @@ def run(
 
     train_dataset_adapter.override_tokenizer(tokenizer)
 
-    OUT_PATH = (
-        Path(__file__)
-        .parent.joinpath("../../../../artifacts/distillation_by_metrics/mmlu/")
-        .joinpath(relative_out_path)
-    )
+    OUT_PATH = out_path_for(relative_out_path)
 
     lora_training_args = lora_training_args or LoRASpecificTrainingArgs()
     lora_training_args.train_thinking_token_embeddings = True
@@ -99,7 +106,7 @@ def run(
                 dataset=MMLUSingleTokenResponseDataset(
                     config=QADatasetConfig(
                         path=TEACHER_ENTROPY_DATASET_PATH.as_posix(),
-                        dataset_id="mmlu_teacher_entropy",
+                        dataset_id=COMPLEXITY_EVALUATION_DATASET_ID,
                     ),
                     tokenizer=tokenizer,
                 )
