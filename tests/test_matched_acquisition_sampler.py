@@ -3,7 +3,12 @@ import pytest
 from datasets import Dataset
 from pydantic import ValidationError
 
-from core.dataset_samplers.matched_acquisition import AcquisitionStep, acquisition_schedule, epoch_selection
+from core.dataset_samplers.matched_acquisition import (
+    AcquisitionStep,
+    acquisition_schedule,
+    epoch_selection,
+    upfront_selection,
+)
 from core.dataset_samplers.matched_acquisition_random_sampler import (
     MatchedAcquisitionRandomSampler,
     MatchedAcquisitionRandomSamplerConfig,
@@ -14,9 +19,13 @@ POOL = [f"q{i}" for i in range(100)]
 SCHEDULE = [AcquisitionStep(20, 20), AcquisitionStep(10, 20), AcquisitionStep(5, 20), AcquisitionStep(0, 20)]
 
 
-def _sampler(top_k: int = 20, seed: int = 42, schedule=SCHEDULE) -> MatchedAcquisitionRandomSampler:
+def _sampler(
+    top_k: int = 20, seed: int = 42, schedule=SCHEDULE, acquire_upfront: bool = False
+) -> MatchedAcquisitionRandomSampler:
     return MatchedAcquisitionRandomSampler(
-        MatchedAcquisitionRandomSamplerConfig(top_k=top_k, schedule=schedule, seed=seed)
+        MatchedAcquisitionRandomSamplerConfig(
+            top_k=top_k, schedule=schedule, seed=seed, acquire_upfront=acquire_upfront
+        )
     )
 
 
@@ -53,6 +62,31 @@ def test_selection_ignores_pool_order_and_depends_on_seed():
     assert epoch_selection(POOL, SCHEDULE, 1, seed=42) != epoch_selection(POOL, SCHEDULE, 1, seed=43)
 
 
+def test_upfront_draws_each_epoch_from_the_final_acquired_set():
+    budget = sum(step.new for step in SCHEDULE)
+    final = set().union(*(epoch_selection(POOL, SCHEDULE, epoch, seed=42) for epoch in range(len(SCHEDULE))))
+    assert len(final) == budget
+    selections = [upfront_selection(POOL, SCHEDULE, epoch, seed=42) for epoch in range(len(SCHEDULE))]
+    for step, selected in zip(SCHEDULE, selections):
+        assert len(selected) == step.total
+        assert selected <= final
+    # Unlike the curve, later questions are available from epoch 0, and draws differ per epoch.
+    assert selections[0] - epoch_selection(POOL, SCHEDULE, 0, seed=42)
+    assert selections[3] != selections[2]
+
+
+@pytest.mark.parametrize(
+    "schedule",
+    [
+        [AcquisitionStep(80, 80), AcquisitionStep(30, 30)],  # budget exceeds the pool
+        [AcquisitionStep(10, 20)],  # trains on more than the budget
+    ],
+)
+def test_invalid_upfront_schedule_raises(schedule):
+    with pytest.raises(ValueError):
+        upfront_selection(POOL, schedule, 0, seed=42)
+
+
 @pytest.mark.parametrize(
     ("schedule", "epoch"),
     [
@@ -73,6 +107,14 @@ def test_sampler_selects_the_epoch_selection():
         sampler.set_epoch(epoch)
         ids = set(sampler.create_sample(_ds())["question_id"])
         assert ids == epoch_selection(POOL, SCHEDULE, epoch, seed=42)
+
+
+def test_upfront_sampler_selects_the_upfront_selection():
+    sampler = _sampler(acquire_upfront=True)
+    for epoch in range(len(SCHEDULE)):
+        sampler.set_epoch(epoch)
+        ids = set(sampler.create_sample(_ds())["question_id"])
+        assert ids == upfront_selection(POOL, SCHEDULE, epoch, seed=42)
 
 
 def test_smaller_top_k_is_a_nested_subset():

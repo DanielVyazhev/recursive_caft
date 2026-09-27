@@ -51,6 +51,7 @@ def run(
     lora_training_args: LoRASpecificTrainingArgs | None = None,
     shuffle: bool = False,
     seed: int = 42,
+    eval_caps: tuple[int, ...] = (4096, 2048),
 ):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
@@ -120,7 +121,7 @@ def run(
     trainer.train()
     trainer.unload()
 
-    for max_thinking_tokens in [4096, 2048]:
+    for max_thinking_tokens in eval_caps:
         eval_dataset_id = f"mmlu_random_test_cap{max_thinking_tokens}"
         summary_filename = f"summary_reasoning_evals_cap{max_thinking_tokens}.json"
 

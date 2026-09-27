@@ -6,7 +6,12 @@ import pandas as pd
 from pydantic import model_validator
 
 from core.dataset_samplers.base_sampler import BaseDatasetSampler, BaseDatasetSamplerConfig
-from core.dataset_samplers.matched_acquisition import AcquisitionStep, epoch_selection, uniform_key
+from core.dataset_samplers.matched_acquisition import (
+    AcquisitionStep,
+    epoch_selection,
+    uniform_key,
+    upfront_selection,
+)
 
 
 class MatchedAcquisitionRandomSamplerConfig(BaseDatasetSamplerConfig):
@@ -14,6 +19,9 @@ class MatchedAcquisitionRandomSamplerConfig(BaseDatasetSamplerConfig):
     # top-k run's selections. Required: the control is only meaningful against a recorded curve.
     schedule: list[AcquisitionStep]
     seed: int = 42
+    # Acquire the schedule's whole budget before epoch 0 and draw each epoch's total from it
+    # (upfront_selection) instead of following the per-epoch curve (epoch_selection).
+    acquire_upfront: bool = False
 
     @model_validator(mode="after")
     def _validate(self):
@@ -26,7 +34,7 @@ class MatchedAcquisitionRandomSamplerConfig(BaseDatasetSamplerConfig):
 
 
 class MatchedAcquisitionRandomSampler(BaseDatasetSampler):
-    """Trains on the questions epoch_selection draws for the current resampling epoch.
+    """Trains on the questions epoch_selection (or upfront_selection) draws for the current epoch.
 
     Selected rows get a uniform (seed, epoch, question)-keyed score and all others score 0, so
     top_k picks a uniformly random subset of the epoch's selection. Two samplers with the same
@@ -44,7 +52,8 @@ class MatchedAcquisitionRandomSampler(BaseDatasetSampler):
     def _select(self, df: pd.DataFrame) -> pd.DataFrame:
         if "question_id" not in df.columns:
             raise KeyError("MatchedAcquisitionRandomSampler requires a question_id column")
-        selected = epoch_selection(df["question_id"].astype(str), self.config.schedule, self.epoch, self.config.seed)
+        select = upfront_selection if self.config.acquire_upfront else epoch_selection
+        selected = select(df["question_id"].astype(str), self.config.schedule, self.epoch, self.config.seed)
         self._scores = {q: uniform_key(self.config.seed, "order", self.epoch, q) for q in selected}
         return super()._select(df)
 

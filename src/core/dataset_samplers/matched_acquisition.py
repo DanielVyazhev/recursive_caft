@@ -5,7 +5,8 @@ trace -- the first time it selects it, and reuses the trace on later selections.
 curve is the per-epoch pair (new, total): questions selected for the first time, and questions
 selected at all. The matched control reproduces a given curve with uniformly random questions, so
 it spends exactly the same teacher traces and student compute per epoch as the policy it mirrors;
-only *which* questions are acquired and reused differs.
+only *which* questions are acquired and reused differs. upfront_selection is the fixed-budget
+variant: the curve's whole budget is acquired before training and each epoch draws from it.
 
 MatchedAcquisitionRandomSampler adapts epoch_selection to the BaseDatasetSampler interface.
 """
@@ -70,3 +71,28 @@ def epoch_selection(
     new = pool[acquired_before : acquired_before + step.new]
     reuse = sorted(pool[:acquired_before], key=lambda q: uniform_key(seed, "reuse", epoch, q))[:reused]
     return set(new) | set(reuse)
+
+
+def upfront_selection(
+    question_ids: Iterable[str], schedule: Sequence[AcquisitionStep], epoch: int, seed: int
+) -> set[str]:
+    """Questions the fixed-budget control trains on at `epoch`.
+
+    The whole budget, sum(step.new), is acquired before epoch 0: it is the first `budget` questions
+    of the same seed-keyed acquisition order epoch_selection uses, so both controls end up with the
+    same set of traces and differ only in when they become available. Epoch e trains on a uniform
+    draw (fresh each epoch) of schedule[e].total questions from that fixed set.
+    """
+    if not 0 <= epoch < len(schedule):
+        raise ValueError(f"No acquisition step for epoch {epoch}; the schedule covers {len(schedule)} epochs")
+
+    pool = sorted(set(question_ids), key=lambda q: uniform_key(seed, "acquire", q))
+    budget = sum(step.new for step in schedule)
+    total = schedule[epoch].total
+
+    if budget > len(pool):
+        raise ValueError(f"The budget of {budget} questions exceeds the pool of {len(pool)}")
+    if not 0 <= total <= budget:
+        raise ValueError(f"Epoch {epoch} trains on {total} questions but the budget is {budget}")
+
+    return set(sorted(pool[:budget], key=lambda q: uniform_key(seed, "upfront", epoch, q))[:total])
