@@ -23,7 +23,7 @@ from experiments.distillation_by_metrics.mmlu.shared import out_path_for
 
 MODELS = ("qwen_3b", "llama_3b", "phi4_mini")
 CAPS = (2048, 4096)
-COMPARISONS = (("entropy_gain", "matched_random"), ("entropy_gain", "random"), ("matched_random", "random"))
+COMPARISONS = (("entropy_gain", "matched_random"),)
 BOOTSTRAP_SAMPLES = 2000
 
 
