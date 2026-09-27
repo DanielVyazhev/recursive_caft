@@ -14,6 +14,8 @@ import pandas as pd
 
 from experiments.distillation_by_metrics.mmlu.budget20.shared import (
     ARMS,
+    CONTROLS,
+    EVAL_CAPS,
     SAVE_SCHEDULE,
     load_schedule,
     relative_out_path,
@@ -22,13 +24,15 @@ from experiments.distillation_by_metrics.mmlu.budget20.shared import (
 from experiments.distillation_by_metrics.mmlu.shared import out_path_for
 
 MODELS = ("qwen_3b", "llama_3b", "phi4_mini")
-CAPS = (2048, 4096)
-COMPARISONS = (("entropy_gain", "matched_random"),)
+COMPARISONS = (("entropy_gain", "matched_random"), ("entropy_gain", "random_fixed"), ("matched_random", "random_fixed"))
 BOOTSTRAP_SAMPLES = 2000
 
 
 def unique_traces(arm: str, model_name: str, seed: int) -> dict[int, int]:
-    schedule = load_schedule(model_name, seed) if arm == "matched_random" else None
+    schedule = load_schedule(arm, model_name, seed) if arm in CONTROLS else None
+    if arm == "random_fixed":
+        # The whole budget is acquired before epoch 0.
+        return dict.fromkeys(SAVE_SCHEDULE, sum(step.new for step in schedule))
     selections = trace_selections(arm, model_name, seed, schedule)
     return {epoch: len({q for selection in selections[:epoch] for q in selection}) for epoch in SAVE_SCHEDULE}
 
@@ -61,11 +65,11 @@ def main(seed: int) -> None:
         for arm in ARMS:
             try:
                 traces[arm] = unique_traces(arm, model_name, seed)
-                results[arm] = {cap: correctness(arm, model_name, seed, cap) for cap in CAPS}
+                results[arm] = {cap: correctness(arm, model_name, seed, cap) for cap in EVAL_CAPS}
             except FileNotFoundError as error:
                 print(f"- skipping {arm}: {error}")
 
-        for cap in CAPS:
+        for cap in EVAL_CAPS:
             print(f"\ncap {cap}\n")
             print("| epoch | " + " | ".join(f"{arm} acc (traces)" for arm in results) + " |")
             print("|---" * (len(results) + 1) + "|")

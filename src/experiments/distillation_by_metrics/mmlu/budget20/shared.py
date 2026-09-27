@@ -9,12 +9,16 @@ more traces; this experiment compares entropy_gain against random at the *same* 
 - matched_random:  MatchedAcquisitionRandomSampler replaying entropy_gain's per-epoch acquisition
                    curve (same number of new and reused traces per epoch, same seed), but with
                    uniformly random questions.
+- random_fixed:    the same total budget of traces as entropy_gain, but drawn at random once before
+                   training (what a practitioner without entropy_gain would do); every epoch trains
+                   on entropy_gain's per-epoch count drawn from that fixed set.
 
-The two arms differ only in *which* traces are acquired. They share the 20-epoch schedule (so
-identical LR warmup/cosine and checkpoints), the 1024 trace + 256 single-token mix, per-epoch
-shuffling and the estimator.
+entropy_gain vs matched_random differ only in *which* traces are acquired; matched_random vs
+random_fixed acquire the same traces and differ only in *when*. All arms share the 20-epoch
+schedule (so identical LR warmup/cosine and checkpoints), the 1024 trace + 256 single-token mix,
+per-epoch shuffling and the estimator. Checkpoints are evaluated at cap 2048 only.
 
-matched_random reads the entropy_gain run of the same model and seed from disk, so run it after
+The controls read the entropy_gain run of the same model and seed from disk, so run them after
 that run has finished all 20 epochs.
 """
 
@@ -36,8 +40,11 @@ from experiments.distillation_by_metrics.mmlu.shared import (
     run,
 )
 
-ARMS = ("entropy_gain", "matched_random")
+ARMS = ("entropy_gain", "matched_random", "random_fixed")
+# Arms that replay the entropy_gain run's acquisition curve.
+CONTROLS = ("matched_random", "random_fixed")
 SAVE_SCHEDULE = [5, 10, 15, 20]
+EVAL_CAPS = (2048,)
 EPOCHS = SAVE_SCHEDULE[-1]
 # Must match the trace adapter's top_k in get_merged_adapter_with_data_mix_from_factory.
 TRACE_TOP_K = 1024
@@ -63,18 +70,20 @@ def epoch_dump(arm: str, model_name: str, seed: int, epoch: int) -> pd.DataFrame
     return pd.read_parquet(path)
 
 
-def load_schedule(model_name: str, seed: int) -> list[AcquisitionStep]:
-    path = out_path_for(relative_out_path("matched_random", model_name, seed)) / SCHEDULE_FILENAME
+def load_schedule(arm: str, model_name: str, seed: int) -> list[AcquisitionStep]:
+    path = out_path_for(relative_out_path(arm, model_name, seed)) / SCHEDULE_FILENAME
     return [AcquisitionStep(*step) for step in json.loads(path.read_text())]
 
 
 def sampler_for(arm: str, top_k: int, seed: int, schedule: list[AcquisitionStep] | None = None) -> BaseDatasetSampler:
     if arm == "entropy_gain":
         return EntropyGainSampler(BaseDatasetSamplerConfig(top_k=top_k))
-    if arm == "matched_random":
-        assert schedule is not None, "matched_random needs the entropy_gain acquisition schedule"
+    if arm in CONTROLS:
+        assert schedule is not None, f"{arm} needs the entropy_gain acquisition schedule"
         return MatchedAcquisitionRandomSampler(
-            MatchedAcquisitionRandomSamplerConfig(top_k=top_k, schedule=schedule, seed=seed)
+            MatchedAcquisitionRandomSamplerConfig(
+                top_k=top_k, schedule=schedule, seed=seed, acquire_upfront=arm == "random_fixed"
+            )
         )
     raise ValueError(f"Unknown arm {arm!r}; expected one of {ARMS}")
 
@@ -98,7 +107,7 @@ def trace_selections(
 
 def run_arm(arm: str, model_name: str, seed: int = 42) -> None:
     schedule = None
-    if arm == "matched_random":
+    if arm in CONTROLS:
         # Fails before any model is loaded if the entropy_gain run is missing or unfinished.
         schedule = acquisition_schedule(trace_selections("entropy_gain", model_name, seed))
         out_dir = out_path_for(relative_out_path(arm, model_name, seed))
@@ -113,6 +122,7 @@ def run_arm(arm: str, model_name: str, seed: int = 42) -> None:
             lambda top_k: sampler_for(arm, top_k, seed, schedule)
         ),
         save_schedule=SAVE_SCHEDULE,
+        eval_caps=EVAL_CAPS,
         shuffle=True,
         seed=seed,
     )
