@@ -1,18 +1,18 @@
-"""Budget-20 experiment: does entropy-gain top-k acquire *better* teacher traces, or just fewer?
+"""Budget-20 experiment: at the same budget of unique teacher traces, does entropy-gain beat random?
 
 Entropy-gain top-k re-selects the 1024 highest-gain questions every epoch. Because it keeps
 re-selecting the same core, it needs far fewer distinct teacher traces than random sampling for
-the same student compute. Three arms separate the two explanations:
+the same student compute. Earlier random runs draw fresh questions every epoch and so spend many
+more traces; this experiment compares entropy_gain against random at the *same* trace budget:
 
-- random:          RandomSampler, a fresh uniform draw every epoch.
 - entropy_gain:    EntropyGainSampler top-k.
 - matched_random:  MatchedAcquisitionRandomSampler replaying entropy_gain's per-epoch acquisition
                    curve (same number of new and reused traces per epoch, same seed), but with
                    uniformly random questions.
 
-entropy_gain vs matched_random isolates *which* traces are acquired; matched_random vs random
-isolates *how many*. All arms share the 20-epoch schedule (so identical LR warmup/cosine and
-checkpoints), the 1024 trace + 256 single-token mix, per-epoch shuffling and the estimator.
+The two arms differ only in *which* traces are acquired. They share the 20-epoch schedule (so
+identical LR warmup/cosine and checkpoints), the 1024 trace + 256 single-token mix, per-epoch
+shuffling and the estimator.
 
 matched_random reads the entropy_gain run of the same model and seed from disk, so run it after
 that run has finished all 20 epochs.
@@ -22,9 +22,6 @@ import json
 
 import pandas as pd
 
-from core.complexity_estimation.entropy.single_token_entropy_with_random_estimator import (
-    SingleTokenEntropyWithRandomEstimator,
-)
 from core.dataset_samplers.base_sampler import BaseDatasetSampler, BaseDatasetSamplerConfig
 from core.dataset_samplers.entropy_gain_sampler import EntropyGainSampler
 from core.dataset_samplers.matched_acquisition import AcquisitionStep, acquisition_schedule
@@ -32,7 +29,6 @@ from core.dataset_samplers.matched_acquisition_random_sampler import (
     MatchedAcquisitionRandomSampler,
     MatchedAcquisitionRandomSamplerConfig,
 )
-from core.dataset_samplers.random_sampler import RandomSampler
 from experiments.distillation_by_metrics.mmlu.shared import (
     COMPLEXITY_EVALUATION_DATASET_ID,
     get_merged_adapter_with_data_mix_from_factory,
@@ -40,7 +36,7 @@ from experiments.distillation_by_metrics.mmlu.shared import (
     run,
 )
 
-ARMS = ("random", "entropy_gain", "matched_random")
+ARMS = ("entropy_gain", "matched_random")
 SAVE_SCHEDULE = [5, 10, 15, 20]
 EPOCHS = SAVE_SCHEDULE[-1]
 # Must match the trace adapter's top_k in get_merged_adapter_with_data_mix_from_factory.
@@ -73,8 +69,6 @@ def load_schedule(model_name: str, seed: int) -> list[AcquisitionStep]:
 
 
 def sampler_for(arm: str, top_k: int, seed: int, schedule: list[AcquisitionStep] | None = None) -> BaseDatasetSampler:
-    if arm == "random":
-        return RandomSampler(BaseDatasetSamplerConfig(top_k=top_k))
     if arm == "entropy_gain":
         return EntropyGainSampler(BaseDatasetSamplerConfig(top_k=top_k))
     if arm == "matched_random":
@@ -119,9 +113,6 @@ def run_arm(arm: str, model_name: str, seed: int = 42) -> None:
             lambda top_k: sampler_for(arm, top_k, seed, schedule)
         ),
         save_schedule=SAVE_SCHEDULE,
-        # random_value for the random arm; harmless extra column for the others, which keeps the
-        # estimation step identical across arms.
-        complexity_estimator_override=SingleTokenEntropyWithRandomEstimator(),
         shuffle=True,
         seed=seed,
     )
