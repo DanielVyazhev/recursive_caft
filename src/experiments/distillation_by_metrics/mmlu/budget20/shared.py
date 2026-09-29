@@ -50,6 +50,12 @@ EPOCHS = SAVE_SCHEDULE[-1]
 TRACE_TOP_K = 1024
 TRAIN_DATASET = "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192"
 SCHEDULE_FILENAME = "acquisition_schedule.json"
+# The controls select by acquisition schedule and question_id only; entropy_value never enters
+# their selection, so an epoch whose single-token estimation mostly fails (the student drifting to
+# CoT on the single-token prompt) changes nothing they train on. Their per-epoch estimates are kept
+# for analysis, but must not abort training. entropy_gain keeps the default 10% guard: its selection
+# is the entropy.
+CONTROL_MAX_FAILED_ESTIMATION_FRACTION = 1.0
 
 
 def relative_out_path(arm: str, model_name: str, seed: int) -> str:
@@ -123,6 +129,7 @@ def run_arm(arm: str, model_name: str, seed: int = 42) -> None:
         ),
         save_schedule=SAVE_SCHEDULE,
         eval_caps=EVAL_CAPS,
+        max_failed_estimation_fraction=CONTROL_MAX_FAILED_ESTIMATION_FRACTION if arm in CONTROLS else 0.1,
         shuffle=True,
         seed=seed,
     )

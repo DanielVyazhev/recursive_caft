@@ -147,3 +147,18 @@ def test_config_requires_drop_non_positive_and_a_schedule():
 def test_schedule_round_trips_through_json_lists():
     config = MatchedAcquisitionRandomSamplerConfig(top_k=5, schedule=[[20, 20], [10, 20]])
     assert config.schedule == [AcquisitionStep(20, 20), AcquisitionStep(10, 20)]
+
+
+@pytest.mark.parametrize("acquire_upfront", [False, True])
+def test_failed_entropy_measurements_do_not_change_the_selection(acquire_upfront):
+    # The budget-20 controls run with the failed-estimation guard off: their selection must not
+    # depend on entropy_value, so rows whose measurement failed (NaN) stay selectable as before.
+    measured = pd.DataFrame({"question_id": POOL, "entropy_value": [0.5] * len(POOL)})
+    failed = measured.assign(entropy_value=[float("nan") if i % 3 else 0.5 for i in range(len(POOL))])
+    for epoch in range(len(SCHEDULE)):
+        picks = []
+        for df in (measured, failed):
+            sampler = _sampler(acquire_upfront=acquire_upfront)
+            sampler.set_epoch(epoch)
+            picks.append(set(sampler._select(df)["question_id"]))
+        assert picks[0] == picks[1]
