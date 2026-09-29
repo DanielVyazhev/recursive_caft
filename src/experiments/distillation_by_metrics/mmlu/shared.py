@@ -52,6 +52,7 @@ def run(
     shuffle: bool = False,
     seed: int = 42,
     eval_caps: tuple[int, ...] = (4096, 2048),
+    max_failed_estimation_fraction: float = 0.1,
 ):
     MODEL_NAME = Path(__file__).parent.joinpath(f"../../../../artifacts/base_models_v0/{model_name}").as_posix()
 
@@ -114,6 +115,7 @@ def run(
             ),
             complexity_estimator=complexity_estimator_override or SingleTokenEntropyEstimator(),
             complexity_estimation_runner_generation_config=ModelGenerateConfig(max_new_tokens=1),
+            max_failed_estimation_fraction=max_failed_estimation_fraction,
         ),
         tokenizer=tokenizer,
     )
