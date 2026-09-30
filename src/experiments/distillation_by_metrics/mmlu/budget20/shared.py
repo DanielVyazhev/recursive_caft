@@ -53,9 +53,14 @@ SCHEDULE_FILENAME = "acquisition_schedule.json"
 # The controls select by acquisition schedule and question_id only; entropy_value never enters
 # their selection, so an epoch whose single-token estimation mostly fails (the student drifting to
 # CoT on the single-token prompt) changes nothing they train on. Their per-epoch estimates are kept
-# for analysis, but must not abort training. entropy_gain keeps the default 10% guard: its selection
-# is the entropy.
+# for analysis, but must not abort training.
 CONTROL_MAX_FAILED_ESTIMATION_FRACTION = 1.0
+# entropy_gain selects by the entropy, so it keeps a guard, raised from the default 10%: rows that fail
+# to measure are backfilled with their last measured entropy at any threshold (the threshold only
+# decides whether to abort), so runs that stayed under 10% are unchanged. Qwen2.5-3B drifts to CoT on
+# the single-token prompt for 10-16% of rows from epoch 12 on; above 30% too large a share of the
+# selection would rest on stale scores, so the run still aborts (after the usual one grace epoch).
+ENTROPY_GAIN_MAX_FAILED_ESTIMATION_FRACTION = 0.3
 
 
 def relative_out_path(arm: str, model_name: str, seed: int) -> str:
@@ -129,7 +134,9 @@ def run_arm(arm: str, model_name: str, seed: int = 42) -> None:
         ),
         save_schedule=SAVE_SCHEDULE,
         eval_caps=EVAL_CAPS,
-        max_failed_estimation_fraction=CONTROL_MAX_FAILED_ESTIMATION_FRACTION if arm in CONTROLS else 0.1,
+        max_failed_estimation_fraction=(
+            CONTROL_MAX_FAILED_ESTIMATION_FRACTION if arm in CONTROLS else ENTROPY_GAIN_MAX_FAILED_ESTIMATION_FRACTION
+        ),
         shuffle=True,
         seed=seed,
     )
