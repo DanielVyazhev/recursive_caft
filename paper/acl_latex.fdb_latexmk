@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1790873062.37705 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1790873062.95633 0
-  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1790873061.44727 4193 d91b291c948f80b7a9b266032499033a ""
+["pdflatex"] 1790874471.63307 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1790874472.20212 0
+  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1790874471.12384 4282 4de005d7a05ded33caa201fc61612890 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/helvetic/phvb.tfm" 1136768653 2300 14616918391efa49ac8b481a75fbdc1a ""
@@ -100,9 +100,9 @@
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1728286097 8221418 5f60306fce482631c48243f3fbe1cf27 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
   "acl.sty" 1782748040 11615 e2c027f483aa40e577ed34264c8b0655 ""
-  "acl_latex.aux" 1790873062.91809 1344 b3c0f052e54fb860a86e884a606241e7 "pdflatex"
-  "acl_latex.out" 1790873062.9185 666 e3b85f9957cea18e8486bf29edbac2c0 "pdflatex"
-  "acl_latex.tex" 1790873061.44727 4193 d91b291c948f80b7a9b266032499033a ""
+  "acl_latex.aux" 1790874472.16422 1745 e6e8d95faf69e037c238d686ae2777cf "pdflatex"
+  "acl_latex.out" 1790874472.16464 1066 62be48830155dcef7ec6d0f21adaadd7 "pdflatex"
+  "acl_latex.tex" 1790874471.12384 4282 4de005d7a05ded33caa201fc61612890 ""
   (generated)
   "acl_latex.aux"
   "acl_latex.log"
