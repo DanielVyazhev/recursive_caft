@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1790962249.31696 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1790962251.02723 0
-  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1790962249.13331 7169 8a6b350bbbdebfef040bbdb64c7272c1 ""
+["pdflatex"] 1790965690.91397 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1790965692.60016 0
+  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1790965689.02292 6782 58ae2e255ecfa74a94b0da1415ad900f ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/helvetic/phvb.tfm" 1136768653 2300 14616918391efa49ac8b481a75fbdc1a ""
@@ -188,9 +188,9 @@
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1728286097 8221418 5f60306fce482631c48243f3fbe1cf27 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
   "acl.sty" 1782748040 11615 e2c027f483aa40e577ed34264c8b0655 ""
-  "acl_latex.aux" 1790962250.9512 3267 391c62deb32285b628ccecdeb56134c7 "pdflatex"
-  "acl_latex.out" 1790962250.95194 1066 62be48830155dcef7ec6d0f21adaadd7 "pdflatex"
-  "acl_latex.tex" 1790962249.13331 7169 8a6b350bbbdebfef040bbdb64c7272c1 ""
+  "acl_latex.aux" 1790965692.53816 3125 da6abd3192f7409f2adc771580848e07 "pdflatex"
+  "acl_latex.out" 1790965692.53882 1265 f1e4cce78e907423c459bab81ce439fb "pdflatex"
+  "acl_latex.tex" 1790965689.02292 6782 58ae2e255ecfa74a94b0da1415ad900f ""
   "img/all_models_reasoning_evals_cap4096.pdf" 1790956533.61022 17549 1127efd2146efc89f52c6b8afc549ff2 ""
   "img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf" 1790959857.46057 16101 13993d1bdcd13d8a69e6aba58c18ad89 ""
   "img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf" 1790960027.58641 16463 c78b4bd86d5f6aea40302e3b318460c3 ""
