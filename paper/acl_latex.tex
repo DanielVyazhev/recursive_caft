@@ -31,6 +31,17 @@
 %additional package(s)
 \usepackage{graphicx}
 
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{subcaption}
+
+\usepackage{orcidlink}
+\usepackage{booktabs}
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tabularx}
+
 % If the title and author information does not fit in the area allocated, uncomment the following
 %
 %\setlength\titlebox{<dim>}
@@ -77,12 +88,19 @@
   We propose a novel blueprint for efficient offline distillation that recursively uses lightweight epistemic and aleatoric complexity approximations for selective distillation.
   Specifically, for three open models (3-4B) at each epoch we estimate offline data complexity with a single-token answer entropy and use a medium model's (70B) entropy as an aleatoric proxy.
   Next, we apply selective distillation only for a small subset of the reasoning chains with the highest corresponding epistemic component.
-  Our approach significantly outperforms naive distillation (TODO numbers).
+  Our approach consistently outperforms naive distillation on comparable computational budget (57.15 ($\pm 1.00$) vs 51.61 on average) and offers a much steeper learning curve (baseline final score on ~15\% of the data).
   Additionally, we present comparative analysis of methods to generate, standardize and augment synthetic reasoning chains when the teacher model does not perform perfectly on the target distillation domain in the first place.
   We publish our code and data to facilitate further research in this direction.
 \end{abstract}
 
 \section{Introduction}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{img/recursive_caft_scheme.png}
+  \caption{Recursive offline distillation scheme}
+  \label{fig:recursive_caft_scheme}
+\end{figure}
 
 \section{Related Work}
 
@@ -94,7 +112,75 @@
 
 \subsection{Main Results}
 
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{img/all_models_reasoning_evals_cap4096.pdf}
+  \caption{Mean accuracy of distillation approaches across three models (Qwen-3B, LLaMA-3B, and Phi4-mini) on MMLU-Pro}
+  \label{fig:distillation_mean_accuracy}
+\end{figure}
+
 \subsection{Ablation Study}
+
+\begin{figure*}
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=1\linewidth]{img/performance_vs_truncation_mode_mode_best_acc_bars.pdf}
+    \caption{by truncation}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=1\linewidth]{img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf}
+    \caption{by type}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=1\linewidth]{img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf}
+    \caption{by length}
+  \end{subfigure}
+  \caption{Comparison of synthetic traces}
+  \label{fig:synth_comparison}
+\end{figure*}
+
+\begin{figure*}
+  \centering
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=1\linewidth]{img/proportional_samplers_reasoning_evals_cap4096.pdf}
+    \caption{vs other entropy-based samplers}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=1\linewidth]{img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf}
+    \caption{vs random sampler}
+  \end{subfigure}
+  \caption{Comparison of entropy gain sampler}
+  \label{fig:entropy_gain_comparison}
+\end{figure*}
+
+% \begin{figure}
+%   \centering
+%   \includegraphics[width=1\linewidth]{img/proportional_samplers_reasoning_evals_cap4096.pdf}
+%   \caption{Comparison of entropy-based samplers}
+%   \label{fig:proportional_samplers_comparison}
+% \end{figure}
+
+% \begin{figure}
+%   \centering
+%   \includegraphics[width=1\linewidth]{img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf}
+%   \caption{Comparison of entropy gain sampling with random sampling}
+%   \label{fig:proportional_samplers_comparison}
+% \end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{img/student_entropy_roc_auc_all_models.pdf}
+  \caption{Single-token answer entropy dynamics}
+  \label{fig:student_entropy_roc_auc}
+\end{figure}
 
 \section{Conclusion and discussion}
 
