@@ -112,30 +112,40 @@
 
 \subsection{Main Results}
 
-\begin{figure}
+\begin{figure*}
   \centering
-  \includegraphics[width=1\linewidth]{img/all_models_reasoning_evals_cap4096.pdf}
-  \caption{Mean accuracy of distillation approaches across three models (Qwen-3B, LLaMA-3B, and Phi4-mini) on MMLU-Pro}
-  \label{fig:distillation_mean_accuracy}
-\end{figure}
+  \begin{subfigure}[b]{0.52\linewidth}
+    \centering
+    \includegraphics[width=1\linewidth]{img/all_models_reasoning_evals_cap4096.pdf}
+    \caption{Mean accuracy}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.44\linewidth}
+    \centering
+    \includegraphics[width=1\linewidth]{img/student_entropy_roc_auc_all_models.pdf}
+    \caption{Student single-token answer entropy}
+  \end{subfigure}
+  \caption{Distillation pipeline results across three models (Qwen-3B, LLaMA-3B, and Phi4-mini) on MMLU-Pro}
+  \label{fig:main_results_chraphs}
+\end{figure*}
 
-\subsection{Ablation Study}
+\subsection{Synthetic Traces Generation}
 
 \begin{figure*}
   \centering
-  \begin{subfigure}[b]{0.32\linewidth}
+  \begin{subfigure}[b]{0.31\linewidth}
     \centering
     \includegraphics[width=1\linewidth]{img/performance_vs_truncation_mode_mode_best_acc_bars.pdf}
     \caption{by truncation}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[b]{0.32\linewidth}
+  \begin{subfigure}[b]{0.30\linewidth}
     \centering
     \includegraphics[width=1\linewidth]{img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf}
     \caption{by type}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[b]{0.32\linewidth}
+  \begin{subfigure}[b]{0.35\linewidth}
     \centering
     \includegraphics[width=1\linewidth]{img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf}
     \caption{by length}
@@ -143,6 +153,8 @@
   \caption{Comparison of synthetic traces}
   \label{fig:synth_comparison}
 \end{figure*}
+
+\subsection{Ablation Study}
 
 \begin{figure*}
   \centering
@@ -160,27 +172,6 @@
   \caption{Comparison of entropy gain sampler}
   \label{fig:entropy_gain_comparison}
 \end{figure*}
-
-% \begin{figure}
-%   \centering
-%   \includegraphics[width=1\linewidth]{img/proportional_samplers_reasoning_evals_cap4096.pdf}
-%   \caption{Comparison of entropy-based samplers}
-%   \label{fig:proportional_samplers_comparison}
-% \end{figure}
-
-% \begin{figure}
-%   \centering
-%   \includegraphics[width=1\linewidth]{img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf}
-%   \caption{Comparison of entropy gain sampling with random sampling}
-%   \label{fig:proportional_samplers_comparison}
-% \end{figure}
-
-\begin{figure}
-  \centering
-  \includegraphics[width=1\linewidth]{img/student_entropy_roc_auc_all_models.pdf}
-  \caption{Single-token answer entropy dynamics}
-  \label{fig:student_entropy_roc_auc}
-\end{figure}
 
 \section{Conclusion and discussion}
 
