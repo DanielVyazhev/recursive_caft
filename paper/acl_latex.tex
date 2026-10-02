@@ -88,7 +88,7 @@
   We propose a novel blueprint for efficient offline distillation that recursively uses lightweight epistemic and aleatoric complexity approximations for selective distillation.
   Specifically, for three open models (3-4B) at each epoch we estimate offline data complexity with a single-token answer entropy and use a medium model's (70B) entropy as an aleatoric proxy.
   Next, we apply selective distillation only for a small subset of the reasoning chains with the highest corresponding epistemic component.
-  Our approach consistently outperforms naive distillation on comparable computational budget (57.15 ($\pm 1.00$) vs 51.61 on average) and offers a much steeper learning curve (baseline final score on ~15\% of the data).
+  Our approach consistently outperforms naive distillation on comparable computational budget ($57.15 \pm 1.01$ vs 51.61 on average) and offers a much steeper learning curve (baseline final score on ~15\% of the data).
   Additionally, we present comparative analysis of methods to generate, standardize and augment synthetic reasoning chains when the teacher model does not perform perfectly on the target distillation domain in the first place.
   We publish our code and data to facilitate further research in this direction.
 \end{abstract}
@@ -114,20 +114,57 @@
 
 \begin{figure*}
   \centering
-  \begin{subfigure}[b]{0.52\linewidth}
+  \begin{subfigure}[b]{0.48\linewidth}
     \centering
     \includegraphics[width=1\linewidth]{img/all_models_reasoning_evals_cap4096.pdf}
-    \caption{Mean accuracy}
+    \caption{4096-token reasoning cap}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[b]{0.44\linewidth}
+  \begin{subfigure}[b]{0.48\linewidth}
     \centering
-    \includegraphics[width=1\linewidth]{img/student_entropy_roc_auc_all_models.pdf}
-    \caption{Student single-token answer entropy}
+    \includegraphics[width=1\linewidth]{img/all_models_reasoning_evals_cap2048.pdf}
+    \caption{2048-token reasoning cap}
   \end{subfigure}
   \caption{Distillation pipeline results across three models (Qwen-3B, LLaMA-3B, and Phi4-mini) on MMLU-Pro}
   \label{fig:main_results_chraphs}
 \end{figure*}
+
+\begin{table*}[t]
+  \centering
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{l *{4}{l}}
+    \hline
+    Method & \multicolumn{1}{c}{LLaMA-3B} & \multicolumn{1}{c}{Qwen-3B} & \multicolumn{1}{c}{Phi4-mini} & \multicolumn{1}{c}{Mean} \\
+    \hline
+    Direct reasoning trace & 46.09 / 45.55 & 51.45 / 50.37 & 57.27 / 62.43 & 51.61 / 52.78 \\
+    Corrected answer & 47.80 / 47.26 & 50.87 / 49.42 & \underline{58.81} / 61.26 & 52.49 / 52.65 \\
+    Student entropy (deterministic) & 49.83 / 50.08 & 53.62 / 53.03 & 58.35 / \underline{64.42} & \underline{53.93} / 55.85 \\
+    Entropy gain (deterministic) & \underline{50.17} / \underline{50.37} & 51.04 / \underline{53.28} & 58.40 / \textbf{64.63} & 53.20 / \underline{56.10} \\
+    Student entropy (sampled once, $k=1024$) & 41.35 / 40.11 & 39.44 / 39.07 & 50.17 / 52.87 & 43.65 / 44.01 \\
+    Student entropy (sampled once, $k=2048$) & 42.19 / 41.06 & 43.18 / 43.02 & 53.20 / 52.62 & 46.19 / 45.57 \\
+    Student entropy (sampled once, $k=3072$) & 42.02 / 42.81 & \textbf{56.77} / 40.86 & 56.77 / 55.90 & 51.86 / 46.52 \\
+    Entropy gain (sampled) &
+    \begin{tabular}[c]{@{}l@{}}\textbf{52.58} $\pm\,1.94$ /\\\textbf{52.08} $\pm\,2.28$
+    \end{tabular} &
+    \begin{tabular}[c]{@{}l@{}}\underline{56.64} $\pm\,3.79$ /\\\textbf{56.86} $\pm\,2.32$
+    \end{tabular} &
+    \begin{tabular}[c]{@{}l@{}}\textbf{62.22} $\pm\,2.42$ /\\64.07 $\pm\,4.52$
+    \end{tabular} &
+    \begin{tabular}[c]{@{}l@{}}\textbf{57.15} $\pm\,1.01$ /\\\textbf{57.67} $\pm\,1.19$
+    \end{tabular} \\
+    \hline
+  \end{tabular}
+  \caption{Distillation pipeline last epoch accuracy (\%) across three models (Qwen-3B, LLaMA-3B, and Phi4-mini) on MMLU-Pro, reported for 4096-token / 2,048-token thinking budget. Sampled entropy gain uses three seeds per model and includes $\pm$ 95\% confidence-interval. Other methods are deterministic.}
+  \label{tab:distillation_main_results}
+\end{table*}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{img/student_entropy_roc_auc_all_models.pdf}
+  \caption{Student calibration}
+  \label{fig:student_calibration}
+\end{figure}
 
 \subsection{Synthetic Traces Generation}
 
@@ -172,6 +209,24 @@
   \caption{Comparison of entropy gain sampler}
   \label{fig:entropy_gain_comparison}
 \end{figure*}
+
+\begin{table*}[t]
+  \centering
+  \small
+  \setlength{\tabcolsep}{5pt}
+  \begin{tabular}{l *{4}{r@{\,}l}}
+    \hline
+    Sampler & \multicolumn{2}{c}{LLaMA-3B} & \multicolumn{2}{c}{Qwen-3B} & \multicolumn{2}{c}{Phi4-mini} & \multicolumn{2}{c}{Mean} \\
+    \hline
+    Random & \underline{51.77} & $\pm\,2.76$ & \textbf{57.91} & $\pm\,1.40$ & 55.57 & $\pm\,2.54$ & 55.08 & $\pm\,0.80$ \\
+    Student entropy & 51.18 & $\pm\,3.11$ & \underline{57.32} & $\pm\,1.52$ & 59.12 & $\pm\,5.22$ & 55.87 & $\pm\,1.40$ \\
+    Combined entropy & 51.50 & & 56.90 & & \underline{59.53} & $\pm\,2.11$ & \underline{55.98} & \\
+    Entropy gain & \textbf{52.58} & $\pm\,1.94$ & 56.64 & $\pm\,3.79$ & \textbf{62.22} & $\pm\,2.42$ & \textbf{57.15} & $\pm\,1.01$ \\
+    \hline
+  \end{tabular}
+  \caption{Distillation pipeline last epoch accuracy for different sampling methods across three models (Qwen-3B, LLaMA-3B, and Phi4-mini) on MMLU-Pro, reported for 4096-token thinking budget. Each method is evaluated with 3 seeds per model and includes $\pm$ 95\% confidence-interval.}
+  \label{tab:sampler_ablation}
+\end{table*}
 
 \section{Conclusion and discussion}
 
