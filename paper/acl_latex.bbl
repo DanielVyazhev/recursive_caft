@@ -1,4 +1,157 @@
-\begin{thebibliography}{0}
+\begin{thebibliography}{31}
 \providecommand{\natexlab}[1]{#1}
+
+\bibitem[{Agarwal et~al.(2024)Agarwal, Vieillard, Zhou, Stanczyk, Ramos~Garea, Geist, and Bachem}]{ICLR2024_5be69a58}
+Rishabh Agarwal, Nino Vieillard, Yongchao Zhou, Piotr Stanczyk, Sabela Ramos~Garea, Matthieu Geist, and Olivier Bachem. 2024.
+\newblock \href {https://proceedings.iclr.cc/paper_files/paper/2024/file/5be69a584901a26c521c2b51e40a4c20-Paper-Conference.pdf} {On-policy distillation of language models: Learning from self-generated mistakes}.
+\newblock In \emph{International Conference on Learning Representations}, volume 2024, pages 21246--21263.
+
+\bibitem[{Chen and Varoquaux(2026)}]{chen2026rolesmallmodelsllm}
+Lihu Chen and Gaël Varoquaux. 2026.
+\newblock \href {https://arxiv.org/abs/2409.06857} {What is the role of small models in the llm era: A survey}.
+\newblock \emph{Preprint}, arXiv:2409.06857.
+
+\bibitem[{Cheng et~al.(2024)Cheng, Huang, and Wei}]{ICLR2024_d51cd79a}
+Daixuan Cheng, Shaohan Huang, and Furu Wei. 2024.
+\newblock \href {https://proceedings.iclr.cc/paper_files/paper/2024/file/d51cd79a85833b022841f7a2383b32d3-Paper-Conference.pdf} {Adapting large language models via reading comprehension}.
+\newblock In \emph{International Conference on Learning Representations}, volume 2024, pages 48624--48652.
+
+\bibitem[{DeepSeek-AI et~al.(2026)DeepSeek-AI, Xu, Lin, Xue, Wang, Xu, Wu, Zhang, Lin, Dong, Ling, Lu, Zhao, Deng, Hou, Xu, Shao, Ruan, Sun, Dai, Guo, Yang, Chen, Li, Ji, Li, Wei, Lin, Yuan, Xia, Dai, Hao, Chen, Cao, Meng, Li, Yu, Zhang, Xu, Li, Liang, Zhang, Luo, Wei, Yuan, Zhang, Luo, Chen, Ji, Zhang, Ding, Tang, Cao, Gao, Qu, Zeng, Yang, Zhu, Luo, Song, Yu, Huang, Cai, Liang, Zhou, Ye, Li, Xu, Hu, Yang, Chen, Yan, Chen, Zhou, Xiang, Yuan, Cheng, Zhou, Zhu, Yu, Sun, Ran, Jiang, Qiu, Li, Zheng, Song, Dong, Gao, Guan, Zhou, Huang, Yu, Wang, Zhang, Wang, Xia, Zhang, Zhao, Guo, Luo, Ma, Zhu, Wang, Cai, Zhang, Chen, Di, Xu, Mei, Wang, Zhang, Zhang, Tang, Li, Zhou, Han, Wang, Huang, Wang, Cong, Wang, Zhang, Wang, Zhu, Li, Chen, Du, Jiang, Tian, Xu, Lu, Xu, Ge, Zhang, Pan, Wang, Chen, Yin, Xu, Shen, Zhang, Chen, Liu, Lu, Sun, Zhou, Chen, Cai, Nie, Wu, Chen, Hu, Liu, Hu, Ma, Wang, Yu, Zhou, Pan, Yu, Zhou, Ni, Yun, Jin, Pei, Ye, Lin, Ji, Cui, Yue, Yu, Wang, Zhang, Xiao, Zeng, An, Zhao, Liu, Liang, Pang, Luo, Yao, Gao, Yang, Huang, Hou, Zhang, Ma, Gao, He, Wang, Wang, Bi, Liu, Wang, Chen, Zhang, Nie, Sun, Wang, Cheng, Liu, Xie, Liu, Liu, Yu, Li, Yang, Zhang, Chen, Wang, Su, Chen, Lin, Fu, Yan, Wang, Ma, Luo, Zhang, Xu, Ma, Huang, Li, Li, Xu, Zhao, Sun, Wang, Qian, Shao, Yu, Zhang, Ding, Shi, Wu, Xiong, Ma, He, Tang, Zhou, Luo, Zhong, Piao, Wang, Zhang, Chen, Tan, Wei, Ma, Liu, Yang, Guo, Wu, Wu, Li, Cheng, Ou, Xu, Li, Wang, Yang, Xu, Wu, Meng, Zou, Zha, Xiong, Chen, Lin, Cao, Wang, Zhang, Yan, Lin, Gu, Luo, You, Liu, Zhou, Zhou, Huang, Wu, Wang, Zhao, Ren, Zhang, Sha, Fu, Ju, Xu, Xie, Zhang, Gao, Hao, Gou, Ma, Yan, Shao, Huang, Chen, Wu, Ren, Wu, Li, Zhang, Xu, Wang, Qu, Gu, Zhu, Li, Zhang, Xie, Gao, Wan, Pan, and Yao}]{deepseekai2026deepseekv4highlyefficientmilliontoken}
+DeepSeek-AI, Anyi Xu, Bangcai Lin, Bing Xue, Bingxuan Wang, Bingzheng Xu, Bochao Wu, Bowei Zhang, Chaofan Lin, Chen Dong, Chenchen Ling, Chengda Lu, Chenggang Zhao, Chengqi Deng, Chengyu Hou, Chenhao Xu, Chenze Shao, Chong Ruan, Conner Sun, and 300 others. 2026.
+\newblock \href {https://arxiv.org/abs/2606.19348} {Deepseek-v4: Towards highly efficient million-token context intelligence}.
+\newblock \emph{Preprint}, arXiv:2606.19348.
+
+\bibitem[{GLM-5-Team et~al.(2026)GLM-5-Team, :, Zeng, Lv, Hou, Du, Zheng, Chen, Yin, Ge, Huang, Xie, Zhu, Yin, Wang, Pan, Zeng, Zhang, Wang, Chen, Zhang, Jiao, Guo, Wang, Du, Wu, Wang, Li, Fan, Zhong, Liu, Zhao, Du, Dong, Lu, Shuang-Li, Cao, Liu, Jiang, Chen, Zhang, Huang, Dong, Xu, Wei, An, Niu, Zhu, Wen, Cen, Bai, Qiao, Wang, Wang, Zhu, Liu, Li, Wang, Wen, Huang, Cai, Yu, Li, Hu, Zhang, Zhang, Lin, Yang, Wang, Ai, Zhu, Yi, Chen, Wen, Sun, Zhao, Hu, Zhang, Liu, Zhang, Peng, Tai, Zhang, Liu, Wang, Yan, Ge, Liu, Chu, Zhao, Wang, Zhao, Ren, Wang, Zhang, Gui, Zhao, Li, An, Li, Yuan, Du, Liu, Zhi, Duan, Zhou, Wei, Wang, Luo, Zhang, Sha, Xu, Wu, Ding, Chen, Li, Lin, Ta, Zou, Song, Yang, Tu, Yang, Wu, Zhang, Li, Li, Fan, Qin, Tian, Zhang, Yu, Liang, Kuang, Cheng, Li, Yan, Hu, Ling, Fan, Xia, Zhang, Zhang, Pan, Zou, Zhang, Liu, Wu, Li, Wang, Zhu, Tan, Zhou, Pan, Zhang, Su, Geng, Yan, Tan, Bi, Shen, Yang, Li, Liu, Wang, Li, Wu, Zhang, Duan, Zhang, Liu, Jiang, Yan, Zhang, Wei, Chen, Feng, Yao, Chai, Wang, Zhang, Xu, Huang, Wang, Li, Dong, and Tang}]{glm5team2026glm5vibecodingagentic}
+GLM-5-Team, :, Aohan Zeng, Xin Lv, Zhenyu Hou, Zhengxiao Du, Qinkai Zheng, Bin Chen, Da~Yin, Chendi Ge, Chenghua Huang, Chengxing Xie, Chenzheng Zhu, Congfeng Yin, Cunxiang Wang, Gengzheng Pan, Hao Zeng, Haoke Zhang, Haoran Wang, and 168 others. 2026.
+\newblock \href {https://arxiv.org/abs/2602.15763} {Glm-5: from vibe coding to agentic engineering}.
+\newblock \emph{Preprint}, arXiv:2602.15763.
+
+\bibitem[{Grattafiori et~al.(2024)Grattafiori, Dubey, Jauhri, Pandey, Kadian, Al-Dahle, Letman, Mathur, Schelten, Vaughan, Yang, Fan, Goyal, Hartshorn, Yang, Mitra, Sravankumar, Korenev, Hinsvark, Rao, Zhang, Rodriguez, Gregerson, Spataru, Roziere, Biron, Tang, Chern, Caucheteux, Nayak, Bi, Marra, McConnell, Keller, Touret, Wu, Wong, Ferrer, Nikolaidis, Allonsius, Song, Pintz, Livshits, Wyatt, Esiobu, Choudhary, Mahajan, Garcia-Olano, Perino, Hupkes, Lakomkin, AlBadawy, Lobanova, Dinan, Smith, Radenovic, Guzmán, Zhang, Synnaeve, Lee, Anderson, Thattai, Nail, Mialon, Pang, Cucurell, Nguyen, Korevaar, Xu, Touvron, Zarov, Ibarra, Kloumann, Misra, Evtimov, Zhang, Copet, Lee, Geffert, Vranes, Park, Mahadeokar, Shah, van~der Linde, Billock, Hong, Lee, Fu, Chi, Huang, Liu, Wang, Yu, Bitton, Spisak, Park, Rocca, Johnstun, Saxe, Jia, Alwala, Prasad, Upasani, Plawiak, Li, Heafield, Stone, El-Arini, Iyer, Malik, Chiu, Bhalla, Lakhotia, Rantala-Yeary, van~der Maaten, Chen, Tan, Jenkins, Martin, Madaan, Malo, Blecher, Landzaat, de~Oliveira, Muzzi, Pasupuleti, Singh, Paluri, Kardas, Tsimpoukelli, Oldham, Rita, Pavlova, Kambadur, Lewis, Si, Singh, Hassan, Goyal, Torabi, Bashlykov, Bogoychev, Chatterji, Zhang, Duchenne, Çelebi, Alrassy, Zhang, Li, Vasic, Weng, Bhargava, Dubal, Krishnan, Koura, Xu, He, Dong, Srinivasan, Ganapathy, Calderer, Cabral, Stojnic, Raileanu, Maheswari, Girdhar, Patel, Sauvestre, Polidoro, Sumbaly, Taylor, Silva, Hou, Wang, Hosseini, Chennabasappa, Singh, Bell, Kim, Edunov, Nie, Narang, Raparthy, Shen, Wan, Bhosale, Zhang, Vandenhende, Batra, Whitman, Sootla, Collot, Gururangan, Borodinsky, Herman, Fowler, Sheasha, Georgiou, Scialom, Speckbacher, Mihaylov, Xiao, Karn, Goswami, Gupta, Ramanathan, Kerkez, Gonguet, Do, Vogeti, Albiero, Petrovic, Chu, Xiong, Fu, Meers, Martinet, Wang, Wang, Tan, Xia, Xie, Jia, Wang, Goldschlag, Gaur, Babaei, Wen, Song, Zhang, Li, Mao, Coudert, Yan, Chen, Papakipos, Singh, Srivastava, Jain, Kelsey, Shajnfeld, Gangidi, Victoria, Goldstand, Menon, Sharma, Boesenberg, Baevski, Feinstein, Kallet, Sangani, Teo, Yunus, Lupu, Alvarado, Caples, Gu, Ho, Poulton, Ryan, Ramchandani, Dong, Franco, Goyal, Saraf, Chowdhury, Gabriel, Bharambe, Eisenman, Yazdan, James, Maurer, Leonhardi, Huang, Loyd, Paola, Paranjape, Liu, Wu, Ni, Hancock, Wasti, Spence, Stojkovic, Gamido, Montalvo, Parker, Burton, Mejia, Liu, Wang, Kim, Zhou, Hu, Chu, Cai, Tindal, Feichtenhofer, Gao, Civin, Beaty, Kreymer, Li, Adkins, Xu, Testuggine, David, Parikh, Liskovich, Foss, Wang, Le, Holland, Dowling, Jamil, Montgomery, Presani, Hahn, Wood, Le, Brinkman, Arcaute, Dunbar, Smothers, Sun, Kreuk, Tian, Kokkinos, Ozgenel, Caggioni, Kanayet, Seide, Florez, Schwarz, Badeer, Swee, Halpern, Herman, Sizov, Guangyi, Zhang, Lakshminarayanan, Inan, Shojanazeri, Zou, Wang, Zha, Habeeb, Rudolph, Suk, Aspegren, Goldman, Zhan, Damlaj, Molybog, Tufanov, Leontiadis, Veliche, Gat, Weissman, Geboski, Kohli, Lam, Asher, Gaya, Marcus, Tang, Chan, Zhen, Reizenstein, Teboul, Zhong, Jin, Yang, Cummings, Carvill, Shepard, McPhie, Torres, Ginsburg, Wang, Wu, U, Saxena, Khandelwal, Zand, Matosich, Veeraraghavan, Michelena, Li, Jagadeesh, Huang, Chawla, Huang, Chen, Garg, A, Silva, Bell, Zhang, Guo, Yu, Moshkovich, Wehrstedt, Khabsa, Avalani, Bhatt, Mankus, Hasson, Lennie, Reso, Groshev, Naumov, Lathi, Keneally, Liu, Seltzer, Valko, Restrepo, Patel, Vyatskov, Samvelyan, Clark, Macey, Wang, Hermoso, Metanat, Rastegari, Bansal, Santhanam, Parks, White, Bawa, Singhal, Egebo, Usunier, Mehta, Laptev, Dong, Cheng, Chernoguz, Hart, Salpekar, Kalinli, Kent, Parekh, Saab, Balaji, Rittner, Bontrager, Roux, Dollar, Zvyagina, Ratanchandani, Yuvraj, Liang, Alao, Rodriguez, Ayub, Murthy, Nayani, Mitra, Parthasarathy, Li, Hogan, Battey, Wang, Howes, Rinott, Mehta, Siby, Bondu, Datta, Chugh, Hunt, Dhillon, Sidorov, Pan, Mahajan, Verma, Yamamoto, Ramaswamy, Lindsay, Lindsay, Feng, Lin, Zha, Patil, Shankar, Zhang, Zhang, Wang, Agarwal, Sajuyigbe, Chintala, Max, Chen, Kehoe, Satterfield, Govindaprasad, Gupta, Deng, Cho, Virk, Subramanian, Choudhury, Goldman, Remez, Glaser, Best, Koehler, Robinson, Li, Zhang, Matthews, Chou, Shaked, Vontimitta, Ajayi, Montanez, Mohan, Kumar, Mangla, Ionescu, Poenaru, Mihailescu, Ivanov, Li, Wang, Jiang, Bouaziz, Constable, Tang, Wu, Wang, Wu, Gao, Kleinman, Chen, Hu, Jia, Qi, Li, Zhang, Zhang, Adi, Nam, Yu, Wang, Zhao, Hao, Qian, Li, He, Rait, DeVito, Rosnbrick, Wen, Yang, Zhao, and Ma}]{grattafiori2024llama3herdmodels}
+Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Abhishek Kadian, Ahmad Al-Dahle, Aiesha Letman, Akhil Mathur, Alan Schelten, Alex Vaughan, Amy Yang, Angela Fan, Anirudh Goyal, Anthony Hartshorn, Aobo Yang, Archi Mitra, Archie Sravankumar, Artem Korenev, Arthur Hinsvark, and 542 others. 2024.
+\newblock \href {https://arxiv.org/abs/2407.21783} {The llama 3 herd of models}.
+\newblock \emph{Preprint}, arXiv:2407.21783.
+
+\bibitem[{Gu et~al.(2024)Gu, Dong, Wei, and Huang}]{ICLR2024_8ac015d4}
+Yuxian Gu, Li~Dong, Furu Wei, and Minlie Huang. 2024.
+\newblock \href {https://proceedings.iclr.cc/paper_files/paper/2024/file/8ac015d409635f196f9e3e9dcfb9a94e-Paper-Conference.pdf} {Minillm: Knowledge distillation of large language models}.
+\newblock In \emph{International Conference on Learning Representations}, volume 2024, pages 32694--32717.
+
+\bibitem[{Hinton et~al.(2015)Hinton, Vinyals, and Dean}]{hinton2015distillingknowledgeneuralnetwork}
+Geoffrey Hinton, Oriol Vinyals, and Jeff Dean. 2015.
+\newblock \href {https://arxiv.org/abs/1503.02531} {Distilling the knowledge in a neural network}.
+\newblock \emph{Preprint}, arXiv:1503.02531.
+
+\bibitem[{Hsieh et~al.(2023)Hsieh, Li, Yeh, Nakhost, Fujii, Ratner, Krishna, Lee, and Pfister}]{hsieh-etal-2023-distilling}
+Cheng-Yu Hsieh, Chun-Liang Li, Chih-kuan Yeh, Hootan Nakhost, Yasuhisa Fujii, Alex Ratner, Ranjay Krishna, Chen-Yu Lee, and Tomas Pfister. 2023.
+\newblock \href {https://doi.org/10.18653/v1/2023.findings-acl.507} {Distilling step-by-step! outperforming larger language models with less training data and smaller model sizes}.
+\newblock In \emph{Findings of the Association for Computational Linguistics: ACL 2023}, pages 8003--8017, Toronto, Canada. Association for Computational Linguistics.
+
+\bibitem[{Jia et~al.(2026)Jia, Zhang, Diao, Yuan, Ouyang, Ma, and Vosoughi}]{jia-etal-2026-makes}
+Yaning Jia, Chunhui Zhang, Xingjian Diao, Xiangchi Yuan, Zhongyu Ouyang, Chiyu Ma, and Soroush Vosoughi. 2026.
+\newblock \href {https://doi.org/10.18653/v1/2026.acl-long.1591} {What makes a good curriculum? disentangling the effects of data ordering on {LLM} mathematical reasoning}.
+\newblock In \emph{Proceedings of the 64th Annual Meeting of the {A}ssociation for {C}omputational {L}inguistics (Volume 1: Long Papers)}, pages 34472--34488, San Diego, California, United States. Association for Computational Linguistics.
+
+\bibitem[{Jiang et~al.(2025)Jiang, Lu, Lin, Han, and Sun}]{jiang-etal-2025-teach}
+Wangyi Jiang, Yaojie Lu, Hongyu Lin, Xianpei Han, and Le~Sun. 2025.
+\newblock \href {https://doi.org/10.18653/v1/2025.emnlp-main.376} {Teach small models to reason by curriculum distillation}.
+\newblock In \emph{Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing}, pages 7412--7422, Suzhou, China. Association for Computational Linguistics.
+
+\bibitem[{Jiao et~al.(2020)Jiao, Yin, Shang, Jiang, Chen, Li, Wang, and Liu}]{jiao-etal-2020-tinybert}
+Xiaoqi Jiao, Yichun Yin, Lifeng Shang, Xin Jiang, Xiao Chen, Linlin Li, Fang Wang, and Qun Liu. 2020.
+\newblock \href {https://doi.org/10.18653/v1/2020.findings-emnlp.372} {{T}iny{BERT}: Distilling {BERT} for natural language understanding}.
+\newblock In \emph{Findings of the Association for Computational Linguistics: EMNLP 2020}, pages 4163--4174, Online. Association for Computational Linguistics.
+
+\bibitem[{Just et~al.(2026)Just, Ko, and Jia}]{pmlr-v306-just26a}
+Hoang~Anh Just, Myeongseob Ko, and Ruoxi Jia. 2026.
+\newblock \href {https://proceedings.mlr.press/v306/just26a.html} {The signal is in the steps: Local scoring for reasoning data selection}.
+\newblock In \emph{Proceedings of the 43rd International Conference on Machine Learning}, volume 306 of \emph{Proceedings of Machine Learning Research}, pages 55125--55155. PMLR.
+
+\bibitem[{Kimi-Team et~al.(2026)Kimi-Team, Bai, Bai, Bao, C., Cai, Cai, Cao, Cao, Chai, Charles, Che, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Cheng, Cheng, Cui, Cui, Dai, Deng, Ding, Ding, Ding, Dong, Dong, Dong, Dong, Du, Du, Du, Du, Du, Fan, Feng, Feng, Feng, Fu, Fu, Gao, Gao, Gao, Gao, Gao, Geng, Gong, Gong, Gong, Gong, Gu, Gu, Guan, Guo, Guo, Guo, Guo, Hao, Hao, Hao, He, He, He, He, He, He, He, He, He, Hong, Hong, Hu, Hu, Hu, Hu, Hu, Hu, Hua, Huang, Huang, Huang, Huang, Huang, Huang, Huang, Huang, Hui, Jia, Jiang, Jiang, Jiang, Jin, Jin, Jing, Kong, Lai, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Lin, Lin, Lin, Lin, Lin, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Lu, Lu, Lu, Lu, Lu, Luo, Luo, Luo, Luo, Lyu, Lyu, Mao, Mei, Men, Ni, Niu, Pan, Peng, Qi, Qin, Qin, Qin, Qiu, Qiu, Qiu, Qu, Qu, Shang, Shao, Shen, Shi, Shi, Shi, Shi, Siu, Song, Song, Su, Su, Su, Sui, Sun, Sun, Sun, Sun, Sun, Sun, Tai, Tang, Tang, Tang, Tang, Tian, Tian, Tian, Tu, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wei, Wei, Wei, Wen, Wu, Wu, Wu, Wu, Wu, Wu, Wu, Wu, Wu, Xian, Xiang, Xiang, Xiao, Xiao, Xiao, Xie, Xie, Xie, Xie, Xing, Xiong, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xue, Yan, Yan, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yao, Ye, Ye, Ye, Ye, Yin, Yin, Yin, Yu, Yu, Yu, Yu, Yu, Yu, Yuan, Yuan, Yue, Yue, Yue, Zha, Zhan, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zheng, Zheng, Zheng, Zheng, Zheng, Zhong, Zhong, Zhong, Zhou, Zhou, Zhou, Zhou, Zhou, Zhou, Zhou, Zhu, Zhu, Zhu, Zhu, Zhu, Zhu, Zhuang, Zhuang, and Zu}]{kimiteam2026kimik3openfrontier}
+Kimi-Team, Tongtong Bai, Yifan Bai, Yiping Bao, M.~C., Jianfeng Cai, Xinyuan Cai, Peizhou Cao, Yuxuan Cao, Ziwei Chai, Y.~Charles, H.~S. Che, Guanduo Chen, Guangyu Chen, Guanzheng Chen, Huarong Chen, Jia Chen, Jianlong Chen, Jun Chen, and 383 others. 2026.
+\newblock \href {https://arxiv.org/abs/2607.24653} {Kimi k3: Open frontier intelligence}.
+\newblock \emph{Preprint}, arXiv:2607.24653.
+
+\bibitem[{Ko et~al.(2024)Ko, Kim, Chen, and Yun}]{pmlr-v235-ko24c}
+Jongwoo Ko, Sungnyun Kim, Tianyi Chen, and Se-Young Yun. 2024.
+\newblock \href {https://proceedings.mlr.press/v235/ko24c.html} {{D}isti{LLM}: Towards streamlined distillation for large language models}.
+\newblock In \emph{Proceedings of the 41st International Conference on Machine Learning}, volume 235 of \emph{Proceedings of Machine Learning Research}, pages 24872--24895. PMLR.
+
+\bibitem[{Li et~al.(2023)Li, Hessel, Yu, Ren, Chang, and Choi}]{li-etal-2023-symbolic}
+Liunian~Harold Li, Jack Hessel, Youngjae Yu, Xiang Ren, Kai-Wei Chang, and Yejin Choi. 2023.
+\newblock \href {https://doi.org/10.18653/v1/2023.acl-long.150} {Symbolic chain-of-thought distillation: Small models can also ``think'' step-by-step}.
+\newblock In \emph{Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pages 2665--2679, Toronto, Canada. Association for Computational Linguistics.
+
+\bibitem[{Li et~al.(2025)Li, Emad, Padthe, Lanchantin, Yuan, Nguyen, Weston, Li, Wang, Kulikov, and Li}]{li2025naturalthoughtsselectingdistillingreasoning}
+Yang Li, Youssef Emad, Karthik Padthe, Jack Lanchantin, Weizhe Yuan, Thao Nguyen, Jason Weston, Shang-Wen Li, Dong Wang, Ilia Kulikov, and Xian Li. 2025.
+\newblock \href {https://arxiv.org/abs/2507.01921} {Naturalthoughts: Selecting and distilling reasoning traces for general reasoning tasks}.
+\newblock \emph{Preprint}, arXiv:2507.01921.
+
+\bibitem[{Lu et~al.(2024)Lu, Luu, and Buehler}]{lu2024finetuninglargelanguagemodels}
+Wei Lu, Rachel~K. Luu, and Markus~J. Buehler. 2024.
+\newblock \href {https://arxiv.org/abs/2409.03444} {Fine-tuning large language models for domain adaptation: Exploration of training strategies, scaling, model merging and synergistic capabilities}.
+\newblock \emph{Preprint}, arXiv:2409.03444.
+
+\bibitem[{Microsoft et~al.(2025)Microsoft, :, Abouelenin, Ashfaq, Atkinson, Awadalla, Bach, Bao, Benhaim, Cai, Chaudhary, Chen, Chen, Chen, Chen, Chen, Chen, ling Chen, Dai, Dai, Fan, Gao, Gao, Garg, Goswami, Hao, Hendy, Hu, Jin, Khademi, Kim, Kim, Lee, Li, Li, Liang, Lin, Lin, Liu, Liu, Lopez, Luo, Madan, Mazalov, Mitra, Mousavi, Nguyen, Pan, Perez-Becker, Platin, Portet, Qiu, Ren, Ren, Roy, Shang, Shen, Singhal, Som, Song, Sych, Vaddamanu, Wang, Wang, Wang, Wu, Xu, Xu, Yang, Yang, Yu, Zabir, Zhang, Zhang, Zhang, and Zhou}]{microsoft2025phi4minitechnicalreportcompact}
+Microsoft, :, Abdelrahman Abouelenin, Atabak Ashfaq, Adam Atkinson, Hany Awadalla, Nguyen Bach, Jianmin Bao, Alon Benhaim, Martin Cai, Vishrav Chaudhary, Congcong Chen, Dong Chen, Dongdong Chen, Junkun Chen, Weizhu Chen, Yen-Chun Chen, Yi~ling Chen, Qi~Dai, and 57 others. 2025.
+\newblock \href {https://arxiv.org/abs/2503.01743} {Phi-4-mini technical report: Compact yet powerful multimodal language models via mixture-of-loras}.
+\newblock \emph{Preprint}, arXiv:2503.01743.
+
+\bibitem[{{Qwen Team}(2026)}]{qwen38}
+{Qwen Team}. 2026.
+\newblock \href {https://qwen.ai/blog?id=qwen3.8} {Qwen3.8-max: A new bar for coding and cowork}.
+
+\bibitem[{Ryskulov et~al.(2026)Ryskulov, García-Ferrero, Montero, Jansen, Hashemi, Garcia, Tiene, and Orús}]{ryskulov2026efficientknowledgedistillationllms}
+Bakbergen Ryskulov, Iker García-Ferrero, David Montero, David Jansen, Ali Hashemi, Jezabel~R. Garcia, Antonio Tiene, and Román Orús. 2026.
+\newblock \href {https://arxiv.org/abs/2608.03796} {Efficient knowledge distillation for llms: Offline top-k logits and a fused chunked kl loss}.
+\newblock \emph{Preprint}, arXiv:2608.03796.
+
+\bibitem[{Sanh et~al.(2020)Sanh, Debut, Chaumond, and Wolf}]{sanh2020distilbertdistilledversionbert}
+Victor Sanh, Lysandre Debut, Julien Chaumond, and Thomas Wolf. 2020.
+\newblock \href {https://arxiv.org/abs/1910.01108} {Distilbert, a distilled version of bert: smaller, faster, cheaper and lighter}.
+\newblock \emph{Preprint}, arXiv:1910.01108.
+
+\bibitem[{Team(2024)}]{qwen2.5}
+Qwen Team. 2024.
+\newblock \href {https://qwenlm.github.io/blog/qwen2.5/} {Qwen2.5: A party of foundation models}.
+
+\bibitem[{Wan et~al.(2024)Wan, Wang, Liu, Alam, Zheng, Liu, Qu, Yan, Zhu, Zhang, Chowdhury, and Zhang}]{wan2024efficientlargelanguagemodels}
+Zhongwei Wan, Xin Wang, Che Liu, Samiul Alam, Yu~Zheng, Jiachen Liu, Zhongnan Qu, Shen Yan, Yi~Zhu, Quanlu Zhang, Mosharaf Chowdhury, and Mi~Zhang. 2024.
+\newblock \href {https://arxiv.org/abs/2312.03863} {Efficient large language models: A survey}.
+\newblock \emph{Preprint}, arXiv:2312.03863.
+
+\bibitem[{Wang et~al.(2025)Wang, Wang, Zhou, Peng, Song, Zhang, Sun, Niu, Liu, Chen, Chen, Li, Feng, Bi, Liu, Zhang, Fei, Yin, and Yan}]{wang2025aleatoricepistemicexploringuncertainty}
+Tianyang Wang, Yunze Wang, Jun Zhou, Benji Peng, Xinyuan Song, Charles Zhang, Xintian Sun, Qian Niu, Junyu Liu, Silin Chen, Keyu Chen, Ming Li, Pohsun Feng, Ziqian Bi, Ming Liu, Yichao Zhang, Cheng Fei, Caitlyn~Heqi Yin, and Lawrence~KQ Yan. 2025.
+\newblock \href {https://arxiv.org/abs/2501.03282} {From aleatoric to epistemic: Exploring uncertainty quantification techniques in artificial intelligence}.
+\newblock \emph{Preprint}, arXiv:2501.03282.
+
+\bibitem[{Wang et~al.(2024)Wang, Ma, Zhang, Ni, Chandra, Guo, Ren, Arulraj, He, Jiang, Li, Ku, Wang, Zhuang, Fan, Yue, and Chen}]{wang2024mmluprorobustchallengingmultitask}
+Yubo Wang, Xueguang Ma, Ge~Zhang, Yuansheng Ni, Abhranil Chandra, Shiguang Guo, Weiming Ren, Aaran Arulraj, Xuan He, Ziyan Jiang, Tianle Li, Max Ku, Kai Wang, Alex Zhuang, Rongqi Fan, Xiang Yue, and Wenhu Chen. 2024.
+\newblock \href {https://arxiv.org/abs/2406.01574} {Mmlu-pro: A more robust and challenging multi-task language understanding benchmark}.
+\newblock \emph{Preprint}, arXiv:2406.01574.
+
+\bibitem[{Xu et~al.(2026)Xu, Peng, Long, Xu, Chu, and Qi}]{xu-etal-2026-harnessing}
+Shuyao Xu, Cheng Peng, Jiangxuan Long, Weidi Xu, Wei Chu, and Yuan Qi. 2026.
+\newblock \href {https://doi.org/10.18653/v1/2026.acl-long.74} {Harnessing negative signals: Reinforcement distillation from teacher data for {LLM} reasoning}.
+\newblock In \emph{Proceedings of the 64th Annual Meeting of the {A}ssociation for {C}omputational {L}inguistics (Volume 1: Long Papers)}, pages 1618--1639, San Diego, California, United States. Association for Computational Linguistics.
+
+\bibitem[{Xu et~al.(2024)Xu, Li, Tao, Shen, Cheng, Li, Xu, Tao, and Zhou}]{xu2024surveyknowledgedistillationlarge}
+Xiaohan Xu, Ming Li, Chongyang Tao, Tao Shen, Reynold Cheng, Jinyang Li, Can Xu, Dacheng Tao, and Tianyi Zhou. 2024.
+\newblock \href {https://arxiv.org/abs/2402.13116} {A survey on knowledge distillation of large language models}.
+\newblock \emph{Preprint}, arXiv:2402.13116.
+
+\bibitem[{Yang et~al.(2026)Yang, Lin, Wu, Xu, Jiang, Liu, Xiong, and Guo}]{yang-etal-2026-select2reason}
+Cehao Yang, Xueyuan Lin, Xiaojun Wu, Chengjin Xu, Xuhui Jiang, Honghao Liu, Hui Xiong, and Jian Guo. 2026.
+\newblock \href {https://doi.org/10.18653/v1/2026.findings-acl.331} {{S}elect2{R}eason: Efficient instruction-tuning data selection for long-{C}o{T} reasoning}.
+\newblock In \emph{Findings of the {A}ssociation for {C}omputational {L}inguistics: {ACL} 2026}, pages 6656--6671, San Diego, California, United States. Association for Computational Linguistics.
+
+\bibitem[{Zhang and Liu(2026)}]{zhang-liu-2026-calibrated}
+Mengxiang Zhang and Lingyuan Liu. 2026.
+\newblock \href {https://doi.org/10.18653/v1/2026.findings-acl.335} {Calibrated progressive distillation: Co-designing curriculum and target mixing for knowledge distillation of large language models}.
+\newblock In \emph{Findings of the {A}ssociation for {C}omputational {L}inguistics: {ACL} 2026}, pages 6757--6776, San Diego, California, United States. Association for Computational Linguistics.
+
+\bibitem[{Zhou et~al.(2023)Zhou, Yang, Li, and Liu}]{zhou-etal-2023-bridging}
+Qinhong Zhou, Zonghan Yang, Peng Li, and Yang Liu. 2023.
+\newblock \href {https://doi.org/10.18653/v1/2023.acl-long.738} {Bridging the gap between decision and logits in decision-based knowledge distillation for pre-trained language models}.
+\newblock In \emph{Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pages 13234--13248, Toronto, Canada. Association for Computational Linguistics.
 
 \end{thebibliography}

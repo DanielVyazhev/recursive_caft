@@ -67,10 +67,10 @@
 %         Author 3 \\ Address line \\ ... \\ Address line}
 
 \author{
-  \textbf{Andrey Goncharov\textsuperscript{1}},
-  \textbf{Daniil Vyazhev\textsuperscript{1,2}},
+  \textbf{Andrey Goncharov\textsuperscript{1}\orcidlink{0009-0006-9471-2181}},
+  \textbf{Daniil Vyazhev\textsuperscript{1,2}\orcidlink{0009-0004-4521-9062}},
   \textbf{Simon Epanov\textsuperscript{1}},
-  \textbf{Alexey Zaytsev\textsuperscript{1}},
+  \textbf{Alexey Zaytsev\textsuperscript{1}\orcidlink{0000-0002-1653-0204}},
   \\
   \\
   \textsuperscript{1}Applied AI Institute,
@@ -88,12 +88,17 @@
   We propose a novel blueprint for efficient offline distillation that recursively uses lightweight epistemic and aleatoric complexity approximations for selective distillation.
   Specifically, for three open models (3-4B) at each epoch we estimate offline data complexity with a single-token answer entropy and use a medium model's (70B) entropy as an aleatoric proxy.
   Next, we apply selective distillation only for a small subset of the reasoning chains with the highest corresponding epistemic component.
-  Our approach consistently outperforms naive distillation on comparable computational budget ($57.15 \pm 1.01$ vs 51.61 on average) and offers a much steeper learning curve (baseline final score on ~15\% of the data).
-  Additionally, we present comparative analysis of methods to generate, standardize and augment synthetic reasoning chains when the teacher model does not perform perfectly on the target distillation domain in the first place.
+  Our approach consistently outperforms naive distillation on comparable computational budget ($57.15 \pm 1.01$ vs 51.61 on average) and offers a much steeper learning curve (matching baseline score on ~15\% of the data).
+  Additionally, we present comparative analysis of methods to generate, normalize and augment synthetic reasoning chains when the teacher model does not perform perfectly on the target distillation domain.
   We publish our code and data to facilitate further research in this direction.
 \end{abstract}
 
 \section{Introduction}
+
+Modern LLMs come in different sizes, and their performance is often correlated with the number of parameters.
+The largest of them \citep{glm5team2026glm5vibecodingagentic, kimiteam2026kimik3openfrontier, deepseekai2026deepseekv4highlyefficientmilliontoken, qwen38} demonstrate exceptional results on a vast variety of tasks and span 1-2 trillion parameters.
+Further domain adaptation \citep{ICLR2024_d51cd79a,lu2024finetuninglargelanguagemodels} or even inference at this scale requires massive computational resources \citep{wan2024efficientlargelanguagemodels} unavailable to most practitioners.
+It prompts the need for capable smaller models \citep{chen2026rolesmallmodelsllm} that can be fine-tuned and deployed in resource-constrained environments.
 
 \begin{figure}
   \centering
@@ -102,9 +107,26 @@
   \label{fig:recursive_caft_scheme}
 \end{figure}
 
+One of the most prominent approaches for small model training is distillation from a larger teacher model \citep{hinton2015distillingknowledgeneuralnetwork, sanh2020distilbertdistilledversionbert, xu2024surveyknowledgedistillationlarge}.
+Many methods rely on having access to the online teacher, its logits and internal representations \citep{ICLR2024_5be69a58, jiao-etal-2020-tinybert, ICLR2024_8ac015d4}, which is not always possible \citep{zhou-etal-2023-bridging, ryskulov2026efficientknowledgedistillationllms}.
+It forces practitioners to rely on offline distillation, where the teacher model generates reasoning text for a given dataset, and the student model is trained on this data \citep{li-etal-2023-symbolic, hsieh-etal-2023-distilling}.
+
+Recent work has improved LLM distillation through training objectives \citep{pmlr-v235-ko24c, xu-etal-2026-harnessing}.
+Alternatively, data curation \citep{pmlr-v306-just26a, li2025naturalthoughtsselectingdistillingreasoning, yang-etal-2026-select2reason} and curriculum learning \citep{jiang-etal-2025-teach, zhang-liu-2026-calibrated} have been explored with the scoring criteria remaining a key challenge \citep{jia-etal-2026-makes}.
+
+We propose a fully automated recursive pipeline for offline distillation (Figure \ref{fig:recursive_caft_scheme}) based on uncertainty decomposition \citep{wang2025aleatoricepistemicexploringuncertainty}:
+(1) measure the medium model's entropy once, using it as the aleatoric uncertainty proxy;
+(2) for each training epoch, estimate the epistemic component, sample the dataset, and run the distillation on the selected data mix.
+The method consistently outperforms naive distillation ($57.15 \pm 1.01$ vs 51.61 on average), and it is designed to work in resource-constrained environments.
+
+We validate our approach by fine-tuning three open-source models Qwen2.5 3B \citep{qwen2.5}, Phi-4-Mini \citep{microsoft2025phi4minitechnicalreportcompact}, LLaMA 3.2 3B \citep{grattafiori2024llama3herdmodels} on a multiple-choice question answering dataset MMLU-Pro \citep{wang2024mmluprorobustchallengingmultitask}.
+To confirm how the method works in practice under hardware constraints, we run the experiments on a single A100/H100\footnote{We had to switch cards depending on availability} GPU with 80GB of VRAM.
+
+Additionally, we provide a comparative analysis of augmentation strategies for synthetic reasoning chains when the teacher model does not perform perfectly on the target distillation domain and conduct sensitivity studies of the synthetic trace generation and normalization methods and sampling strategies.
+
 \section{Related Work}
 
-\section{Methods}
+\section{Method}
 
 \section{Results}
 
@@ -235,8 +257,7 @@
 % Bibliography entries for the entire Anthology, followed by custom entries
 %\bibliography{custom,anthology-overleaf-1,anthology-overleaf-2}
 
-% Uncomment after adding a citation: an empty ACL bibliography causes a missing \item error.
-%\bibliography{custom}
+\bibliography{custom}
 
 \appendix
 
