@@ -116,8 +116,12 @@ Microsoft, :, Abdelrahman Abouelenin, Atabak Ashfaq, Adam Atkinson, Hany Awadall
 \newblock \href {https://arxiv.org/abs/2503.01743} {Phi-4-mini technical report: Compact yet powerful multimodal language models via mixture-of-loras}.
 \newblock \emph{Preprint}, arXiv:2503.01743.
 
-\bibitem[{{Qwen Team}(2026)}]{qwen38}
-{Qwen Team}. 2026.
+\bibitem[{Qwen-Team(2024)}]{qwen2.5}
+Qwen-Team. 2024.
+\newblock \href {https://qwenlm.github.io/blog/qwen2.5/} {Qwen2.5: A party of foundation models}.
+
+\bibitem[{{Qwen-Team}(2026)}]{qwen38}
+{Qwen-Team}. 2026.
 \newblock \href {https://qwen.ai/blog?id=qwen3.8} {Qwen3.8-max: A new bar for coding and cowork}.
 
 \bibitem[{Ryskulov et~al.(2026)Ryskulov, García-Ferrero, Montero, Jansen, Hashemi, Garcia, Tiene, and Orús}]{ryskulov2026efficientknowledgedistillationllms}
@@ -129,10 +133,6 @@ Bakbergen Ryskulov, Iker García-Ferrero, David Montero, David Jansen, Ali Hashe
 Victor Sanh, Lysandre Debut, Julien Chaumond, and Thomas Wolf. 2020.
 \newblock \href {https://arxiv.org/abs/1910.01108} {Distilbert, a distilled version of bert: smaller, faster, cheaper and lighter}.
 \newblock \emph{Preprint}, arXiv:1910.01108.
-
-\bibitem[{Team(2024)}]{qwen2.5}
-Qwen Team. 2024.
-\newblock \href {https://qwenlm.github.io/blog/qwen2.5/} {Qwen2.5: A party of foundation models}.
 
 \bibitem[{Wan et~al.(2024)Wan, Wang, Liu, Alam, Zheng, Liu, Qu, Yan, Zhu, Zhang, Chowdhury, and Zhang}]{wan2024efficientlargelanguagemodels}
 Zhongwei Wan, Xin Wang, Che Liu, Samiul Alam, Yu~Zheng, Jiachen Liu, Zhongnan Qu, Shen Yan, Yi~Zhu, Quanlu Zhang, Mosharaf Chowdhury, and Mi~Zhang. 2024.
