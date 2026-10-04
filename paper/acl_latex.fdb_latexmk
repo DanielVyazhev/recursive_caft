@@ -1,14 +1,14 @@
 # Fdb version 4
-["bibtex acl_latex"] 1791055945.5399 "acl_latex.aux" "acl_latex.bbl" "acl_latex" 1791055968.14983 0
+["bibtex acl_latex"] 1791133412.50125 "acl_latex.aux" "acl_latex.bbl" "acl_latex" 1791133419.13314 0
   "./acl_natbib.bst" 1782748040 45442 bb9ea745fc0a84096e0948d1c1b99bbe ""
-  "./custom.bib" 1791053860.33535 57333 1ee2ee5bfd8a283d0d7987fd24d13c46 ""
-  "acl_latex.aux" 1791055967.90687 22333 a236425afc77512e614fb4c5708b191b "pdflatex"
+  "./custom.bib" 1791131539.11285 60020 93dc26bb28a5e8f35975108fa826a81c ""
+  "acl_latex.aux" 1791133418.88327 24071 7cb4d7662ce9d0aef4f7afe45b566017 "pdflatex"
   (generated)
   "acl_latex.bbl"
   "acl_latex.blg"
   (rewritten before read)
-["pdflatex"] 1791055966.03405 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1791055968.15 0
-  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1791055965.85507 13334 bb540cc1b7585afbef369b2f619198c9 ""
+["pdflatex"] 1791133416.79436 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1791133419.13331 0
+  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1791133418.60737 15144 da028beeab569df30f5ba82f6f9a330c ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/helvetic/phvb.tfm" 1136768653 2300 14616918391efa49ac8b481a75fbdc1a ""
@@ -44,6 +44,7 @@
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/latex-fonts/lasy8.tfm" 1136768653 520 7bb3abb160b19e0ed6ac404bb59052b7 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/latex-fonts/lasy9.tfm" 1136768653 520 1cc7cc05f4d7bae5c23bf7516f88fa52 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb" 1248133631 36299 5f9df58c2139e7edcf37c8fca4bd384d ""
+  "/usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb" 1248133631 35469 70d41d2b9ea31d5d813066df7c99281c ""
   "/usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb" 1248133631 36094 798f80770b3b148ceedd006d487db67c ""
   "/usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1248133631 35752 024fb6c41858982481f6968b5fc26508 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb" 1248133631 33993 9b89b85fd2d9df0482bd47194d1d3bf3 ""
@@ -209,10 +210,10 @@
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1728286097 8221418 5f60306fce482631c48243f3fbe1cf27 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
   "acl.sty" 1782748040 11615 e2c027f483aa40e577ed34264c8b0655 ""
-  "acl_latex.aux" 1791055967.90687 22333 a236425afc77512e614fb4c5708b191b "pdflatex"
-  "acl_latex.bbl" 1791055945.65632 24249 d5a35dc306431891762beede677a3721 "bibtex acl_latex"
-  "acl_latex.out" 1791055967.90837 1260 03f4c4aacec4464412c5be10d841e602 "pdflatex"
-  "acl_latex.tex" 1791055965.85507 13334 bb540cc1b7585afbef369b2f619198c9 ""
+  "acl_latex.aux" 1791133418.88327 24071 7cb4d7662ce9d0aef4f7afe45b566017 "pdflatex"
+  "acl_latex.bbl" 1791133412.63487 25869 7a3f3aab1b3d0449040d1d0678f2b893 "bibtex acl_latex"
+  "acl_latex.out" 1791133418.88512 1260 03f4c4aacec4464412c5be10d841e602 "pdflatex"
+  "acl_latex.tex" 1791133418.60737 15144 da028beeab569df30f5ba82f6f9a330c ""
   "img/all_models_reasoning_evals_cap2048.pdf" 1790966803.77789 17496 7f962ed1bec8a7d0156875a55c98ee54 ""
   "img/all_models_reasoning_evals_cap4096.pdf" 1790956533.61022 17549 1127efd2146efc89f52c6b8afc549ff2 ""
   "img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf" 1790959857.46057 16101 13993d1bdcd13d8a69e6aba58c18ad89 ""
@@ -221,6 +222,7 @@
   "img/proportional_samplers_reasoning_evals_cap4096.pdf" 1790966555.9115 19319 54bb5a0fd547faa4a82fdd1ecd59f276 ""
   "img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf" 1790956533.61774 18394 8c87376783591c800f796a8d4fa17f2a ""
   "img/recursive_caft_scheme.png" 1791053103.60845 1665582 9420cf7fd3922801f054fb6307dc6f16 ""
+  "img/single_token_entropy.png" 1791130354.49721 165112 962945b6b034b5b5ce2945e5a5045fde ""
   "img/student_entropy_roc_auc_all_models.pdf" 1790960851.1902 24058 66ecd79d72947b47e98245427e15140e ""
   (generated)
   "acl_latex.aux"

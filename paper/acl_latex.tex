@@ -128,6 +128,30 @@ Additionally, we provide a comparative analysis of augmentation strategies for s
 
 \section{Method}
 
+\paragraph{Our central hypothesis} is that we can approximate epistemic uncertainty of the student model with its entropy and entropy of a larger LLM.
+\citet{goncharov2026complexityawarefinetuning} show that a single-token entropy (Figure \ref{fig:single_token_entropy_illustration}) is a reasonable complexity predictor for a given entry in a question-answering dataset.
+We assume that it approximates the total uncertainty and that we can decompose it into epistemic and aleatoric components \citep{pmlr-v80-depeweg18a, malinin2021uncertaintyestimationautoregressivestructured}.
+With scaling laws \citep{kaplan2020scalinglawsneurallanguage} in mind, we hypothesize that larger models should have lower total uncertainty.
+Therefore, in comparison to a small student model (3-4B) its substantially larger sibling (70-72B\footnote{This particular size is chosen based on the imposed resource constraints (80GB VRAM) and open model availability}) could be treated as a weak aleatoric proxy.
+
+For a question $x$, assume $H(x)=A(x)+E(x)$, where $H_S$, $H_P$ - single-token entropy (student and proxy), $A$ - shared aleatoric component, and $E_S$, $E_P$ - model-specific epistemic component.
+If proxy's residual epistemic uncertainty satisfies $E_P(x)\leq\varepsilon(x)$, then
+\begin{equation}
+  \begin{aligned}
+    A(x) = H_P(x)-E_P(x) \geq H_P(x) - \varepsilon(x) \\
+    E_S(x) = H_S(x) - A(x) \leq H_S(x) - H_P(x) + \varepsilon(x)
+  \end{aligned}
+  \label{eq:aleatoric_proxy_error}
+\end{equation}
+Thus, the entropy difference approximates the student's epistemic uncertainty with error at most $\varepsilon(x)$.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{img/single_token_entropy.png}
+  \caption{Single-token entropy example}
+  \label{fig:single_token_entropy_illustration}
+\end{figure}
+
 \section{Results}
 
 \subsection{Experimental Setup}
