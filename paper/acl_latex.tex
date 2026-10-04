@@ -153,7 +153,7 @@ If proxy's residual epistemic uncertainty satisfies $E_P(x)\leq\varepsilon(x)$, 
 Thus, the entropy difference (\emph{entropy gain}) approximates the student's epistemic uncertainty with error at most $\varepsilon(x)$.
 
 \paragraph{The proposed pipeline} consists of the following steps (Figure \ref{fig:recursive_caft_scheme}, Algorithm \ref{alg:recursive_distillation}):
-(1) prompt the larger model to answer all questions in the dataset with a single token once, collect entropy, assume it is an aleatoric uncertainty proxy;
+(1) prompt the larger model to answer all questions in the dataset with a single token once (or an ensemble of models taking average), collect entropy, assume it is an aleatoric uncertainty proxy;
 (2) for each training epoch,
 (2.1) prompt the student model to answer all questions in the dataset with a single token, collect entropy;
 (2.2) calculate entropy gain $EG(x) = \max\{H_S(x)-H_P(x),0\}$;
@@ -191,6 +191,18 @@ Thus, the entropy difference (\emph{entropy gain}) approximates the student's ep
 \section{Results}
 
 \subsection{Experimental Setup}
+
+\paragraph{Dataset:} Multiple choice question answering dataset MMLU Pro \citep{wang2024mmluprorobustchallengingmultitask}.
+It has questions of different complexities from 14 domains, ten options for each, single correct one.
+
+\paragraph{Aleatoric proxy:} Ensemble of two medium models (taking average of their entropies) - LLaMA 3.3 70B \citep{grattafiori2024llama3herdmodels}, Qwen 2.5 72B \citep{qwen2.5}.
+
+\paragraph{Student LLMs:} three small models\footnote{All models and datasets are published under permissive
+licenses that allow them to be used for research purposes} Qwen2.5 3B \citep{qwen2.5}, Phi-4-Mini \citep{microsoft2025phi4minitechnicalreportcompact}, LLaMA 3.2 3B \citep{grattafiori2024llama3herdmodels}.
+
+\paragraph{Reasoning trace source:} DeepSeek V4 Pro and Flash \citep{deepseekai2026deepseekv4highlyefficientmilliontoken} via API
+
+Other training hyperparameters can be found in Appendix TODO.
 
 \subsection{Main Results}
 
