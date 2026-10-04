@@ -128,6 +128,13 @@ Additionally, we provide a comparative analysis of augmentation strategies for s
 
 \section{Method}
 
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{img/single_token_entropy.png}
+  \caption{Single-token entropy example}
+  \label{fig:single_token_entropy_illustration}
+\end{figure}
+
 \paragraph{Our central hypothesis} is that we can approximate epistemic uncertainty of the student model with its entropy and entropy of a larger LLM.
 \citet{goncharov2026complexityawarefinetuning} show that a single-token entropy (Figure \ref{fig:single_token_entropy_illustration}) is a reasonable complexity predictor for a given entry in a question-answering dataset.
 We assume that it approximates the total uncertainty and that we can decompose it into epistemic and aleatoric components \citep{pmlr-v80-depeweg18a, malinin2021uncertaintyestimationautoregressivestructured}.
@@ -138,19 +145,48 @@ For a question $x$, assume $H(x)=A(x)+E(x)$, where $H_S$, $H_P$ - single-token e
 If proxy's residual epistemic uncertainty satisfies $E_P(x)\leq\varepsilon(x)$, then
 \begin{equation}
   \begin{aligned}
-    A(x) = H_P(x)-E_P(x) \geq H_P(x) - \varepsilon(x) \\
-    E_S(x) = H_S(x) - A(x) \leq H_S(x) - H_P(x) + \varepsilon(x)
+    A(x) &= H_P(x)-E_P(x) \geq H_P(x) - \varepsilon(x) \\
+    E_S(x) &= H_S(x) - A(x) \leq H_S(x) - H_P(x) + \varepsilon(x)
   \end{aligned}
   \label{eq:aleatoric_proxy_error}
 \end{equation}
-Thus, the entropy difference approximates the student's epistemic uncertainty with error at most $\varepsilon(x)$.
+Thus, the entropy difference (\emph{entropy gain}) approximates the student's epistemic uncertainty with error at most $\varepsilon(x)$.
 
-\begin{figure}
-  \centering
-  \includegraphics[width=1\linewidth]{img/single_token_entropy.png}
-  \caption{Single-token entropy example}
-  \label{fig:single_token_entropy_illustration}
-\end{figure}
+\paragraph{The proposed pipeline} consists of the following steps (Figure \ref{fig:recursive_caft_scheme}, Algorithm \ref{alg:recursive_distillation}):
+(1) prompt the larger model to answer all questions in the dataset with a single token once, collect entropy, assume it is an aleatoric uncertainty proxy;
+(2) for each training epoch,
+(2.1) prompt the student model to answer all questions in the dataset with a single token, collect entropy;
+(2.2) calculate entropy gain $EG(x) = \max\{H_S(x)-H_P(x),0\}$;
+(2.3.1) sample 1024 synthetic reasoning chains without replacement, weighted by positive entropy gain;
+(2.3.2) sample 256 single-token answers in similar fashion as a subset of the previous sample;
+(2.4) concatenate samples;
+(2.5) train the student on reasoning traces first, followed by single-token responses.
+
+\begin{algorithm}
+  \caption{Recursive offline distillation via epistemic complexity approximation}
+  \label{alg:recursive_distillation}
+  \small
+  \begin{algorithmic}[1]
+    \Require Student $S$, proxy model $P$, epochs $T$
+    \Require Questions $D$, ground-truth answers $y_x$, and precomputed reasoning traces $r_x$
+    \Ensure Trained student $S$
+    \ForAll{$x\in D$}
+    \State $H_P(x)\gets\Call{Entropy}{P,x}$
+    \EndFor
+    \For{$t=1,\ldots,T$}
+    \ForAll{$x\in D$}
+    \State $H_S(x)\gets\Call{Entropy}{S,x}$
+    \State $\mathrm{EG}(x)\gets\max\{H_S(x)-H_P(x),0\}$
+    \EndFor
+    \State $Q\gets\Call{WeightedSample}{D,\mathrm{EG},1024}$
+    \State $Q_A\gets\text{first }256\text{ questions in }Q$
+    \State $B_R\gets[(x,r_x):x\in Q]$
+    \State $B_A\gets[(x,y_x):x\in Q_A]$
+    \State $S\gets\Call{Train}{S,B_R\mathbin{\Vert}B_A}$
+    \EndFor
+    \State \Return $S$
+  \end{algorithmic}
+\end{algorithm}
 
 \section{Results}
 
