@@ -128,13 +128,6 @@ Additionally, we provide a comparative analysis of augmentation strategies for s
 
 \section{Method}
 
-\begin{figure}
-  \centering
-  \includegraphics[width=1\linewidth]{img/single_token_entropy.png}
-  \caption{Single-token entropy example}
-  \label{fig:single_token_entropy_illustration}
-\end{figure}
-
 \paragraph{Our central hypothesis} is that we can approximate epistemic uncertainty of the student model with its entropy and entropy of a larger LLM.
 \citet{goncharov2026complexityawarefinetuning} show that a single-token entropy (Figure \ref{fig:single_token_entropy_illustration}) is a reasonable complexity predictor for a given entry in a question-answering dataset.
 We assume that it approximates the total uncertainty and that we can decompose it into epistemic and aleatoric components \citep{pmlr-v80-depeweg18a, malinin2021uncertaintyestimationautoregressivestructured}.
@@ -160,7 +153,7 @@ Thus, the entropy difference (\emph{entropy gain}) approximates the student's ep
 (2.3.1) sample 1024 synthetic reasoning chains without replacement, weighted by positive entropy gain;
 (2.3.2) sample 256 single-token answers in similar fashion as a subset of the previous sample;
 (2.4) concatenate samples;
-(2.5) train the student on reasoning traces first, followed by single-token responses.
+(2.5) train the student using LoRA \citep{hu2021loralowrankadaptationlarge} on reasoning traces first, followed by single-token responses.
 
 \begin{algorithm}
   \caption{Recursive offline distillation via epistemic complexity approximation}
@@ -190,37 +183,26 @@ Thus, the entropy difference (\emph{entropy gain}) approximates the student's ep
 
 \section{Results}
 
-\subsection{Experimental Setup}
-
-\paragraph{Dataset:} Multiple choice question answering dataset MMLU Pro \citep{wang2024mmluprorobustchallengingmultitask}.
-It has questions of different complexities from 14 domains, ten options for each, single correct one.
-
-\paragraph{Aleatoric proxy:} Ensemble of two medium models (taking average of their entropies) - LLaMA 3.3 70B \citep{grattafiori2024llama3herdmodels}, Qwen 2.5 72B \citep{qwen2.5}.
-
-\paragraph{Student LLMs:} three small models\footnote{All models and datasets are published under permissive
-licenses that allow them to be used for research purposes} Qwen2.5 3B \citep{qwen2.5}, Phi-4-Mini \citep{microsoft2025phi4minitechnicalreportcompact}, LLaMA 3.2 3B \citep{grattafiori2024llama3herdmodels}.
-
-\paragraph{Reasoning trace source:} DeepSeek V4 Pro and Flash \citep{deepseekai2026deepseekv4highlyefficientmilliontoken} via API
-
-Other training hyperparameters can be found in Appendix TODO.
-
-\subsection{Main Results}
-
-\begin{figure*}
+\begin{figure*}[t]
   \centering
-  \begin{subfigure}[b]{0.48\linewidth}
+  \begin{subfigure}[b]{0.34\linewidth}
     \centering
     \includegraphics[width=1\linewidth]{img/all_models_reasoning_evals_cap4096.pdf}
     \caption{4096-token reasoning cap}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[b]{0.48\linewidth}
+  \begin{subfigure}[b]{0.34\linewidth}
     \centering
     \includegraphics[width=1\linewidth]{img/all_models_reasoning_evals_cap2048.pdf}
     \caption{2048-token reasoning cap}
   \end{subfigure}
+  \begin{subfigure}[b]{0.29\linewidth}
+    \centering
+    \includegraphics[width=1\linewidth]{img/student_entropy_roc_auc_all_models.pdf}
+    \caption{Student calibration}
+  \end{subfigure}
   \caption{Distillation pipeline results across three models (Qwen-3B, LLaMA-3B, and Phi4-mini) on MMLU-Pro}
-  \label{fig:main_results_chraphs}
+  \label{fig:main_results_ghraphs}
 \end{figure*}
 
 \begin{table*}[t]
@@ -238,7 +220,7 @@ Other training hyperparameters can be found in Appendix TODO.
     Student entropy (sampled once, $k=1024$) & 41.35 / 40.11 & 39.44 / 39.07 & 50.17 / 52.87 & 43.65 / 44.01 \\
     Student entropy (sampled once, $k=2048$) & 42.19 / 41.06 & 43.18 / 43.02 & 53.20 / 52.62 & 46.19 / 45.57 \\
     Student entropy (sampled once, $k=3072$) & 42.02 / 42.81 & \textbf{56.77} / 40.86 & 56.77 / 55.90 & 51.86 / 46.52 \\
-    Entropy gain (sampled) &
+    Entropy gain (sampled, ours) &
     \begin{tabular}[c]{@{}l@{}}\textbf{52.58} $\pm\,1.94$ /\\\textbf{52.08} $\pm\,2.28$
     \end{tabular} &
     \begin{tabular}[c]{@{}l@{}}\underline{56.64} $\pm\,3.79$ /\\\textbf{56.86} $\pm\,2.32$
@@ -253,16 +235,50 @@ Other training hyperparameters can be found in Appendix TODO.
   \label{tab:distillation_main_results}
 \end{table*}
 
-\begin{figure}
-  \centering
-  \includegraphics[width=1\linewidth]{img/student_entropy_roc_auc_all_models.pdf}
-  \caption{Student calibration}
-  \label{fig:student_calibration}
-\end{figure}
+\subsection{Experimental Setup}
 
-\subsection{Synthetic Traces Generation}
+\paragraph{Dataset:} Multiple choice question answering dataset MMLU Pro \citep{wang2024mmluprorobustchallengingmultitask}.
+It has questions of different complexities from 14 domains, ten options for each, single correct one. Random train/test split - 80/20.
 
-\begin{figure*}
+\paragraph{Aleatoric proxy:} Ensemble of two medium models (taking average of their entropies) - LLaMA 3.3 70B \citep{grattafiori2024llama3herdmodels}, Qwen 2.5 72B \citep{qwen2.5}.
+
+\paragraph{Student LLMs:} three small models\footnote{All models and datasets are published under permissive
+licenses that allow them to be used for research purposes} Qwen2.5 3B \citep{qwen2.5}, Phi-4-Mini \citep{microsoft2025phi4minitechnicalreportcompact}, LLaMA 3.2 3B \citep{grattafiori2024llama3herdmodels}.
+
+\paragraph{Reasoning trace source:} DeepSeek V4 Pro and Flash \citep{deepseekai2026deepseekv4highlyefficientmilliontoken} via API
+
+\paragraph{Training hyperparameters} can be found in Appendix~\ref{sec:training_hyperparameters}.
+
+\subsubsection{Our method and results}
+
+We evaluate the proposed pipeline for 200 epochs (205k questions seen) with 3 random seeds and 2 thinking budgets (2048 and 4096 tokens).
+It is compared at similar data budget with:\\
+\emph{Direct reasoning trace, Corrected answer} - naive distillation on the most promising types of reasoning traces (see \ref{sec:synth_trace_analysis});\\
+\emph{Student entropy (deterministic), Entropy gain (deterministic)} - alternative pipeline with weighted sampling replaced with greedy sampling;\\
+\emph{Student entropy (sampled once, k={x})} - distillation executed against k samples selected once by student entropy (not recursively at each epoch).
+
+\emph{Entropy gain (sampled), Student entropy (deterministic), Entropy gain (deterministic)} use the proposed data mix (reasoning traces/single-token answers = 1024/256), other methods use only reasoning traces. All non-sampled baselines are evaluated once with greedy sampling.
+
+Notably, the proposed data mix increases the number of training tokens only by 0.003\% - 256 extra tokens compared to 8,388,608 tokens in 1024 reasoning chains.
+
+In other experiments all sampled methods use 3 random seeds, and deterministic methods are evaluated once with greedy sampling.
+
+\subsection{Main Results}
+
+Table \ref{tab:distillation_main_results} and Figure \ref{fig:main_results_ghraphs} show the results for MMLU Pro.
+We see that the proposed method produces a significant improvement over naive distillation (up to $10\%$ gain).
+For both reasoning budgets, it provides the best result on average across three models in comparison with other approaches.
+Greedy sampling demonstrates subpar and less stable curves, though surpassing the baselines.
+Greedy distillation based on student entropy sampled once \citep{goncharov2026complexityawarefinetuning} shows signs of severe degradation after the initial uplift.
+However, Qwen 2.5 3B, notably, demonstrates the best performance with it at k=3072, but degrades at smaller sample sizes, revealing the fragility of the approach.
+
+We also note that our method helps with the model calibration significantly enhancing ROC AUC of single-token entropy for the first 75 epochs of training.
+After that ROC AUC starts declining returning to baseline which is loosely correlated with the method performance reaching a plateau.
+
+\subsection{Synthetic Traces Generation and Normalization}
+\label{sec:synth_trace_analysis}
+
+\begin{figure*}[t]
   \centering
   \begin{subfigure}[b]{0.31\linewidth}
     \centering
@@ -285,24 +301,7 @@ Other training hyperparameters can be found in Appendix TODO.
   \label{fig:synth_comparison}
 \end{figure*}
 
-\subsection{Ablation Study}
-
-\begin{figure*}
-  \centering
-  \begin{subfigure}[b]{0.48\linewidth}
-    \centering
-    \includegraphics[width=1\linewidth]{img/proportional_samplers_reasoning_evals_cap4096.pdf}
-    \caption{vs other entropy-based samplers}
-  \end{subfigure}
-  \hfill
-  \begin{subfigure}[b]{0.48\linewidth}
-    \centering
-    \includegraphics[width=1\linewidth]{img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf}
-    \caption{vs random sampler}
-  \end{subfigure}
-  \caption{Comparison of entropy gain sampler}
-  \label{fig:entropy_gain_comparison}
-\end{figure*}
+\subsection{Sensitivity Study}
 
 \begin{table*}[t]
   \centering
@@ -312,15 +311,26 @@ Other training hyperparameters can be found in Appendix TODO.
     \hline
     Sampler & \multicolumn{2}{c}{LLaMA-3B} & \multicolumn{2}{c}{Qwen-3B} & \multicolumn{2}{c}{Phi4-mini} & \multicolumn{2}{c}{Mean} \\
     \hline
+    Direct reasoning trace (baseline) & 46.09 & & 51.45 & & 57.27 & & 51.61 \\
     Random & \underline{51.77} & $\pm\,2.76$ & \textbf{57.91} & $\pm\,1.40$ & 55.57 & $\pm\,2.54$ & 55.08 & $\pm\,0.80$ \\
     Student entropy & 51.18 & $\pm\,3.11$ & \underline{57.32} & $\pm\,1.52$ & 59.12 & $\pm\,5.22$ & 55.87 & $\pm\,1.40$ \\
-    Combined entropy & 51.50 & & 56.90 & & \underline{59.53} & $\pm\,2.11$ & \underline{55.98} & \\
+    Discounted entropy gain & 51.50 & & 56.90 & & \underline{59.53} & $\pm\,2.11$ & \underline{55.98} & \\
     Entropy gain & \textbf{52.58} & $\pm\,1.94$ & 56.64 & $\pm\,3.79$ & \textbf{62.22} & $\pm\,2.42$ & \textbf{57.15} & $\pm\,1.01$ \\
     \hline
   \end{tabular}
   \caption{Distillation pipeline last epoch accuracy for different sampling methods across three models (Qwen-3B, LLaMA-3B, and Phi4-mini) on MMLU-Pro, reported for 4096-token thinking budget. Each method is evaluated with 3 seeds per model and includes $\pm$ 95\% confidence-interval.}
   \label{tab:sampler_ablation}
 \end{table*}
+
+To attribute performance gains to either the data mix or the entropy-based score and sampler, we compare the proposed pipeline (\emph{entropy gain}) with:
+(1) alternative pipelines where we sample according to \emph{student entropy} and \emph{discounted entropy gain} (see below);
+(2) alternative pipeline where we use a random sampler.
+
+\emph{Discounted entropy gain} is defined as $DEG(x, t) = \max\{H_S(x)- k(t) * H_P(x),0\}, k(t) \in [0, 1]$, where $t$ - training epoch.
+We set $k(t)$ initially to 0.8 and decrease it according to a schedule, hypothesizing that as the student undergoes training the static medium model stops being a good aleatoric proxy.
+
+Table \ref{tab:sampler_ablation} shows that across three models on average entropy gain provides the best results confirming the contribution of the aleatoric uncertainty approximation.
+At the same time, we notice that random sampler performs exceptionally well (confirming findings of \citet{okanovic2023repeatedrandomsamplingminimizing}) compared to the baseline, which points to the proposed data mix as a significant contributor to the gains.
 
 \section{Conclusion and discussion}
 
@@ -333,9 +343,58 @@ Other training hyperparameters can be found in Appendix TODO.
 
 \appendix
 
-\section{Example Appendix}
+\section{Experimental Hyperparameters}
 \label{sec:appendix}
+\label{sec:training_hyperparameters}
 
-This is an appendix.
+\subsection{Optimization and Batching}
+
+\begin{center}
+  \small
+  \begin{tabularx}{\linewidth}{@{}p{0.48\linewidth}X@{}}
+    \toprule
+    Hyperparameter & Value \\
+    \midrule
+    Optimizer & AdamW (\texttt{adamw\_torch}) \\
+    Learning rate & $10^{-4}$ \\
+    Learning-rate schedule & Cosine \\
+    Warmup ratio & 0.06 \\
+    Weight decay & 0 \\
+    Adam $(\beta_1,\beta_2)$ & $(0.9,0.999)$ \\
+    Adam epsilon & $10^{-8}$ \\
+    Maximum gradient norm & 1.0 \\
+    Mixed precision & BF16 enabled \\
+    Gradient checkpointing & Enabled \\
+    \texttt{torch.compile} & Enabled \\
+    \bottomrule
+  \end{tabularx}
+\end{center}
+
+\subsection{LoRA and Trainable Parameters}
+
+\begin{center}
+  \small
+  \begin{tabularx}{\linewidth}{@{}p{0.48\linewidth}X@{}}
+    \toprule
+    Hyperparameter & Value \\
+    \midrule
+    LoRA rank $r$ & 8 \\
+    LoRA alpha & 16 \\
+    LoRA scaling $\alpha/r$ & 2 \\
+    LoRA dropout & 0.1 \\
+    Initialization & Gaussian \\
+    Bias adaptation & None \\
+    \bottomrule
+  \end{tabularx}
+\end{center}
+
+\section{Single-token entropy}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{img/single_token_entropy.png}
+  \caption{Single-token entropy example}
+  \label{fig:single_token_entropy_illustration}
+\end{figure}
 
 \end{document}

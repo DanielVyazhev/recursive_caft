@@ -1,4 +1,4 @@
-\begin{thebibliography}{35}
+\begin{thebibliography}{37}
 \providecommand{\natexlab}[1]{#1}
 
 \bibitem[{Agarwal et~al.(2024)Agarwal, Vieillard, Zhou, Stanczyk, Ramos~Garea, Geist, and Bachem}]{ICLR2024_5be69a58}
@@ -55,6 +55,11 @@ Geoffrey Hinton, Oriol Vinyals, and Jeff Dean. 2015.
 Cheng-Yu Hsieh, Chun-Liang Li, Chih-kuan Yeh, Hootan Nakhost, Yasuhisa Fujii, Alex Ratner, Ranjay Krishna, Chen-Yu Lee, and Tomas Pfister. 2023.
 \newblock \href {https://doi.org/10.18653/v1/2023.findings-acl.507} {Distilling step-by-step! outperforming larger language models with less training data and smaller model sizes}.
 \newblock In \emph{Findings of the Association for Computational Linguistics: ACL 2023}, pages 8003--8017, Toronto, Canada. Association for Computational Linguistics.
+
+\bibitem[{Hu et~al.(2021)Hu, Shen, Wallis, Allen-Zhu, Li, Wang, Wang, and Chen}]{hu2021loralowrankadaptationlarge}
+Edward~J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu~Wang, and Weizhu Chen. 2021.
+\newblock \href {https://arxiv.org/abs/2106.09685} {Lora: Low-rank adaptation of large language models}.
+\newblock \emph{Preprint}, arXiv:2106.09685.
 
 \bibitem[{Jia et~al.(2026)Jia, Zhang, Diao, Yuan, Ouyang, Ma, and Vosoughi}]{jia-etal-2026-makes}
 Yaning Jia, Chunhui Zhang, Xingjian Diao, Xiangchi Yuan, Zhongyu Ouyang, Chiyu Ma, and Soroush Vosoughi. 2026.
@@ -115,6 +120,11 @@ Andrey Malinin and Mark Gales. 2021.
 Microsoft, :, Abdelrahman Abouelenin, Atabak Ashfaq, Adam Atkinson, Hany Awadalla, Nguyen Bach, Jianmin Bao, Alon Benhaim, Martin Cai, Vishrav Chaudhary, Congcong Chen, Dong Chen, Dongdong Chen, Junkun Chen, Weizhu Chen, Yen-Chun Chen, Yi~ling Chen, Qi~Dai, and 57 others. 2025.
 \newblock \href {https://arxiv.org/abs/2503.01743} {Phi-4-mini technical report: Compact yet powerful multimodal language models via mixture-of-loras}.
 \newblock \emph{Preprint}, arXiv:2503.01743.
+
+\bibitem[{Okanovic et~al.(2023)Okanovic, Waleffe, Mageirakos, Nikolakakis, Karbasi, Kalogerias, Gürel, and Rekatsinas}]{okanovic2023repeatedrandomsamplingminimizing}
+Patrik Okanovic, Roger Waleffe, Vasilis Mageirakos, Konstantinos~E. Nikolakakis, Amin Karbasi, Dionysis Kalogerias, Nezihe~Merve Gürel, and Theodoros Rekatsinas. 2023.
+\newblock \href {https://arxiv.org/abs/2305.18424} {Repeated random sampling for minimizing the time-to-accuracy of learning}.
+\newblock \emph{Preprint}, arXiv:2305.18424.
 
 \bibitem[{Qwen-Team(2024)}]{qwen2.5}
 Qwen-Team. 2024.
