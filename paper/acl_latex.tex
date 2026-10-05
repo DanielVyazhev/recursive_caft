@@ -330,7 +330,7 @@ To attribute performance gains to either the data mix or the entropy-based score
 \emph{Discounted entropy gain} is defined as $\max\{H_S(x)- k(t) * H_P(x),0\}, k(t) \in [0, 1]$, where $t$ is the training epoch.
 We set $k(t)$ initially to 0.8 and decrease it according to a schedule, hypothesizing that, as the student undergoes training, the static medium model stops being a good aleatoric proxy.
 
-Table \ref{tab:sampler_ablation} shows that, across three models on average, entropy gain provides the best results, confirming the contribution of the aleatoric uncertainty approximation.
+Table \ref{tab:sampler_ablation} shows that, across three models on average, entropy gain provides better results, which makes aleatoric uncertainty approximation promising.
 At the same time, we notice that random sampling performs exceptionally well (confirming findings of \citet{okanovic2023repeatedrandomsamplingminimizing}) compared to the baseline, which points to the proposed data mix as a significant contributor to the gains.
 
 \begin{table}
@@ -355,9 +355,9 @@ At the same time, we notice that random sampling performs exceptionally well (co
 \section{Conclusion and Discussion}
 
 This paper introduces a recursive offline distillation method rooted in epistemic uncertainty approximation ($57.15 \pm 1.01$ mean accuracy across three students on MMLU-Pro vs $51.61$ for direct distillation) with a much steeper learning curve (baseline score at 15\% of its data budget).
-We confirm that both the entropy difference sampler and the data mix contribute to the gains.
+We observe that both entropy-based samplers (entropy gain slightly leading) and the data mix contribute to the gains.
 Surprisingly, shorter traces and reasoning budgets perform better.
-Further exploration of more rigorous epistemic uncertainty estimation and the surprising effect of the small data mix augmentation remains future work.
+Exploration of more rigorous epistemic uncertainty estimation and the nature of the tiny data mix augmentation remains future work.
 
 \section*{Limitations}
 
