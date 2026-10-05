@@ -1,14 +1,14 @@
 # Fdb version 4
-["bibtex acl_latex"] 1791205097.5966 "acl_latex.aux" "acl_latex.bbl" "acl_latex" 1791205128.32722 0
+["bibtex acl_latex"] 1791206401.07136 "acl_latex.aux" "acl_latex.bbl" "acl_latex" 1791206403.47971 0
   "./acl_natbib.bst" 1782748040 45442 bb9ea745fc0a84096e0948d1c1b99bbe ""
   "./custom.bib" 1791203818.58668 64798 17780174ace5501aac94d10a57656cb0 ""
-  "acl_latex.aux" 1791205128.06694 25099 5d593cc640bd4089759e591a9b150c13 "pdflatex"
+  "acl_latex.aux" 1791206403.2313 29423 27cf85981fb65c2987bd2f740b486d12 "pdflatex"
   (generated)
   "acl_latex.bbl"
   "acl_latex.blg"
   (rewritten before read)
-["pdflatex"] 1791205125.9647 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1791205128.32739 0
-  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1791205125.73049 25673 48e6c61723b7ff1f2278b7f60c37806c ""
+["pdflatex"] 1791206401.18768 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1791206403.47988 0
+  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1791206398.38548 33790 6f3ddedab1910deb872a2cd252b57162 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc" 1558214095 7631 5169ff1acd97ff1c4ab83563c99f96f4 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -224,14 +224,22 @@
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1728286097 8221418 5f60306fce482631c48243f3fbe1cf27 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
   "acl.sty" 1782748040 11615 e2c027f483aa40e577ed34264c8b0655 ""
-  "acl_latex.aux" 1791205128.06694 25099 5d593cc640bd4089759e591a9b150c13 "pdflatex"
-  "acl_latex.bbl" 1791205097.70841 24623 bc1483a63d5c5833e4fee6323303dae7 "bibtex acl_latex"
-  "acl_latex.out" 1791205128.06838 1894 abfff956faf46a3fbab51e0e77a4b09a "pdflatex"
-  "acl_latex.tex" 1791205125.73049 25673 48e6c61723b7ff1f2278b7f60c37806c ""
+  "acl_latex.aux" 1791206403.2313 29423 27cf85981fb65c2987bd2f740b486d12 "pdflatex"
+  "acl_latex.bbl" 1791206401.18434 24623 bc1483a63d5c5833e4fee6323303dae7 "bibtex acl_latex"
+  "acl_latex.out" 1791206403.23291 2483 3611b34f91556c4ed270c2b4cb9b0492 "pdflatex"
+  "acl_latex.tex" 1791206398.38548 33790 6f3ddedab1910deb872a2cd252b57162 ""
   "img/all_models_reasoning_evals_cap2048.pdf" 1790966803.77789 17496 7f962ed1bec8a7d0156875a55c98ee54 ""
   "img/all_models_reasoning_evals_cap4096.pdf" 1790956533.61022 17549 1127efd2146efc89f52c6b8afc549ff2 ""
   "img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf" 1790959857.46057 16101 13993d1bdcd13d8a69e6aba58c18ad89 ""
   "img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf" 1790960027.58641 16463 c78b4bd86d5f6aea40302e3b318460c3 ""
+  "img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf" 1791205913.39291 16537 d95866ec9a7ba3880bc0fc46d51c189a ""
+  "img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf" 1791205913.48689 15307 247b112e6f006f747e04db3fc3cbb675 ""
+  "img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf" 1791205913.6768 16389 6cf8f965c0ca4dd2730d417cb912dce7 ""
+  "img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf" 1791205913.53354 15312 2f2df33e7a132109702c8f3e5bcd1cf9 ""
+  "img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf" 1791205913.74205 16356 9e633d4c7ee0abcf976900229c91c70b ""
+  "img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf" 1791205913.43896 15924 7b737b643268626913ec743dc0dfc80a ""
+  "img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf" 1791205913.57244 14820 7ecc5d1861ecf56c88d037f72e9f7b5c ""
+  "img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf" 1791205913.80339 16224 c9d7bd8984b7df64ec507cb69e065aa2 ""
   "img/performance_vs_truncation_mode_mode_best_acc_bars.pdf" 1790962156.6465 16911 b0cc23c7a9ec8039932ca1868c171d85 ""
   "img/recursive_caft_scheme.png" 1791053103.60845 1665582 9420cf7fd3922801f054fb6307dc6f16 ""
   "img/single_token_entropy.png" 1791130354.49721 165112 962945b6b034b5b5ce2945e5a5045fde ""

@@ -317,6 +317,7 @@ Generation methods (details in Appendix~\ref{sec:synth_genration_methods_details
 (5) \emph{Corrected answer} - same as (1), but for incorrect traces we give the model correct answers and ask it to update its reasoning.
 
 Figure~\ref{fig:synth_comparison} shows that models have a slight preference towards head truncation, medium to short reasoning chains in training and thinking budgets.
+Individual model curves are provided in Appendix~\ref{sec:synth_per_model}.
 Surprisingly, longer reasoning chains and greater thinking budgets lead to notable performance decrease.
 As to the generation methods, we see that augmented reasoning traces lead to elevated performance, while the consistent data leakage results in degradation.
 Based on the findings, we use 8,192-token head truncation and \emph{Corrected answer} generation for the pipeline.
@@ -427,6 +428,140 @@ Dividing by $\log |V|$ puts student and proxy entropies on a common $[0,1]$ scal
 
 \section{Synthetic trace generation methods}
 \label{sec:synth_genration_methods_details}
+
+We compare five ways to construct reasoning-and-answer targets for the same multiple-choice questions. Directly generated option letters are checked against ground-truth labels.
+
+\paragraph{Direct reasoning trace.}
+The teacher receives the question and options, generates reasoning, and predicts an option without seeing the ground-truth answer. The baseline retains both correct and incorrect responses.
+
+\paragraph{Direct reasoning trace (correct only).}
+We retain only baseline responses whose predicted option matches the ground truth, reducing the training set by discarding failed attempts.
+
+\paragraph{Explained answer.}
+The teacher receives the question, options, and correct answer. It generates a step-by-step explanation that reads as a fresh solution, allowing alternatives and self-correction while avoiding acknowledgment of the supplied answer. The target pairs this explanation with the ground-truth option.
+
+\paragraph{Direct reasoning trace (with explained).}
+We retain correct baseline responses and replace each incorrect response with the explained-answer response for the same question. This preserves question coverage while restricting answer-conditioned generation to failed attempts.
+
+\paragraph{Corrected answer.}
+For each incorrect baseline response, the teacher receives the original reasoning, its incorrect option, and the correct option. It continues the trace toward the correct answer, presenting a natural self-correction without restarting or repeating the original text. We append the continuation and use the ground-truth option as the final answer. Correct baseline responses remain intact.
+
+\subsection{Prompt templates}
+The placeholders below are filled with the subject, question, and options. Correct-only filtering and replacement with explanations reuse these prompts; they introduce no additional generation prompt.
+
+\paragraph{Direct generation: system prompt.}
+Reasoning is collected separately from the teacher's final answer.
+\begin{quote}\small
+  The following are multiple choice questions about \{subject\}. Choose a correct option letter. Answer with a single symbol. Do not print anything else.
+\end{quote}
+
+\paragraph{Explained answer: system prompt.}
+\begin{quote}\small
+  The following is a multiple choice question about \{subject\}. The correct answer is provided to you, but your task is to produce a detailed chain-of-thought with step-by-step reasoning that reads as if you were solving the question from scratch---including any natural uncertainty, consideration of multiple options, or self-correction. Do not state or imply that the answer was given to you. End your response with Answer: \texttt{<letter>}.
+\end{quote}
+
+\paragraph{Corrected answer: system prompt.}
+\begin{quote}\small
+  The following are multiple choice questions about \{subject\}. You will be shown a question, a partial chain-of-thought that was previously produced for it, the incorrect option that chain-of-thought arrived at, and the correct option letter. Continue the partial chain-of-thought from where it left off so that it naturally arrives at the correct option. Do not restart the reasoning, do not repeat what was already written, and do not acknowledge that the previous attempt was wrong or that the correct answer was given to you. Write the continuation as if you were the same reasoner noticing a mistake or new consideration mid-thought and revising course. In the end, answer with the correct option letter. End your response with Answer: \texttt{<letter>}.
+\end{quote}
+
+\paragraph{User prompts.}
+All three begin with:
+\begin{quote}\small\ttfamily
+  Question: \{question\}\\
+  Options:\\
+  a. \{option text\}\\
+  b. \{option text\}\\
+  \ldots
+\end{quote}
+For explained answers, append \texttt{Correct option:} followed by the ground-truth letter. For corrections, append:
+\begin{quote}\small\ttfamily
+  Partial reasoning so far:\\
+  \{original reasoning\}\\
+  Incorrect option this reasoning led to: \{predicted letter\}\\
+  Correct option: \{ground-truth letter\}
+\end{quote}
+
+\subsection{Illustrative examples}
+For brevity, consider a toy question with two options: ``A rectangle has sides of length 3 and 2. What is its perimeter? a.\ 6; b.\ 10.'' The following illustrative targets show how the methods handle an incorrect attempt.
+
+\paragraph{Direct trace.}
+``The perimeter is $3\times2=6$. Answer: a.'' The baseline retains this response; the correct-only variant discards it.
+
+\paragraph{Explained answer.}
+Given correct option b, a fresh explanation is: ``There are two sides of each length, so the perimeter is $2(3+2)=10$. Answer: b.'' The with-explained variant substitutes this response for the incorrect direct trace.
+
+\paragraph{Corrected answer.}
+Given the original reasoning, incorrect option a, and correct option b, a continuation is: ``That product gives the area. For the perimeter, I need to add all four sides: $3+2+3+2=10$. Answer: b.'' The target retains the original reasoning, appends this continuation, and ends with b.
+
+\subsection{Per-model results}
+\label{sec:synth_per_model}
+Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show test accuracy across training epochs for each student. Length comparisons use direct reasoning traces; generation-method comparisons use head truncation at 8,192. Dashed horizontal lines and epoch-zero values use the base model's accuracy prompted to answer with chain-of-thought (base models originally are not reasoners), shared across evaluation budgets.
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf}
+    \caption{Trace lengths and evaluation budgets}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf}
+    \caption{Generation methods, 8,192-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf}
+    \caption{Generation methods, 4,096-token thinking budget}
+  \end{subfigure}
+  \caption{Synthetic-trace distillation results for LLaMA-3B.}
+  \label{fig:synth_llama_individual}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf}
+    \caption{Trace lengths and evaluation budgets}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf}
+    \caption{Generation methods, 8,192-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf}
+    \caption{Generation methods, 4,096-token thinking budget}
+  \end{subfigure}
+  \caption{Synthetic-trace distillation results for Qwen-3B.}
+  \label{fig:synth_qwen_individual}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf}
+    \caption{Trace lengths and evaluation budgets}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf}
+    \caption{Generation methods, 4,096-token thinking budget}
+  \end{subfigure}
+  \caption{Synthetic-trace distillation results for Phi4-mini.}
+  \label{fig:synth_phi_individual}
+\end{figure*}
+
+\section{Sensitivity Study}
 
 \begin{table*}[t]
   \centering
