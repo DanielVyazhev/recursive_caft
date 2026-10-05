@@ -317,7 +317,6 @@ Generation methods (details in Appendix~\ref{sec:synth_genration_methods_details
 (5) \emph{Corrected answer} - same as (1), but for incorrect traces we give the model correct answers and ask it to update its reasoning.
 
 Figure~\ref{fig:synth_comparison} shows that models have a slight preference towards head truncation, medium to short reasoning chains in training and thinking budgets.
-Individual model curves are provided in Appendix~\ref{sec:synth_per_model}.
 Surprisingly, longer reasoning chains and greater thinking budgets lead to notable performance decrease.
 As to the generation methods, we see that augmented reasoning traces lead to elevated performance, while the consistent data leakage results in degradation.
 Based on the findings, we use 8,192-token head truncation and \emph{Corrected answer} generation for the pipeline.
@@ -496,26 +495,26 @@ Given the original reasoning, incorrect option a, and correct option b, a contin
 
 \subsection{Per-model results}
 \label{sec:synth_per_model}
-Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show test accuracy across training epochs for each student. Length comparisons use direct reasoning traces; generation-method comparisons use head truncation at 8,192. Dashed horizontal lines and epoch-zero values use the base model's accuracy prompted to answer with chain-of-thought (base models originally are not reasoners), shared across evaluation budgets.
+Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show test accuracy across training epochs for each student. The left panels compare head-truncation limits of 3,072, 8,192, and 24,000 for direct reasoning traces; each legend separately specifies the evaluation cap. Truncation limits the training trace, whereas the evaluation cap limits reasoning generated at test time. The generation-method panels hold head truncation fixed at 8,192 and compare methods at the stated evaluation cap. Dashed horizontal lines and epoch-zero values use the base model's accuracy prompted to answer with chain-of-thought (base models originally are not reasoners), shared across evaluation budgets.
 
 \begin{figure*}[t]
   \centering
   \begin{subfigure}[b]{0.32\linewidth}
     \centering
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf}
-    \caption{Trace lengths and evaluation budgets}
+    \caption{Head-truncation comparison}
   \end{subfigure}
   \hfill
   \begin{subfigure}[b]{0.32\linewidth}
     \centering
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf}
-    \caption{Generation methods, 8,192-token thinking budget}
+    \caption{Generation methods: truncation 8,192, eval cap 8,192}
   \end{subfigure}
   \hfill
   \begin{subfigure}[b]{0.32\linewidth}
     \centering
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf}
-    \caption{Generation methods, 4,096-token thinking budget}
+    \caption{Generation methods: truncation 8,192, eval cap 4,096}
   \end{subfigure}
   \caption{Synthetic-trace distillation results for LLaMA-3B.}
   \label{fig:synth_llama_individual}
@@ -526,19 +525,19 @@ Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show te
   \begin{subfigure}[b]{0.32\linewidth}
     \centering
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf}
-    \caption{Trace lengths and evaluation budgets}
+    \caption{Head-truncation comparison}
   \end{subfigure}
   \hfill
   \begin{subfigure}[b]{0.32\linewidth}
     \centering
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf}
-    \caption{Generation methods, 8,192-token thinking budget}
+    \caption{Generation methods: truncation 8,192, eval cap 8,192}
   \end{subfigure}
   \hfill
   \begin{subfigure}[b]{0.32\linewidth}
     \centering
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf}
-    \caption{Generation methods, 4,096-token thinking budget}
+    \caption{Generation methods: truncation 8,192, eval cap 4,096}
   \end{subfigure}
   \caption{Synthetic-trace distillation results for Qwen-3B.}
   \label{fig:synth_qwen_individual}
@@ -549,19 +548,26 @@ Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show te
   \begin{subfigure}[b]{0.48\linewidth}
     \centering
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf}
-    \caption{Trace lengths and evaluation budgets}
+    \caption{Head-truncation comparison}
   \end{subfigure}
   \hfill
   \begin{subfigure}[b]{0.48\linewidth}
     \centering
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf}
-    \caption{Generation methods, 4,096-token thinking budget}
+    \caption{Generation methods: truncation 8,192, eval cap 4,096}
   \end{subfigure}
   \caption{Synthetic-trace distillation results for Phi4-mini.}
   \label{fig:synth_phi_individual}
 \end{figure*}
 
-\section{Sensitivity Study}
+\section{Sensitivity Study Details}
+\label{sec:sensitivity_details}
+
+The sampler ablation holds the corrected traces and the per-epoch mix of 1,024 reasoning examples and 256 answer-only examples fixed, varying the selection rule: uniform random sampling or sampling without replacement weighted by student entropy, positive entropy gain, or discounted entropy gain. The discounted score uses $k(t)=0.8\cdot0.01^{t/100}$, where $t$ is the resampling epoch; its proxy contribution falls to 0.008 at epoch 100. It is labelled ``Combined entropy (sampled)'' in the graphs. Table~\ref{tab:sampler_ablation_full} reports final accuracy; Figure~\ref{fig:sensitivity_sampler_comparisons} compares the weighted samplers and random sampling.
+
+Figures~\ref{fig:sensitivity_llama}--\ref{fig:sensitivity_phi} provide individual accuracy and coverage curves. Lines average available seed replicas. Horizontal axes count reasoning-question selections, excluding the additional answer-only examples: 1,024 per standard epoch, $k$ for a fixed-$k$ run, and 9,626 for full-dataset baselines. Accuracy plots share each model's initial chain-of-thought score across evaluation budgets.
+
+Coverage counts distinct question IDs selected at least once, so repeated epochs and response formats do not increase it.
 
 \begin{table*}[t]
   \centering
@@ -581,5 +587,97 @@ Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show te
   \caption{Distillation pipeline last epoch accuracy for different sampling methods (4096-token thinking budget)}
   \label{tab:sampler_ablation_full}
 \end{table*}
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/llama_3b_head_truncated8192_reasoning_evals_cap2048.pdf}
+    \caption{2,048-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf}
+    \caption{4,096-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/llama_3b_head_truncated8192_cumulative_unique_questions.pdf}
+    \caption{Cumulative unique question coverage}
+  \end{subfigure}
+  \caption{Distillation by sampling strategy for LLaMA-3B.}
+  \label{fig:sensitivity_llama}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/qwen_3b_head_truncated8192_reasoning_evals_cap2048.pdf}
+    \caption{2,048-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf}
+    \caption{4,096-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/qwen_3b_head_truncated8192_cumulative_unique_questions.pdf}
+    \caption{Cumulative unique question coverage}
+  \end{subfigure}
+  \caption{Distillation by sampling strategy for Qwen-3B.}
+  \label{fig:sensitivity_qwen}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/phi4_mini_head_truncated8192_reasoning_evals_cap2048.pdf}
+    \caption{2,048-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf}
+    \caption{4,096-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/phi4_mini_head_truncated8192_cumulative_unique_questions.pdf}
+    \caption{Cumulative unique question coverage}
+  \end{subfigure}
+  \caption{Distillation by sampling strategy for Phi4-mini.}
+  \label{fig:sensitivity_phi}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/proportional_samplers_reasoning_evals_cap4096.pdf}
+    \caption{Weighted samplers, 4,096-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf}
+    \caption{Random versus entropy gain, 4,096-token thinking budget}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/all_models_cumulative_unique_questions.pdf}
+    \caption{Mean unique question coverage}
+  \end{subfigure}
+  \caption{Sampler comparisons and question coverage across all three models. In the accuracy panels, thin dashed curves show individual models, thick solid curves their equal-weight means, and the thick dashed curve the direct-trace baseline mean.}
+  \label{fig:sensitivity_sampler_comparisons}
+\end{figure*}
 
 \end{document}
