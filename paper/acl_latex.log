@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.7)  4 OCT 2026 21:12
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.7)  5 OCT 2026 12:37
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -735,126 +735,119 @@ LaTeX Font Info:    Trying to load font information for U+lasy on input line 84.
  (/usr/local/texlive/2024/texmf-dist/tex/latex/base/ulasy.fd
 File: ulasy.fd 1998/08/17 v2.2e LaTeX symbol font definitions
 )
-<img/recursive_caft_scheme.png, id=79, 4822.015pt x 2884.7775pt>
+<img/recursive_caft_scheme.png, id=75, 4822.015pt x 2884.7775pt>
 File: img/recursive_caft_scheme.png Graphic file (type png)
 <use img/recursive_caft_scheme.png>
 Package pdftex.def Info: img/recursive_caft_scheme.png  used on input line 105.
 (pdftex.def)             Requested size: 219.08614pt x 131.04189pt.
- [1{/usr/local/texlive/2024/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc}
+
+Underfull \hbox (badness 2134) in paragraph at lines 120--122
+\T1/ptm/m/n/10.95 (+20) Recent work has im-proved LLM dis-til-la-tion
+ []
+
+[1{/usr/local/texlive/2024/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc}
 
 
 
  <./img/recursive_caft_scheme.png>]
-Overfull \hbox (13.0412pt too wide) detected at line 145
+Overfull \hbox (13.0412pt too wide) detected at line 140
 [][][][][]
  []
 
-Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on input line 159.
-<img/all_models_reasoning_evals_cap4096.pdf, id=191, 1231.7832pt x 794.52142pt>
+Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on input line 154.
+<img/all_models_reasoning_evals_cap4096.pdf, id=176, 1231.7832pt x 794.52142pt>
 File: img/all_models_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/all_models_reasoning_evals_cap4096.pdf>
-Package pdftex.def Info: img/all_models_reasoning_evals_cap4096.pdf  used on input line 190.
+Package pdftex.def Info: img/all_models_reasoning_evals_cap4096.pdf  used on input line 185.
 (pdftex.def)             Requested size: 154.78133pt x 99.83623pt.
-<img/all_models_reasoning_evals_cap2048.pdf, id=192, 1231.7832pt x 794.52142pt>
+<img/all_models_reasoning_evals_cap2048.pdf, id=177, 1231.7832pt x 794.52142pt>
 File: img/all_models_reasoning_evals_cap2048.pdf Graphic file (type pdf)
 <use img/all_models_reasoning_evals_cap2048.pdf>
-Package pdftex.def Info: img/all_models_reasoning_evals_cap2048.pdf  used on input line 196.
+Package pdftex.def Info: img/all_models_reasoning_evals_cap2048.pdf  used on input line 191.
 (pdftex.def)             Requested size: 154.78133pt x 99.83623pt.
-<img/student_entropy_roc_auc_all_models.pdf, id=193, 977.60324pt x 701.4801pt>
+<img/student_entropy_roc_auc_all_models.pdf, id=178, 977.60324pt x 701.4801pt>
 File: img/student_entropy_roc_auc_all_models.pdf Graphic file (type pdf)
 <use img/student_entropy_roc_auc_all_models.pdf>
-Package pdftex.def Info: img/student_entropy_roc_auc_all_models.pdf  used on input line 201.
+Package pdftex.def Info: img/student_entropy_roc_auc_all_models.pdf  used on input line 196.
 (pdftex.def)             Requested size: 132.01773pt x 94.72783pt.
-[2] [3 <./img/all_models_reasoning_evals_cap4096.pdf> <./img/all_models_reasoning_evals_cap2048.pdf> <./img/student_entropy_roc_auc_all_models.pdf>]
-<img/performance_vs_truncation_mode_mode_best_acc_bars.pdf, id=395, 973.9788pt x 679.13208pt>
+
+Underfull \hbox (badness 2547) in paragraph at lines 239--242
+ []\T1/ptm/b/n/10.95 (+20) LLMs:[] \T1/ptm/m/n/10.95 (+20) Aleatoric proxy: en-sem-ble of two
+ []
+
+[2]
+<img/performance_vs_truncation_mode_mode_best_acc_bars.pdf, id=244, 973.9788pt x 679.13208pt>
 File: img/performance_vs_truncation_mode_mode_best_acc_bars.pdf Graphic file (type pdf)
 <use img/performance_vs_truncation_mode_mode_best_acc_bars.pdf>
-Package pdftex.def Info: img/performance_vs_truncation_mode_mode_best_acc_bars.pdf  used on input line 285.
+Package pdftex.def Info: img/performance_vs_truncation_mode_mode_best_acc_bars.pdf  used on input line 275.
 (pdftex.def)             Requested size: 141.12456pt x 98.3939pt.
-<img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf, id=396, 906.49365pt x 679.25314pt>
-File: img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf Graphic file (type pdf)
-<use img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf>
-Package pdftex.def Info: img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf  used on input line 291.
-(pdftex.def)             Requested size: 136.57462pt x 102.32924pt.
-<img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf, id=397, 1056.65541pt x 763.807pt>
+<img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf, id=245, 1056.65541pt x 763.807pt>
 File: img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf>
-Package pdftex.def Info: img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf  used on input line 297.
+Package pdftex.def Info: img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf  used on input line 281.
 (pdftex.def)             Requested size: 159.33821pt x 115.17215pt.
-
-Underfull \hbox (badness 10000) in paragraph at lines 329--331
+<img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf, id=246, 906.49365pt x 679.25314pt>
+File: img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf Graphic file (type pdf)
+<use img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf>
+Package pdftex.def Info: img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf  used on input line 287.
+(pdftex.def)             Requested size: 136.57462pt x 102.32924pt.
+ [3 <./img/all_models_reasoning_evals_cap4096.pdf> <./img/all_models_reasoning_evals_cap2048.pdf> <./img/student_entropy_roc_auc_all_models.pdf>]
+Underfull \hbox (badness 10000) in paragraph at lines 323--325
 []\T1/ptm/m/it/10.95 (+20) Discounted en-tropy gain \T1/ptm/m/n/10.95 (+20) is de-fined as
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 329--331
-\OML/cmm/m/it/10.95 DEG\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 x; t\OT1/cmr/m/n/10.95 ) = []\OMS/cmsy/m/n/10.95 f\OML/cmm/m/it/10.95 H[]\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 x\OT1/cmr/m/n/10.95 ) \OMS/cmsy/m/n/10.95 ^^@ \OML/cmm/m/it/10.95 k\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 t\OT1/cmr/m/n/10.95 ) \OMS/cmsy/m/n/10.95 ^^C
+Underfull \hbox (badness 2846) in paragraph at lines 323--325
+\T1/ptm/m/n/10.95 (+20) hy-poth-e-siz-ing that as the stu-dent un-der-goes
  []
 
-
-Underfull \hbox (badness 1231) in paragraph at lines 329--331
-\OML/cmm/m/it/10.95 H[]\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 x\OT1/cmr/m/n/10.95 )\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 0\OMS/cmsy/m/n/10.95 g\OML/cmm/m/it/10.95 ; k\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 t\OT1/cmr/m/n/10.95 ) \OMS/cmsy/m/n/10.95 2 \OT1/cmr/m/n/10.95 [0\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 1]$\T1/ptm/m/n/10.95 (+20) , where $\OML/cmm/m/it/10.95 t$ \T1/ptm/m/n/10.95 (+20) - train-ing
- []
-
-(./acl_latex.bbl
-Underfull \hbox (badness 1383) in paragraph at lines 30--33
-\T1/ptm/m/n/10 (+20) Chendi Ge, Chenghua Huang, Chengx-ing Xie,
- []
-
-
-Underfull \hbox (badness 1371) in paragraph at lines 30--33
-\T1/ptm/m/n/10 (+20) vibe cod-ing to agen-tic en-gi-neer-ing[][].  \T1/ptm/m/it/10 (+20) Preprint\T1/ptm/m/n/10 (+20) ,
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 35--38
+(./acl_latex.bbl [4 <./img/performance_vs_truncation_mode_mode_best_acc_bars.pdf> <./img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf> <./img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf>]
+Underfull \hbox (badness 10000) in paragraph at lines 30--33
 []\T1/ptm/m/n/10 (+20) Andrey Gon-charov, Daniil Vyazhev, Petr Sy-
  []
 
 
-Underfull \hbox (badness 2635) in paragraph at lines 35--38
+Underfull \hbox (badness 2635) in paragraph at lines 30--33
 \T1/ptm/m/n/10 (+20) chev, Ed-vard Kha-lafyan, and Alexey Za-yt-sev.
  []
 
 
-Underfull \hbox (badness 2277) in paragraph at lines 50--53
+Underfull \hbox (badness 2277) in paragraph at lines 45--48
 [][]\T1/ptm/m/n/10 (+20) Dis-till-ing the knowl-edge in a neu-ral net-work[][].
  []
 
-[4] [5 <./img/performance_vs_truncation_mode_mode_best_acc_bars.pdf> <./img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf> <./img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf>]
-Underfull \hbox (badness 1117) in paragraph at lines 125--128
+
+Underfull \hbox (badness 1117) in paragraph at lines 115--118
 \T1/ptm/m/n/10 (+20) Rekatsi-nas. 2023.  [][]Re-peated ran-dom sam-pling
  []
 
-) (/usr/local/texlive/2024/texmf-dist/tex/latex/inconsolata/t1zi4.fd)
-<img/single_token_entropy.png, id=633, 2469.225pt x 1100.11pt>
+[5]) (/usr/local/texlive/2024/texmf-dist/tex/latex/inconsolata/t1zi4.fd)
+<img/single_token_entropy.png, id=626, 2469.225pt x 1100.11pt>
 File: img/single_token_entropy.png Graphic file (type png)
 <use img/single_token_entropy.png>
-Package pdftex.def Info: img/single_token_entropy.png  used on input line 395.
+Package pdftex.def Info: img/single_token_entropy.png  used on input line 408.
 (pdftex.def)             Requested size: 219.08614pt x 97.59558pt.
- [6{/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc}] [7
-
- <./img/single_token_entropy.png>] (./acl_latex.aux)
+ [6{/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc} <./img/single_token_entropy.png>] [7] (./acl_latex.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
  ***********
 Package rerunfilecheck Info: File `acl_latex.out' has not changed.
-(rerunfilecheck)             Checksum: F4BAA8EDD3077E0F2AE3CCE7066F1664;2169.
+(rerunfilecheck)             Checksum: 0506054D9AA466C64463314A1293440A;2393.
  ) 
 Here is how much of TeX's memory you used:
- 26602 strings out of 474116
- 495124 string characters out of 5743682
- 1966187 words of memory out of 5000000
- 48080 multiletter control sequences out of 15000+600000
- 631933 words of font info for 316 fonts, out of 8000000 for 9000
+ 26617 strings out of 474116
+ 495107 string characters out of 5743682
+ 1965187 words of memory out of 5000000
+ 48077 multiletter control sequences out of 15000+600000
+ 633258 words of font info for 329 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 99i,17n,101p,4617b,657s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 99i,17n,101p,4617b,655s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/inconsolata/Inconsolata-zi4r.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/helvetic/uhvb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on acl_latex.pdf (7 pages, 1480094 bytes).
+Output written on acl_latex.pdf (7 pages, 1479101 bytes).
 PDF statistics:
- 775 PDF objects out of 1000 (max. 8388607)
- 490 compressed objects within 5 object streams
- 79 named destinations out of 1000 (max. 500000)
- 64165 words of extra memory for PDF output out of 74296 (max. 10000000)
+ 760 PDF objects out of 1000 (max. 8388607)
+ 475 compressed objects within 5 object streams
+ 77 named destinations out of 1000 (max. 500000)
+ 64173 words of extra memory for PDF output out of 74296 (max. 10000000)
 

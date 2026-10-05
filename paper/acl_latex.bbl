@@ -1,4 +1,4 @@
-\begin{thebibliography}{37}
+\begin{thebibliography}{34}
 \providecommand{\natexlab}[1]{#1}
 
 \bibitem[{Agarwal et~al.(2024)Agarwal, Vieillard, Zhou, Stanczyk, Ramos~Garea, Geist, and Bachem}]{ICLR2024_5be69a58}
@@ -25,11 +25,6 @@ DeepSeek-AI, Anyi Xu, Bangcai Lin, Bing Xue, Bingxuan Wang, Bingzheng Xu, Bochao
 Stefan Depeweg, Jose-Miguel Hernandez-Lobato, Finale Doshi-Velez, and Steffen Udluft. 2018.
 \newblock \href {https://proceedings.mlr.press/v80/depeweg18a.html} {Decomposition of uncertainty in {B}ayesian deep learning for efficient and risk-sensitive learning}.
 \newblock In \emph{Proceedings of the 35th International Conference on Machine Learning}, volume~80 of \emph{Proceedings of Machine Learning Research}, pages 1184--1193. PMLR.
-
-\bibitem[{GLM-5-Team et~al.(2026)GLM-5-Team, :, Zeng, Lv, Hou, Du, Zheng, Chen, Yin, Ge, Huang, Xie, Zhu, Yin, Wang, Pan, Zeng, Zhang, Wang, Chen, Zhang, Jiao, Guo, Wang, Du, Wu, Wang, Li, Fan, Zhong, Liu, Zhao, Du, Dong, Lu, Shuang-Li, Cao, Liu, Jiang, Chen, Zhang, Huang, Dong, Xu, Wei, An, Niu, Zhu, Wen, Cen, Bai, Qiao, Wang, Wang, Zhu, Liu, Li, Wang, Wen, Huang, Cai, Yu, Li, Hu, Zhang, Zhang, Lin, Yang, Wang, Ai, Zhu, Yi, Chen, Wen, Sun, Zhao, Hu, Zhang, Liu, Zhang, Peng, Tai, Zhang, Liu, Wang, Yan, Ge, Liu, Chu, Zhao, Wang, Zhao, Ren, Wang, Zhang, Gui, Zhao, Li, An, Li, Yuan, Du, Liu, Zhi, Duan, Zhou, Wei, Wang, Luo, Zhang, Sha, Xu, Wu, Ding, Chen, Li, Lin, Ta, Zou, Song, Yang, Tu, Yang, Wu, Zhang, Li, Li, Fan, Qin, Tian, Zhang, Yu, Liang, Kuang, Cheng, Li, Yan, Hu, Ling, Fan, Xia, Zhang, Zhang, Pan, Zou, Zhang, Liu, Wu, Li, Wang, Zhu, Tan, Zhou, Pan, Zhang, Su, Geng, Yan, Tan, Bi, Shen, Yang, Li, Liu, Wang, Li, Wu, Zhang, Duan, Zhang, Liu, Jiang, Yan, Zhang, Wei, Chen, Feng, Yao, Chai, Wang, Zhang, Xu, Huang, Wang, Li, Dong, and Tang}]{glm5team2026glm5vibecodingagentic}
-GLM-5-Team, :, Aohan Zeng, Xin Lv, Zhenyu Hou, Zhengxiao Du, Qinkai Zheng, Bin Chen, Da~Yin, Chendi Ge, Chenghua Huang, Chengxing Xie, Chenzheng Zhu, Congfeng Yin, Cunxiang Wang, Gengzheng Pan, Hao Zeng, Haoke Zhang, Haoran Wang, and 168 others. 2026.
-\newblock \href {https://arxiv.org/abs/2602.15763} {Glm-5: from vibe coding to agentic engineering}.
-\newblock \emph{Preprint}, arXiv:2602.15763.
 
 \bibitem[{Goncharov et~al.(2026)Goncharov, Vyazhev, Sychev, Khalafyan, and Zaytsev}]{goncharov2026complexityawarefinetuning}
 Andrey Goncharov, Daniil Vyazhev, Petr Sychev, Edvard Khalafyan, and Alexey Zaytsev. 2026.
@@ -86,11 +81,6 @@ Jared Kaplan, Sam McCandlish, Tom Henighan, Tom~B. Brown, Benjamin Chess, Rewon 
 \newblock \href {https://arxiv.org/abs/2001.08361} {Scaling laws for neural language models}.
 \newblock \emph{Preprint}, arXiv:2001.08361.
 
-\bibitem[{Kimi-Team et~al.(2026)Kimi-Team, Bai, Bai, Bao, C., Cai, Cai, Cao, Cao, Chai, Charles, Che, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Chen, Cheng, Cheng, Cui, Cui, Dai, Deng, Ding, Ding, Ding, Dong, Dong, Dong, Dong, Du, Du, Du, Du, Du, Fan, Feng, Feng, Feng, Fu, Fu, Gao, Gao, Gao, Gao, Gao, Geng, Gong, Gong, Gong, Gong, Gu, Gu, Guan, Guo, Guo, Guo, Guo, Hao, Hao, Hao, He, He, He, He, He, He, He, He, He, Hong, Hong, Hu, Hu, Hu, Hu, Hu, Hu, Hua, Huang, Huang, Huang, Huang, Huang, Huang, Huang, Huang, Hui, Jia, Jiang, Jiang, Jiang, Jin, Jin, Jing, Kong, Lai, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Li, Lin, Lin, Lin, Lin, Lin, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Liu, Lu, Lu, Lu, Lu, Lu, Luo, Luo, Luo, Luo, Lyu, Lyu, Mao, Mei, Men, Ni, Niu, Pan, Peng, Qi, Qin, Qin, Qin, Qiu, Qiu, Qiu, Qu, Qu, Shang, Shao, Shen, Shi, Shi, Shi, Shi, Siu, Song, Song, Su, Su, Su, Sui, Sun, Sun, Sun, Sun, Sun, Sun, Tai, Tang, Tang, Tang, Tang, Tian, Tian, Tian, Tu, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wang, Wei, Wei, Wei, Wen, Wu, Wu, Wu, Wu, Wu, Wu, Wu, Wu, Wu, Xian, Xiang, Xiang, Xiao, Xiao, Xiao, Xie, Xie, Xie, Xie, Xing, Xiong, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xu, Xue, Yan, Yan, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yang, Yao, Ye, Ye, Ye, Ye, Yin, Yin, Yin, Yu, Yu, Yu, Yu, Yu, Yu, Yuan, Yuan, Yue, Yue, Yue, Zha, Zhan, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zhao, Zheng, Zheng, Zheng, Zheng, Zheng, Zhong, Zhong, Zhong, Zhou, Zhou, Zhou, Zhou, Zhou, Zhou, Zhou, Zhu, Zhu, Zhu, Zhu, Zhu, Zhu, Zhuang, Zhuang, and Zu}]{kimiteam2026kimik3openfrontier}
-Kimi-Team, Tongtong Bai, Yifan Bai, Yiping Bao, M.~C., Jianfeng Cai, Xinyuan Cai, Peizhou Cao, Yuxuan Cao, Ziwei Chai, Y.~Charles, H.~S. Che, Guanduo Chen, Guangyu Chen, Guanzheng Chen, Huarong Chen, Jia Chen, Jianlong Chen, Jun Chen, and 383 others. 2026.
-\newblock \href {https://arxiv.org/abs/2607.24653} {Kimi k3: Open frontier intelligence}.
-\newblock \emph{Preprint}, arXiv:2607.24653.
-
 \bibitem[{Ko et~al.(2024)Ko, Kim, Chen, and Yun}]{pmlr-v235-ko24c}
 Jongwoo Ko, Sungnyun Kim, Tianyi Chen, and Se-Young Yun. 2024.
 \newblock \href {https://proceedings.mlr.press/v235/ko24c.html} {{D}isti{LLM}: Towards streamlined distillation for large language models}.
@@ -129,10 +119,6 @@ Patrik Okanovic, Roger Waleffe, Vasilis Mageirakos, Konstantinos~E. Nikolakakis,
 \bibitem[{Qwen-Team(2024)}]{qwen2.5}
 Qwen-Team. 2024.
 \newblock \href {https://qwenlm.github.io/blog/qwen2.5/} {Qwen2.5: A party of foundation models}.
-
-\bibitem[{{Qwen-Team}(2026)}]{qwen38}
-{Qwen-Team}. 2026.
-\newblock \href {https://qwen.ai/blog?id=qwen3.8} {Qwen3.8-max: A new bar for coding and cowork}.
 
 \bibitem[{Ryskulov et~al.(2026)Ryskulov, García-Ferrero, Montero, Jansen, Hashemi, Garcia, Tiene, and Orús}]{ryskulov2026efficientknowledgedistillationllms}
 Bakbergen Ryskulov, Iker García-Ferrero, David Montero, David Jansen, Ali Hashemi, Jezabel~R. Garcia, Antonio Tiene, and Román Orús. 2026.
