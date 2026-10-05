@@ -424,6 +424,13 @@ Further exploration of the more rigorous epistemic uncertainty estimation and th
 
 \section{Single-token entropy}
 
+Single-token entropy (Figure \ref{fig:single_token_entropy_illustration}) measures a model's uncertainty over the first answer token when prompted to answer a question with a single token.
+For a question $x$, we apply softmax to the first-token logits to obtain probabilities $p(v\mid x)$ over the model's full vocabulary $V$, and compute normalized Shannon entropy:
+\begin{equation}
+  H(x) = -\frac{1}{\log |V|}\sum_{v\in V} p(v\mid x)\log p(v\mid x).
+\end{equation}
+Dividing by $\log |V|$ puts student and proxy entropies on a common $[0,1]$ scale despite differences in vocabulary size: values near zero indicate a concentrated prediction, while values near one indicate a nearly uniform distribution.
+
 \begin{figure}
   \centering
   \includegraphics[width=1\linewidth]{img/single_token_entropy.png}
