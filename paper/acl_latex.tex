@@ -84,13 +84,12 @@
 \maketitle
 \begin{abstract}
   Distillation of reasoning chains from Large Language Models (LLMs) into their smaller siblings is a standard training approach.
-  Quite frequently researchers do not have full access to a teacher model and its internal representations, which limits the resulting performance.
+  Frequently researchers do not have full access to a teacher model and its internal representations, which limits the resulting performance.
   We propose a novel blueprint for efficient offline distillation that recursively uses lightweight epistemic and aleatoric complexity approximations for selective distillation.
-  Specifically, for three open models (3-4B) at each epoch we estimate offline data complexity with a single-token answer entropy and use a medium model's (70B) entropy as an aleatoric proxy.
-  Next, we apply selective distillation only for a small subset of the reasoning chains with the highest corresponding epistemic component.
-  Our approach consistently outperforms naive distillation on comparable computational budget ($57.15 \pm 1.01$ vs 51.61 on average) and offers a much steeper learning curve (matching baseline score on ~15\% of the data).
-  Additionally, we present comparative analysis of methods to generate, normalize and augment synthetic reasoning chains when the teacher model does not perform perfectly on the target distillation domain.
-  We publish our code and data to facilitate further research in this direction.
+  Specifically, for three open models (3-4B) at each epoch we estimate epistemic uncertainty using a medium model (70-72B) as an aleatoric proxy and sample only a small subset of the reasoning chains for distillation.
+  Our approach consistently outperforms naive distillation on comparable computational budget ($57.15 \pm 1.01$ vs 51.61 on average) and offers a much steeper learning curve.
+  Additionally, we present a comparative analysis of methods to generate and normalize distillation traces.
+  We publish our code and data\footnote{TODO}.
 \end{abstract}
 
 \section{Introduction}
