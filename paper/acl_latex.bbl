@@ -1,10 +1,15 @@
-\begin{thebibliography}{34}
+\begin{thebibliography}{39}
 \providecommand{\natexlab}[1]{#1}
 
 \bibitem[{Agarwal et~al.(2024)Agarwal, Vieillard, Zhou, Stanczyk, Ramos~Garea, Geist, and Bachem}]{ICLR2024_5be69a58}
 Rishabh Agarwal, Nino Vieillard, Yongchao Zhou, Piotr Stanczyk, Sabela Ramos~Garea, Matthieu Geist, and Olivier Bachem. 2024.
 \newblock \href {https://proceedings.iclr.cc/paper_files/paper/2024/file/5be69a584901a26c521c2b51e40a4c20-Paper-Conference.pdf} {On-policy distillation of language models: Learning from self-generated mistakes}.
 \newblock In \emph{International Conference on Learning Representations}, volume 2024, pages 21246--21263.
+
+\bibitem[{An et~al.(2024)An, Ma, Lin, Zheng, Lou, and Chen}]{an2024learningmistakesmakesllm}
+Shengnan An, Zexiong Ma, Zeqi Lin, Nanning Zheng, Jian-Guang Lou, and Weizhu Chen. 2024.
+\newblock \href {https://arxiv.org/abs/2310.20689} {Learning from mistakes makes llm better reasoner}.
+\newblock \emph{Preprint}, arXiv:2310.20689.
 
 \bibitem[{Chen and Varoquaux(2026)}]{chen2026rolesmallmodelsllm}
 Lihu Chen and Gaël Varoquaux. 2026.
@@ -86,6 +91,11 @@ Jongwoo Ko, Sungnyun Kim, Tianyi Chen, and Se-Young Yun. 2024.
 \newblock \href {https://proceedings.mlr.press/v235/ko24c.html} {{D}isti{LLM}: Towards streamlined distillation for large language models}.
 \newblock In \emph{Proceedings of the 41st International Conference on Machine Learning}, volume 235 of \emph{Proceedings of Machine Learning Research}, pages 24872--24895. PMLR.
 
+\bibitem[{Li and Mooney(2024)}]{li2024distillingalgorithmicreasoning}
+Jierui Li and Raymond Mooney. 2024.
+\newblock \href {https://doi.org/10.48550/arXiv.2404.08148} {Distilling algorithmic reasoning from {LLMs} via explaining solution programs}.
+\newblock \emph{Preprint}, arXiv:2404.08148.
+
 \bibitem[{Li et~al.(2023)Li, Hessel, Yu, Ren, Chang, and Choi}]{li-etal-2023-symbolic}
 Liunian~Harold Li, Jack Hessel, Youngjae Yu, Xiang Ren, Kai-Wei Chang, and Yejin Choi. 2023.
 \newblock \href {https://doi.org/10.18653/v1/2023.acl-long.150} {Symbolic chain-of-thought distillation: Small models can also ``think'' step-by-step}.
@@ -135,8 +145,13 @@ Zhongwei Wan, Xin Wang, Che Liu, Samiul Alam, Yu~Zheng, Jiachen Liu, Zhongnan Qu
 \newblock \href {https://arxiv.org/abs/2312.03863} {Efficient large language models: A survey}.
 \newblock \emph{Preprint}, arXiv:2312.03863.
 
-\bibitem[{Wang et~al.(2025)Wang, Wang, Zhou, Peng, Song, Zhang, Sun, Niu, Liu, Chen, Chen, Li, Feng, Bi, Liu, Zhang, Fei, Yin, and Yan}]{wang2025aleatoricepistemicexploringuncertainty}
-Tianyang Wang, Yunze Wang, Jun Zhou, Benji Peng, Xinyuan Song, Charles Zhang, Xintian Sun, Qian Niu, Junyu Liu, Silin Chen, Keyu Chen, Ming Li, Pohsun Feng, Ziqian Bi, Ming Liu, Yichao Zhang, Cheng Fei, Caitlyn~Heqi Yin, and Lawrence~KQ Yan. 2025.
+\bibitem[{Wang et~al.(2025{\natexlab{a}})Wang, Que, Xu, Liu, Zhou, Feng, Zhong, Ye, Yang, Huang, Zhang, and Lin}]{wang2025reverseengineeredreasoningopenendedgeneration}
+Haozhe Wang, Haoran Que, Qixin Xu, Minghao Liu, Wangchunshu Zhou, Jiazhan Feng, Wanjun Zhong, Wei Ye, Tong Yang, Wenhao Huang, Ge~Zhang, and Fangzhen Lin. 2025{\natexlab{a}}.
+\newblock \href {https://arxiv.org/abs/2509.06160} {Reverse-engineered reasoning for open-ended generation}.
+\newblock \emph{Preprint}, arXiv:2509.06160.
+
+\bibitem[{Wang et~al.(2025{\natexlab{b}})Wang, Wang, Zhou, Peng, Song, Zhang, Sun, Niu, Liu, Chen, Chen, Li, Feng, Bi, Liu, Zhang, Fei, Yin, and Yan}]{wang2025aleatoricepistemicexploringuncertainty}
+Tianyang Wang, Yunze Wang, Jun Zhou, Benji Peng, Xinyuan Song, Charles Zhang, Xintian Sun, Qian Niu, Junyu Liu, Silin Chen, Keyu Chen, Ming Li, Pohsun Feng, Ziqian Bi, Ming Liu, Yichao Zhang, Cheng Fei, Caitlyn~Heqi Yin, and Lawrence~KQ Yan. 2025{\natexlab{b}}.
 \newblock \href {https://arxiv.org/abs/2501.03282} {From aleatoric to epistemic: Exploring uncertainty quantification techniques in artificial intelligence}.
 \newblock \emph{Preprint}, arXiv:2501.03282.
 
@@ -160,10 +175,20 @@ Cehao Yang, Xueyuan Lin, Xiaojun Wu, Chengjin Xu, Xuhui Jiang, Honghao Liu, Hui 
 \newblock \href {https://doi.org/10.18653/v1/2026.findings-acl.331} {{S}elect2{R}eason: Efficient instruction-tuning data selection for long-{C}o{T} reasoning}.
 \newblock In \emph{Findings of the {A}ssociation for {C}omputational {L}inguistics: {ACL} 2026}, pages 6656--6671, San Diego, California, United States. Association for Computational Linguistics.
 
+\bibitem[{Yang et~al.(2025)Yang, Yu, Zhang, Xu, Gonzalez, CUI, and YAN}]{ICLR2025_0967d7c8}
+Ling Yang, Zhaochen Yu, Tianjun Zhang, Minkai Xu, Joseph~E Gonzalez, Bin CUI, and Shuicheng YAN. 2025.
+\newblock \href {https://proceedings.iclr.cc/paper_files/paper/2025/file/0967d7c8b171dd81b77c43067c02bebf-Paper-Conference.pdf} {Supercorrect: Advancing small llm reasoning with thought template distillation and self-correction}.
+\newblock In \emph{International Conference on Learning Representations}, volume 2025, pages 3386--3418.
+
 \bibitem[{Zhang and Liu(2026)}]{zhang-liu-2026-calibrated}
 Mengxiang Zhang and Lingyuan Liu. 2026.
 \newblock \href {https://doi.org/10.18653/v1/2026.findings-acl.335} {Calibrated progressive distillation: Co-designing curriculum and target mixing for knowledge distillation of large language models}.
 \newblock In \emph{Findings of the {A}ssociation for {C}omputational {L}inguistics: {ACL} 2026}, pages 6757--6776, San Diego, California, United States. Association for Computational Linguistics.
+
+\bibitem[{Zhang et~al.(2024)Zhang, Pan, Ling, Hu, and Zhao}]{zhang-etal-2024-elad}
+Yifei Zhang, Bo~Pan, Chen Ling, Yuntong Hu, and Liang Zhao. 2024.
+\newblock \href {https://doi.org/10.18653/v1/2024.findings-acl.264} {{ELAD}: Explanation-guided large language models active distillation}.
+\newblock In \emph{Findings of the Association for Computational Linguistics: ACL 2024}, pages 4463--4475, Bangkok, Thailand. Association for Computational Linguistics.
 
 \bibitem[{Zhou et~al.(2023)Zhou, Yang, Li, and Liu}]{zhou-etal-2023-bridging}
 Qinhong Zhou, Zonghan Yang, Peng Li, and Yang Liu. 2023.

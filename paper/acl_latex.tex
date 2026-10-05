@@ -116,8 +116,15 @@ Additionally, we provide a comparative analysis of augmentation strategies for s
 
 \section{Related Work}
 
-Recent work has improved LLM distillation through training objectives \citep{pmlr-v235-ko24c, xu-etal-2026-harnessing}.
-Alternatively, data curation \citep{pmlr-v306-just26a, li2025naturalthoughtsselectingdistillingreasoning, yang-etal-2026-select2reason} and curriculum learning \citep{jiang-etal-2025-teach, zhang-liu-2026-calibrated} have been explored with the scoring criteria remaining a key challenge \citep{jia-etal-2026-makes}.
+Recent work improved distillation through training objectives \citep{pmlr-v235-ko24c,xu-etal-2026-harnessing}, data selection \citep{pmlr-v306-just26a,li2025naturalthoughtsselectingdistillingreasoning,yang-etal-2026-select2reason}, and curriculum learning \citep{jiang-etal-2025-teach,zhang-liu-2026-calibrated}.
+Joint supervision with rationales and labels improves data efficiency \citep{hsieh-etal-2023-distilling}.
+Curriculum benefits vary with model capability, task complexity, and the choice of difficulty metric \citep{jia-etal-2026-makes}.
+ELAD \citep{zhang-etal-2024-elad} selects uncertain student explanations for teacher revision.
+Complexity-aware fine-tuning \citep{goncharov2026complexityawarefinetuning} selects reasoning examples by single-token entropy.
+We recursively sample pre-generated traces using student-proxy entropy differences.
+
+Trace synthesis includes explaining known solutions \citep{li2024distillingalgorithmicreasoning,wang2025reverseengineeredreasoningopenendedgeneration} and learning from corrections \citep{an2024learningmistakesmakesllm, ICLR2025_0967d7c8}.
+We compare direct generation and various augmentations on the same task under constrained trace lengths.
 
 \section{Method}
 \label{sec:method}
@@ -138,16 +145,6 @@ If proxy's residual epistemic uncertainty satisfies $E_P(x)\leq\varepsilon(x)$, 
   \label{eq:aleatoric_proxy_error}
 \end{equation}
 Thus, the entropy difference (\emph{entropy gain}) approximates the student's epistemic uncertainty with error at most $\varepsilon(x)$.
-
-\paragraph{The proposed pipeline} consists of the following steps (Figure \ref{fig:recursive_caft_scheme}, Algorithm \ref{alg:recursive_distillation}):
-(1) prompt the larger model to answer all questions in the dataset with a single token once (or an ensemble of models taking average), collect entropy, assume it is an aleatoric uncertainty proxy;
-(2) for each training epoch,
-(2.1) prompt the student model to answer all questions in the dataset with a single token, collect entropy;
-(2.2) calculate entropy gain $EG(x) = \max\{H_S(x)-H_P(x),0\}$;
-(2.3.1) sample 1024 synthetic reasoning chains without replacement, weighted by positive entropy gain;
-(2.3.2) sample 256 single-token answers in similar fashion as a subset of the previous sample;
-(2.4) concatenate samples;
-(2.5) train the student using LoRA \citep{hu2021loralowrankadaptationlarge} on reasoning traces first, followed by single-token responses.
 
 \begin{algorithm}
   \caption{Recursive offline distillation via epistemic complexity approximation}
@@ -174,6 +171,16 @@ Thus, the entropy difference (\emph{entropy gain}) approximates the student's ep
     \State \Return $S$
   \end{algorithmic}
 \end{algorithm}
+
+\paragraph{The proposed pipeline} consists of the following steps (Figure \ref{fig:recursive_caft_scheme}, Algorithm \ref{alg:recursive_distillation}):
+(1) prompt the larger model to answer all questions in the dataset with a single token once (or an ensemble of models taking average), collect entropy, assume it is an aleatoric uncertainty proxy;
+(2) for each training epoch,
+(2.1) prompt the student model to answer all questions in the dataset with a single token, collect entropy;
+(2.2) calculate entropy gain $EG(x) = \max\{H_S(x)-H_P(x),0\}$;
+(2.3.1) sample 1024 synthetic reasoning chains without replacement, weighted by positive entropy gain;
+(2.3.2) sample 256 single-token answers in similar fashion as a subset of the previous sample;
+(2.4) concatenate samples;
+(2.5) train the student using LoRA \citep{hu2021loralowrankadaptationlarge} on reasoning traces first, followed by single-token responses.
 
 \section{Results}
 
@@ -290,7 +297,7 @@ Shortly after, it starts declining which is loosely correlated with the method's
   \label{fig:synth_comparison}
 \end{figure*}
 
-\subsection{Synthetic Traces Generation and Normalization}
+\subsection{Synthetic Traces Generation}
 \label{sec:synth_trace_analysis}
 
 In resource-constrained environments, available VRAM imposes a strict limitation on the length of distilled reasoning chains.
@@ -344,9 +351,24 @@ At the same time, we notice that random sampler performs exceptionally well (con
   \label{tab:sampler_ablation}
 \end{table}
 
-\section{Conclusion and discussion}
+\section{Conclusion and Discussion}
+
+This paper introduces a fully automated recursive offline distillation method rooted in epistemic uncertainty approximation. It achieves $57.15 \pm 1.01$ mean accuracy across three students on MMLU-Pro vs $51.61$ for direct distillation at a comparable training data budget and offers a much steeper learning curve (baseline score at 15\% of its data budget).
+We confirm that both the entropy difference sampler and the data mix contribute to the gains.
+Surprisingly, shorter traces and reasoning budgets exhibit better performance.
+Further exploration of the more rigorous epistemic uncertainty estimation and the surprising effect of such a small data mix augmentation remain future work.
 
 \section*{Limitations}
+
+\begin{itemize}
+  \item Method is tested only with small models. We do not know how well it is going to generalize to larger LLMs. Additionally, it might be challenging to find a suitable aleatoric proxy for larger students.
+  \item We use a single dataset. We do not know how well it translates to other settings.
+  \item Alternative aleatoric approximations, such as agreement of the ensemble and other, are left unexplored.
+  \item We did not test and compare multiple sizes of aleatoric proxies and their impact on performance.
+  \item Different compositions of the data mix are not tested due to lack of resources.
+  \item We tested only a single schedule for \emph{Discounted Entropy Gain}. Alternatives are yet to explore.
+  \item Some low-resource environments might have even more constraints and therefore struggle to fit a suitable aleatoric proxy into VRAM.
+\end{itemize}
 
 % Bibliography entries for the entire Anthology, followed by custom entries
 %\bibliography{custom,anthology-overleaf-1,anthology-overleaf-2}
