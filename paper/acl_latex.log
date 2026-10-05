@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.7)  5 OCT 2026 16:30
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.7)  5 OCT 2026 17:10
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -750,17 +750,17 @@ Overfull \hbox (13.0412pt too wide) detected at line 146
  []
 
 Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on input line 150.
-<img/all_models_reasoning_evals_cap4096.pdf, id=216, 1231.7832pt x 794.52142pt>
+<img/all_models_reasoning_evals_cap4096.pdf, id=220, 1231.7832pt x 794.52142pt>
 File: img/all_models_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/all_models_reasoning_evals_cap4096.pdf>
 Package pdftex.def Info: img/all_models_reasoning_evals_cap4096.pdf  used on input line 191.
 (pdftex.def)             Requested size: 154.78133pt x 99.83623pt.
-<img/all_models_reasoning_evals_cap2048.pdf, id=217, 1231.7832pt x 794.52142pt>
+<img/all_models_reasoning_evals_cap2048.pdf, id=221, 1231.7832pt x 794.52142pt>
 File: img/all_models_reasoning_evals_cap2048.pdf Graphic file (type pdf)
 <use img/all_models_reasoning_evals_cap2048.pdf>
 Package pdftex.def Info: img/all_models_reasoning_evals_cap2048.pdf  used on input line 197.
 (pdftex.def)             Requested size: 154.78133pt x 99.83623pt.
-<img/student_entropy_roc_auc_all_models.pdf, id=218, 977.60324pt x 701.4801pt>
+<img/student_entropy_roc_auc_all_models.pdf, id=222, 977.60324pt x 701.4801pt>
 File: img/student_entropy_roc_auc_all_models.pdf Graphic file (type pdf)
 <use img/student_entropy_roc_auc_all_models.pdf>
 Package pdftex.def Info: img/student_entropy_roc_auc_all_models.pdf  used on input line 202.
@@ -775,21 +775,18 @@ Underfull \hbox (badness 2547) in paragraph at lines 245--248
  []\T1/ptm/b/n/10.95 (+20) LLMs:[] \T1/ptm/m/n/10.95 (+20) Aleatoric proxy: en-sem-ble of two
  []
 
-
-Underfull \vbox (badness 1102) has occurred while \output is active []
-
- [2]
-<img/performance_vs_truncation_mode_mode_best_acc_bars.pdf, id=283, 973.9788pt x 679.13208pt>
+[2]
+<img/performance_vs_truncation_mode_mode_best_acc_bars.pdf, id=289, 973.9788pt x 679.13208pt>
 File: img/performance_vs_truncation_mode_mode_best_acc_bars.pdf Graphic file (type pdf)
 <use img/performance_vs_truncation_mode_mode_best_acc_bars.pdf>
 Package pdftex.def Info: img/performance_vs_truncation_mode_mode_best_acc_bars.pdf  used on input line 281.
 (pdftex.def)             Requested size: 141.12456pt x 98.3939pt.
-<img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf, id=284, 1125.7887pt x 763.807pt>
+<img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf, id=290, 1125.7887pt x 763.807pt>
 File: img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf  used on input line 287.
 (pdftex.def)             Requested size: 159.33821pt x 108.09772pt.
-<img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf, id=285, 906.49365pt x 679.25314pt>
+<img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf, id=291, 906.49365pt x 679.25314pt>
 File: img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf  used on input line 293.
@@ -824,16 +821,19 @@ Underfull \hbox (badness 2277) in paragraph at lines 50--53
  []
 
 [5]
-Underfull \hbox (badness 1117) in paragraph at lines 125--128
+Underfull \hbox (badness 1117) in paragraph at lines 135--138
 \T1/ptm/m/n/10 (+20) Rekatsi-nas. 2023.  [][]Re-peated ran-dom sam-pling
  []
 
 [6]) (/usr/local/texlive/2024/texmf-dist/tex/latex/inconsolata/t1zi4.fd)
+Underfull \vbox (badness 1596) has occurred while \output is active []
+
+
 Underfull \hbox (badness 3058) in paragraph at lines 414--416
 \T1/ptm/m/n/10.95 (+20) Single-token en-tropy (Fig-ure [][]4[][]) mea-sures a
  []
 
-<img/single_token_entropy.png, id=707, 2469.225pt x 1100.11pt>
+<img/single_token_entropy.png, id=713, 2469.225pt x 1100.11pt>
 File: img/single_token_entropy.png Graphic file (type png)
 <use img/single_token_entropy.png>
 Package pdftex.def Info: img/single_token_entropy.png  used on input line 423.
@@ -841,12 +841,13 @@ Package pdftex.def Info: img/single_token_entropy.png  used on input line 423.
 [7{/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc} <./img/single_token_entropy.png>]
 LaTeX Font Info:    Font shape `T1/zi4/m/n' will be
 (Font)              scaled to size 10.95pt on input line 476.
-<img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf, id=743, 1125.7887pt x 763.807pt>
+ [8]
+<img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf, id=769, 1125.7887pt x 763.807pt>
 File: img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf  used on input line 504.
 (pdftex.def)             Requested size: 145.68144pt x 98.8322pt.
-<img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf, id=744, 906.49365pt x 679.25314pt>
+<img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf, id=770, 906.49365pt x 679.25314pt>
 File: img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf  used on input line 510.
@@ -856,17 +857,17 @@ Underfull \hbox (badness 2753) in paragraph at lines 511--511
 []\T1/ptm/m/n/9 (+20) (b) |Gen-er-a-tion meth-ods: trun-ca-tion
  []
 
-<img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf, id=745, 883.4474pt x 650.13269pt>
+<img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf, id=771, 883.4474pt x 650.13269pt>
 File: img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf  used on input line 516.
 (pdftex.def)             Requested size: 145.68144pt x 107.20773pt.
-<img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf, id=746, 1125.7887pt x 763.807pt>
+<img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf, id=772, 1125.7887pt x 763.807pt>
 File: img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf  used on input line 527.
 (pdftex.def)             Requested size: 145.68144pt x 98.8322pt.
-<img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf, id=747, 906.49365pt x 679.25314pt>
+<img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf, id=773, 906.49365pt x 679.25314pt>
 File: img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf  used on input line 533.
@@ -876,132 +877,127 @@ Underfull \hbox (badness 2753) in paragraph at lines 534--534
 []\T1/ptm/m/n/9 (+20) (b) |Gen-er-a-tion meth-ods: trun-ca-tion
  []
 
-<img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf, id=748, 883.4474pt x 650.13269pt>
+<img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf, id=774, 883.4474pt x 650.13269pt>
 File: img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf  used on input line 539.
 (pdftex.def)             Requested size: 145.68144pt x 107.20773pt.
-<img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf, id=749, 1125.7887pt x 763.807pt>
+<img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf, id=775, 1125.7887pt x 763.807pt>
 File: img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf  used on input line 550.
 (pdftex.def)             Requested size: 218.51521pt x 148.2483pt.
-<img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf, id=750, 918.7739pt x 679.25314pt>
+<img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf, id=776, 918.7739pt x 679.25314pt>
 File: img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf>
 Package pdftex.def Info: img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf  used on input line 556.
 (pdftex.def)             Requested size: 218.51521pt x 161.54195pt.
-[8]
-<img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_llama_3b_truncated24000.pdf, id=767, 974.17638pt x 685.70558pt>
+<img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_llama_3b_truncated24000.pdf, id=779, 974.17638pt x 685.70558pt>
 File: img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_llama_3b_truncated24000.pdf Graphic file (type pdf)
 <use img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_llama_3b_truncated24000.pdf>
 Package pdftex.def Info: img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_llama_3b_truncated24000.pdf  used on input line 596.
 (pdftex.def)             Requested size: 145.68144pt x 102.5375pt.
-<img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_qwen_3b_truncated24000.pdf, id=768, 974.17638pt x 685.70558pt>
+<img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_qwen_3b_truncated24000.pdf, id=780, 974.17638pt x 685.70558pt>
 File: img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_qwen_3b_truncated24000.pdf Graphic file (type pdf)
 <use img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_qwen_3b_truncated24000.pdf>
 Package pdftex.def Info: img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_qwen_3b_truncated24000.pdf  used on input line 602.
 (pdftex.def)             Requested size: 145.68144pt x 102.5375pt.
-<img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_phi4_mini_truncated24000.pdf, id=769, 974.17638pt x 679.17938pt>
+<img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_phi4_mini_truncated24000.pdf, id=781, 974.17638pt x 679.17938pt>
 File: img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_phi4_mini_truncated24000.pdf Graphic file (type pdf)
 <use img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_phi4_mini_truncated24000.pdf>
 Package pdftex.def Info: img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_phi4_mini_truncated24000.pdf  used on input line 608.
 (pdftex.def)             Requested size: 145.68144pt x 101.5616pt.
-<img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation3072.pdf, id=772, 974.00699pt x 685.66882pt>
+<img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation3072.pdf, id=784, 974.00699pt x 685.66882pt>
 File: img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation3072.pdf Graphic file (type pdf)
 <use img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation3072.pdf>
 Package pdftex.def Info: img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation3072.pdf  used on input line 622.
 (pdftex.def)             Requested size: 145.68144pt x 102.55293pt.
-<img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation8192.pdf, id=773, 974.05783pt x 685.66882pt>
+<img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation8192.pdf, id=785, 974.05783pt x 685.66882pt>
 File: img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation8192.pdf Graphic file (type pdf)
 <use img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation8192.pdf>
 Package pdftex.def Info: img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation8192.pdf  used on input line 628.
 (pdftex.def)             Requested size: 145.68144pt x 102.54247pt.
-<img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation24000.pdf, id=774, 974.05783pt x 685.66882pt>
+<img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation24000.pdf, id=786, 974.05783pt x 685.66882pt>
 File: img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation24000.pdf Graphic file (type pdf)
 <use img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation24000.pdf>
 Package pdftex.def Info: img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation24000.pdf  used on input line 634.
 (pdftex.def)             Requested size: 145.68144pt x 102.54247pt.
-<img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation3072.pdf, id=775, 974.00699pt x 685.66882pt>
+<img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation3072.pdf, id=787, 974.00699pt x 685.66882pt>
 File: img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation3072.pdf Graphic file (type pdf)
 <use img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation3072.pdf>
 Package pdftex.def Info: img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation3072.pdf  used on input line 645.
 (pdftex.def)             Requested size: 145.68144pt x 102.55293pt.
-<img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation8192.pdf, id=776, 974.05783pt x 685.66882pt>
+<img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation8192.pdf, id=788, 974.05783pt x 685.66882pt>
 File: img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation8192.pdf Graphic file (type pdf)
 <use img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation8192.pdf>
 Package pdftex.def Info: img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation8192.pdf  used on input line 651.
 (pdftex.def)             Requested size: 145.68144pt x 102.54247pt.
-<img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation24000.pdf, id=777, 974.06346pt x 685.66882pt>
+<img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation24000.pdf, id=789, 974.06346pt x 685.66882pt>
 File: img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation24000.pdf Graphic file (type pdf)
 <use img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation24000.pdf>
 Package pdftex.def Info: img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation24000.pdf  used on input line 657.
 (pdftex.def)             Requested size: 145.68144pt x 102.54247pt.
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [9 <./img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf> <./img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf> <./img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf> <./img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf> <./img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf>]
-<img/llama_3b_head_truncated8192_reasoning_evals_cap2048.pdf, id=1033, 1231.7832pt x 794.52142pt>
+<img/llama_3b_head_truncated8192_reasoning_evals_cap2048.pdf, id=794, 1231.7832pt x 794.52142pt>
 File: img/llama_3b_head_truncated8192_reasoning_evals_cap2048.pdf Graphic file (type pdf)
 <use img/llama_3b_head_truncated8192_reasoning_evals_cap2048.pdf>
 Package pdftex.def Info: img/llama_3b_head_truncated8192_reasoning_evals_cap2048.pdf  used on input line 696.
 (pdftex.def)             Requested size: 145.68144pt x 93.95639pt.
-<img/llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf, id=1034, 1231.7832pt x 794.52142pt>
+<img/llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf, id=795, 1231.7832pt x 794.52142pt>
 File: img/llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf>
 Package pdftex.def Info: img/llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf  used on input line 702.
 (pdftex.def)             Requested size: 145.68144pt x 93.95639pt.
-<img/llama_3b_head_truncated8192_cumulative_unique_questions.pdf, id=1035, 1237.93117pt x 765.16579pt>
+<img/llama_3b_head_truncated8192_cumulative_unique_questions.pdf, id=796, 1237.93117pt x 765.16579pt>
 File: img/llama_3b_head_truncated8192_cumulative_unique_questions.pdf Graphic file (type pdf)
 <use img/llama_3b_head_truncated8192_cumulative_unique_questions.pdf>
 Package pdftex.def Info: img/llama_3b_head_truncated8192_cumulative_unique_questions.pdf  used on input line 708.
 (pdftex.def)             Requested size: 145.68144pt x 90.04126pt.
-<img/qwen_3b_head_truncated8192_reasoning_evals_cap2048.pdf, id=1036, 1219.50294pt x 794.52142pt>
+<img/qwen_3b_head_truncated8192_reasoning_evals_cap2048.pdf, id=797, 1219.50294pt x 794.52142pt>
 File: img/qwen_3b_head_truncated8192_reasoning_evals_cap2048.pdf Graphic file (type pdf)
 <use img/qwen_3b_head_truncated8192_reasoning_evals_cap2048.pdf>
 Package pdftex.def Info: img/qwen_3b_head_truncated8192_reasoning_evals_cap2048.pdf  used on input line 719.
 (pdftex.def)             Requested size: 145.68144pt x 94.91414pt.
-<img/qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf, id=1037, 1219.50294pt x 794.52142pt>
+<img/qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf, id=798, 1219.50294pt x 794.52142pt>
 File: img/qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf>
 Package pdftex.def Info: img/qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf  used on input line 725.
 (pdftex.def)             Requested size: 145.68144pt x 94.91414pt.
-<img/qwen_3b_head_truncated8192_cumulative_unique_questions.pdf, id=1038, 1237.93117pt x 765.16579pt>
+<img/qwen_3b_head_truncated8192_cumulative_unique_questions.pdf, id=799, 1237.93117pt x 765.16579pt>
 File: img/qwen_3b_head_truncated8192_cumulative_unique_questions.pdf Graphic file (type pdf)
 <use img/qwen_3b_head_truncated8192_cumulative_unique_questions.pdf>
 Package pdftex.def Info: img/qwen_3b_head_truncated8192_cumulative_unique_questions.pdf  used on input line 731.
 (pdftex.def)             Requested size: 145.68144pt x 90.04126pt.
-<img/phi4_mini_head_truncated8192_reasoning_evals_cap2048.pdf, id=1039, 1219.50294pt x 794.52142pt>
+<img/phi4_mini_head_truncated8192_reasoning_evals_cap2048.pdf, id=800, 1219.50294pt x 794.52142pt>
 File: img/phi4_mini_head_truncated8192_reasoning_evals_cap2048.pdf Graphic file (type pdf)
 <use img/phi4_mini_head_truncated8192_reasoning_evals_cap2048.pdf>
 Package pdftex.def Info: img/phi4_mini_head_truncated8192_reasoning_evals_cap2048.pdf  used on input line 742.
 (pdftex.def)             Requested size: 145.68144pt x 94.91414pt.
-<img/phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf, id=1040, 1231.7832pt x 794.52142pt>
+<img/phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf, id=801, 1231.7832pt x 794.52142pt>
 File: img/phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf>
 Package pdftex.def Info: img/phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf  used on input line 748.
 (pdftex.def)             Requested size: 145.68144pt x 93.95639pt.
-<img/phi4_mini_head_truncated8192_cumulative_unique_questions.pdf, id=1041, 1237.93117pt x 765.16579pt>
+<img/phi4_mini_head_truncated8192_cumulative_unique_questions.pdf, id=802, 1237.93117pt x 765.16579pt>
 File: img/phi4_mini_head_truncated8192_cumulative_unique_questions.pdf Graphic file (type pdf)
 <use img/phi4_mini_head_truncated8192_cumulative_unique_questions.pdf>
 Package pdftex.def Info: img/phi4_mini_head_truncated8192_cumulative_unique_questions.pdf  used on input line 754.
 (pdftex.def)             Requested size: 145.68144pt x 90.04126pt.
-<img/proportional_samplers_reasoning_evals_cap4096.pdf, id=1042, 1219.50294pt x 852.29176pt>
+<img/proportional_samplers_reasoning_evals_cap4096.pdf, id=803, 1219.50294pt x 852.29176pt>
 File: img/proportional_samplers_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/proportional_samplers_reasoning_evals_cap4096.pdf>
 Package pdftex.def Info: img/proportional_samplers_reasoning_evals_cap4096.pdf  used on input line 765.
 (pdftex.def)             Requested size: 145.68144pt x 101.81541pt.
-<img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf, id=1043, 1219.50294pt x 792.82759pt>
+<img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf, id=804, 1219.50294pt x 792.82759pt>
 File: img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf Graphic file (type pdf)
 <use img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf>
 Package pdftex.def Info: img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf  used on input line 771.
 (pdftex.def)             Requested size: 145.68144pt x 94.71179pt.
-<img/all_models_cumulative_unique_questions.pdf, id=1044, 1237.64886pt x 765.16579pt>
+<img/all_models_cumulative_unique_questions.pdf, id=805, 1237.64886pt x 765.16579pt>
 File: img/all_models_cumulative_unique_questions.pdf Graphic file (type pdf)
 <use img/all_models_cumulative_unique_questions.pdf>
 Package pdftex.def Info: img/all_models_cumulative_unique_questions.pdf  used on input line 777.
 (pdftex.def)             Requested size: 145.68144pt x 90.0646pt.
- [10 <./img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf> <./img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_llama_3b_truncated24000.pdf> <./img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_qwen_3b_truncated24000.pdf> <./img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_phi4_mini_truncated24000.pdf>] [11 <./img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation3072.pdf> <./img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation8192.pdf> <./img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation24000.pdf> <./img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation3072.pdf> <./img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation8192.pdf> <./img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation24000.pdf> <./img/llama_3b_head_truncated8192_reasoning_evals_cap2048.pdf> <./img/llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/llama_3b_head_truncated8192_cumulative_unique_questions.pdf> <./img/qwen_3b_head_truncated8192_reasoning_evals_cap2048.pdf> <./img/qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/qwen_3b_head_truncated8192_cumulative_unique_questions.pdf>] [12 <./img/phi4_mini_head_truncated8192_reasoning_evals_cap2048.pdf> <./img/phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/phi4_mini_head_truncated8192_cumulative_unique_questions.pdf> <./img/proportional_samplers_reasoning_evals_cap4096.pdf> <./img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf> <./img/all_models_cumulative_unique_questions.pdf>] (./acl_latex.aux)
+[9] [10 <./img/distillation_on_synthetic_traces_llama_3b_head_truncated_by_model.pdf> <./img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals.pdf> <./img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/distillation_on_synthetic_traces_qwen_3b_head_truncated_by_model.pdf> <./img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals.pdf> <./img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/distillation_on_synthetic_traces_phi4_mini_head_truncated_by_model.pdf> <./img/distillation_on_synthetic_traces_phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_llama_3b_truncated24000.pdf> <./img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_qwen_3b_truncated24000.pdf> <./img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_phi4_mini_truncated24000.pdf>] [11 <./img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation3072.pdf> <./img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation8192.pdf> <./img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation24000.pdf> <./img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation3072.pdf> <./img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation8192.pdf> <./img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation24000.pdf> <./img/llama_3b_head_truncated8192_reasoning_evals_cap2048.pdf> <./img/llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/llama_3b_head_truncated8192_cumulative_unique_questions.pdf> <./img/qwen_3b_head_truncated8192_reasoning_evals_cap2048.pdf> <./img/qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/qwen_3b_head_truncated8192_cumulative_unique_questions.pdf>] [12 <./img/phi4_mini_head_truncated8192_reasoning_evals_cap2048.pdf> <./img/phi4_mini_head_truncated8192_reasoning_evals_cap4096.pdf> <./img/phi4_mini_head_truncated8192_cumulative_unique_questions.pdf> <./img/proportional_samplers_reasoning_evals_cap4096.pdf> <./img/random_vs_entropy_gain_proportional_reasoning_evals_cap4096.pdf> <./img/all_models_cumulative_unique_questions.pdf>] (./acl_latex.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
@@ -1010,18 +1006,18 @@ Package rerunfilecheck Info: File `acl_latex.out' has not changed.
 (rerunfilecheck)             Checksum: 994E147BEE1517C13E557D9BDDBC92F2;3377.
  ) 
 Here is how much of TeX's memory you used:
- 27011 strings out of 474116
- 515254 string characters out of 5743682
- 1965187 words of memory out of 5000000
- 48359 multiletter control sequences out of 15000+600000
- 639413 words of font info for 376 fonts, out of 8000000 for 9000
+ 27022 strings out of 474116
+ 515525 string characters out of 5743682
+ 1970187 words of memory out of 5000000
+ 48362 multiletter control sequences out of 15000+600000
+ 639768 words of font info for 380 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 99i,17n,101p,4617b,675s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 99i,17n,101p,4617b,673s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/inconsolata/Inconsolata-zi4r.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/helvetic/uhvb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on acl_latex.pdf (12 pages, 1947329 bytes).
+Output written on acl_latex.pdf (12 pages, 1948408 bytes).
 PDF statistics:
- 2202 PDF objects out of 2487 (max. 8388607)
- 746 compressed objects within 8 object streams
- 117 named destinations out of 1000 (max. 500000)
+ 2216 PDF objects out of 2487 (max. 8388607)
+ 760 compressed objects within 8 object streams
+ 119 named destinations out of 1000 (max. 500000)
  71014 words of extra memory for PDF output out of 74296 (max. 10000000)
 

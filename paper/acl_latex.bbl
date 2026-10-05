@@ -1,4 +1,4 @@
-\begin{thebibliography}{39}
+\begin{thebibliography}{41}
 \providecommand{\natexlab}[1]{#1}
 
 \bibitem[{Agarwal et~al.(2024)Agarwal, Vieillard, Zhou, Stanczyk, Ramos~Garea, Geist, and Bachem}]{ICLR2024_5be69a58}
@@ -106,6 +106,11 @@ Yang Li, Youssef Emad, Karthik Padthe, Jack Lanchantin, Weizhe Yuan, Thao Nguyen
 \newblock \href {https://arxiv.org/abs/2507.01921} {Naturalthoughts: Selecting and distilling reasoning traces for general reasoning tasks}.
 \newblock \emph{Preprint}, arXiv:2507.01921.
 
+\bibitem[{Lin et~al.(2025)Lin, Gou, Gong, Liu, Shen, Xu, Lin, Yang, Jiao, Duan, and Chen}]{lin2025rho1tokensneed}
+Zhenghao Lin, Zhibin Gou, Yeyun Gong, Xiao Liu, Yelong Shen, Ruochen Xu, Chen Lin, Yujiu Yang, Jian Jiao, Nan Duan, and Weizhu Chen. 2025.
+\newblock \href {https://arxiv.org/abs/2404.07965} {Rho-1: Not all tokens are what you need}.
+\newblock \emph{Preprint}, arXiv:2404.07965.
+
 \bibitem[{Lu et~al.(2024)Lu, Luu, and Buehler}]{lu2024finetuninglargelanguagemodels}
 Wei Lu, Rachel~K. Luu, and Markus~J. Buehler. 2024.
 \newblock \href {https://arxiv.org/abs/2409.03444} {Fine-tuning large language models for domain adaptation: Exploration of training strategies, scaling, model merging and synergistic capabilities}.
@@ -120,6 +125,11 @@ Andrey Malinin and Mark Gales. 2021.
 Microsoft, :, Abdelrahman Abouelenin, Atabak Ashfaq, Adam Atkinson, Hany Awadalla, Nguyen Bach, Jianmin Bao, Alon Benhaim, Martin Cai, Vishrav Chaudhary, Congcong Chen, Dong Chen, Dongdong Chen, Junkun Chen, Weizhu Chen, Yen-Chun Chen, Yi~ling Chen, Qi~Dai, and 57 others. 2025.
 \newblock \href {https://arxiv.org/abs/2503.01743} {Phi-4-mini technical report: Compact yet powerful multimodal language models via mixture-of-loras}.
 \newblock \emph{Preprint}, arXiv:2503.01743.
+
+\bibitem[{Mindermann et~al.(2022)Mindermann, Brauner, Razzak, Sharma, Kirsch, Xu, H{\"o}ltgen, Gomez, Morisot, Farquhar, and Gal}]{pmlr-v162-mindermann22a}
+S{\"o}ren Mindermann, Jan~M Brauner, Muhammed~T Razzak, Mrinank Sharma, Andreas Kirsch, Winnie Xu, Benedikt H{\"o}ltgen, Aidan~N Gomez, Adrien Morisot, Sebastian Farquhar, and Yarin Gal. 2022.
+\newblock \href {https://proceedings.mlr.press/v162/mindermann22a.html} {Prioritized training on points that are learnable, worth learning, and not yet learnt}.
+\newblock In \emph{Proceedings of the 39th International Conference on Machine Learning}, volume 162 of \emph{Proceedings of Machine Learning Research}, pages 15630--15649. PMLR.
 
 \bibitem[{Okanovic et~al.(2023)Okanovic, Waleffe, Mageirakos, Nikolakakis, Karbasi, Kalogerias, Gürel, and Rekatsinas}]{okanovic2023repeatedrandomsamplingminimizing}
 Patrik Okanovic, Roger Waleffe, Vasilis Mageirakos, Konstantinos~E. Nikolakakis, Amin Karbasi, Dionysis Kalogerias, Nezihe~Merve Gürel, and Theodoros Rekatsinas. 2023.
