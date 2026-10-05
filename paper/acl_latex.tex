@@ -212,7 +212,7 @@ Thus, the entropy difference (\emph{entropy gain}) approximates the student's ep
   \setlength{\tabcolsep}{4pt}
   \begin{tabular}{l *{4}{l}}
     \hline
-    Method & \multicolumn{1}{c}{LLaMA-3B} & \multicolumn{1}{c}{Qwen-3B} & \multicolumn{1}{c}{Phi4-mini} & \multicolumn{1}{c}{Mean} \\
+    Method & \multicolumn{1}{c}{LLaMA 3.2 3B} & \multicolumn{1}{c}{Qwen 2.5 3B} & \multicolumn{1}{c}{Phi4-mini} & \multicolumn{1}{c}{Mean} \\
     \hline
     Direct reasoning trace & 46.09 / 45.55 & 51.45 / 50.37 & 57.27 / 62.43 & 51.61 / 52.78 \\
     Corrected answer & 47.80 / 47.26 & 50.87 / 49.42 & \underline{58.81} / 61.26 & 52.49 / 52.65 \\
@@ -306,7 +306,7 @@ At last, how exactly do we prompt the teacher model to generate reasoning traces
 
 We evaluate reasoning traces by:
 (a) \emph{truncation type} - which part of the trace we keep when it exceeds the maximum length;
-(b) \emph{length} - what is the optimal training truncation limit and evaluation thinking budget (in tokens).
+(b) \emph{length} - what is the optimal training truncation limit (characters) and evaluation thinking budget (tokens);
 (c) \emph{generation method} (below).
 
 Generation methods (details in Appendix~\ref{sec:synth_genration_methods_details}):
@@ -319,7 +319,7 @@ Generation methods (details in Appendix~\ref{sec:synth_genration_methods_details
 Figure~\ref{fig:synth_comparison} shows that models have a slight preference towards head truncation, medium to short reasoning chains in training and thinking budgets.
 Surprisingly, longer reasoning chains and greater thinking budgets lead to notable performance decrease.
 As to the generation methods, we see that augmented reasoning traces lead to elevated performance, while the consistent data leakage results in degradation.
-Based on the findings, we use 8,192-token head truncation and \emph{Corrected answer} generation for the pipeline.
+Based on the findings, we use 8,192-character head truncation and \emph{Corrected answer} generation for the pipeline.
 
 \subsection{Sensitivity Study}
 
@@ -495,7 +495,7 @@ Given the original reasoning, incorrect option a, and correct option b, a contin
 
 \subsection{Per-model results}
 \label{sec:synth_per_model}
-Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show test accuracy across training epochs for each student. The left panels compare head-truncation limits of 3,072, 8,192, and 24,000 for direct reasoning traces; each legend separately specifies the evaluation cap. Truncation limits the training trace, whereas the evaluation cap limits reasoning generated at test time. The generation-method panels hold head truncation fixed at 8,192 and compare methods at the stated evaluation cap. Dashed horizontal lines and epoch-zero values use the base model's accuracy prompted to answer with chain-of-thought (base models originally are not reasoners), shared across evaluation budgets.
+Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show test accuracy across training epochs for each student. The left panels compare head-truncation limits of 3,072, 8,192, and 24,000 characters for direct reasoning traces; each legend separately specifies the evaluation cap in tokens. The generation-method panels hold head truncation fixed at 8,192 characters and compare methods at the stated evaluation cap. Dashed horizontal lines and epoch-zero values use the base model's accuracy prompted to answer with chain-of-thought (base models originally are not reasoners), shared across evaluation budgets.
 
 \begin{figure*}[t]
   \centering
@@ -516,7 +516,7 @@ Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show te
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_llama_3b_head_truncated8192_reasoning_evals_cap4096.pdf}
     \caption{Generation methods: truncation 8,192, eval cap 4,096}
   \end{subfigure}
-  \caption{Synthetic-trace distillation results for LLaMA-3B.}
+  \caption{Synthetic-trace distillation results for LLaMA 3.2 3B.}
   \label{fig:synth_llama_individual}
 \end{figure*}
 
@@ -539,7 +539,7 @@ Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show te
     \includegraphics[width=\linewidth]{img/distillation_on_synthetic_traces_qwen_3b_head_truncated8192_reasoning_evals_cap4096.pdf}
     \caption{Generation methods: truncation 8,192, eval cap 4,096}
   \end{subfigure}
-  \caption{Synthetic-trace distillation results for Qwen-3B.}
+  \caption{Synthetic-trace distillation results for Qwen 2.5 3B.}
   \label{fig:synth_qwen_individual}
 \end{figure*}
 
@@ -560,6 +560,107 @@ Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show te
   \label{fig:synth_phi_individual}
 \end{figure*}
 
+\section{Synthetic trace truncation and reasoning caps}
+\label{sec:trace_truncation_caps}
+
+Training truncation limits the retained teacher reasoning in characters; the reasoning cap limits the student's generated reasoning at evaluation time in tokens. These are separate controls: a 3,072-character training trace can be evaluated with a 4,096-token cap. The final answer letter is retained separately when training traces are shortened.
+
+Table~\ref{tab:training_trace_truncation_counts} reports how many training traces exceed each character budget before truncation.
+
+\begin{table}[t]
+  \centering
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{rrr}
+    \toprule
+    Budget (chars) & Direct traces & Corrected traces \\
+    \midrule
+    3,072 & 3,603 (37.4\%) & 3,721 (38.7\%) \\
+    8,192 & 1,879 (19.5\%) & 1,921 (20.0\%) \\
+    24,000 & 738 (7.7\%) & 749 (7.8\%) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Number (percentage) of training traces exceeding each truncation budget}
+  \label{tab:training_trace_truncation_counts}
+\end{table}
+
+\subsection{Which part of the trace is retained?}
+Head truncation keeps a prefix. Middle truncation keeps an initial segment and a final segment, dropping the interior of an overlong trace. Tail truncation keeps only a suffix. At the nominal 24,000-character setting, head retains up to 24,000 characters, middle retains the first 18,000 and last 6,000 of overlong traces, and tail retains the last 24,000. For corrected traces, middle truncation instead reserves up to 1,600 characters for the correction and uses the remaining space for the original prefix.
+
+Figure~\ref{fig:trace_truncation_modes} compares these policies at a fixed 8,192-token evaluation cap. Preferences vary by model: head gives the best observed checkpoint for LLaMA and Qwen, while tail does so for Phi4-mini.
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_llama_3b_truncated24000.pdf}
+    \caption{LLaMA 3.2 3B}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_qwen_3b_truncated24000.pdf}
+    \caption{Qwen 2.5 3B}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/performance_vs_truncation_mode_mode_accuracy_vs_epoch_phi4_mini_truncated24000.pdf}
+    \caption{Phi4-mini}
+  \end{subfigure}
+  \caption{Training truncation policies at the nominal 24,000-character setting, evaluated with an 8,192-token reasoning cap. Dashed lines and epoch-zero points give the base model's chain-of-thought accuracy.}
+  \label{fig:trace_truncation_modes}
+\end{figure*}
+
+\subsection{Training truncation length versus evaluation cap}
+For direct traces with head truncation at 3,072, 8,192, or 24,000 characters, we compare available evaluation caps of 1,024, 2,048, 4,096, and 8,192 tokens. Figures~\ref{fig:trace_caps_best} and \ref{fig:trace_caps_last} separate training length from evaluation budget. Best-checkpoint accuracy is the maximum over observed trained checkpoints for each cap; last-checkpoint accuracy uses the final available epoch. Only evaluated combinations are plotted.
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation3072.pdf}
+    \caption{Head truncation: 3,072 characters}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation8192.pdf}
+    \caption{Head truncation: 8,192 characters}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/performance_vs_reasoning_budget_cap_best_acc_vs_cap_by_truncation_truncation24000.pdf}
+    \caption{Head truncation: 24,000 characters}
+  \end{subfigure}
+  \caption{Best-checkpoint accuracy versus evaluation reasoning cap for each training truncation length.}
+  \label{fig:trace_caps_best}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation3072.pdf}
+    \caption{Head truncation: 3,072 characters}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation8192.pdf}
+    \caption{Head truncation: 8,192 characters}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{img/performance_vs_reasoning_budget_cap_last_acc_vs_cap_by_truncation_truncation24000.pdf}
+    \caption{Head truncation: 24,000 characters}
+  \end{subfigure}
+  \caption{Last-checkpoint accuracy versus evaluation reasoning cap for each training truncation length.}
+  \label{fig:trace_caps_last}
+\end{figure*}
+
 \section{Sensitivity Study Details}
 \label{sec:sensitivity_details}
 
@@ -575,7 +676,7 @@ Coverage counts distinct question IDs selected at least once, so repeated epochs
   \setlength{\tabcolsep}{5pt}
   \begin{tabular}{l *{4}{r@{\,}l}}
     \hline
-    Sampler & \multicolumn{2}{c}{LLaMA-3B} & \multicolumn{2}{c}{Qwen-3B} & \multicolumn{2}{c}{Phi4-mini} & \multicolumn{2}{c}{Mean} \\
+    Sampler & \multicolumn{2}{c}{LLaMA 3.2 3B} & \multicolumn{2}{c}{Qwen 2.5 3B} & \multicolumn{2}{c}{Phi4-mini} & \multicolumn{2}{c}{Mean} \\
     \hline
     Direct reasoning trace (baseline) & 46.09 & & 51.45 & & 57.27 & & 51.61 \\
     Random & \underline{51.77} & $\pm\,2.76$ & \textbf{57.91} & $\pm\,1.40$ & 55.57 & $\pm\,2.54$ & 55.08 & $\pm\,0.80$ \\
@@ -607,7 +708,7 @@ Coverage counts distinct question IDs selected at least once, so repeated epochs
     \includegraphics[width=\linewidth]{img/llama_3b_head_truncated8192_cumulative_unique_questions.pdf}
     \caption{Cumulative unique question coverage}
   \end{subfigure}
-  \caption{Distillation by sampling strategy for LLaMA-3B.}
+  \caption{Distillation by sampling strategy for LLaMA 3.2 3B.}
   \label{fig:sensitivity_llama}
 \end{figure*}
 
@@ -630,7 +731,7 @@ Coverage counts distinct question IDs selected at least once, so repeated epochs
     \includegraphics[width=\linewidth]{img/qwen_3b_head_truncated8192_cumulative_unique_questions.pdf}
     \caption{Cumulative unique question coverage}
   \end{subfigure}
-  \caption{Distillation by sampling strategy for Qwen-3B.}
+  \caption{Distillation by sampling strategy for Qwen 2.5 3B.}
   \label{fig:sensitivity_qwen}
 \end{figure*}
 

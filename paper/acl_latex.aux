@@ -795,15 +795,17 @@
 \@LN{648}{7}
 \@LN{649}{7}
 \@LN{650}{7}
-\@LN{651}{7}
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Synthetic-trace distillation results for LLaMA-3B.}}{9}{figure.caption.26}\protected@file@percent }
-\newlabel{fig:synth_llama_individual}{{5}{9}{Synthetic-trace distillation results for LLaMA-3B}{figure.caption.26}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Synthetic-trace distillation results for Qwen-3B.}}{9}{figure.caption.27}\protected@file@percent }
-\newlabel{fig:synth_qwen_individual}{{6}{9}{Synthetic-trace distillation results for Qwen-3B}{figure.caption.27}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Synthetic-trace distillation results for LLaMA 3.2 3B.}}{9}{figure.caption.26}\protected@file@percent }
+\newlabel{fig:synth_llama_individual}{{5}{9}{Synthetic-trace distillation results for LLaMA 3.2 3B}{figure.caption.26}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Synthetic-trace distillation results for Qwen 2.5 3B.}}{9}{figure.caption.27}\protected@file@percent }
+\newlabel{fig:synth_qwen_individual}{{6}{9}{Synthetic-trace distillation results for Qwen 2.5 3B}{figure.caption.27}{}}
 \@LN@col{1}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Number (percentage) of training traces exceeding each truncation budget}}{9}{table.caption.29}\protected@file@percent }
+\newlabel{tab:training_trace_truncation_counts}{{3}{9}{Number (percentage) of training traces exceeding each truncation budget}{table.caption.29}{}}
+\@LN{651}{8}
 \@LN{652}{8}
-\@writefile{toc}{\contentsline {section}{\numberline {D}Sensitivity Study Details}{9}{appendix.D}\protected@file@percent }
-\newlabel{sec:sensitivity_details}{{D}{9}{Sensitivity Study Details}{appendix.D}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {D}Synthetic trace truncation and reasoning caps}{9}{appendix.D}\protected@file@percent }
+\newlabel{sec:trace_truncation_caps}{{D}{9}{Synthetic trace truncation and reasoning caps}{appendix.D}{}}
 \@LN{653}{8}
 \@LN{654}{8}
 \@LN{655}{8}
@@ -814,11 +816,13 @@
 \@LN{660}{8}
 \@LN{661}{8}
 \@LN{662}{8}
+\@writefile{toc}{\contentsline {subsection}{\numberline {D.1}Which part of the trace is retained?}{9}{subsection.D.1}\protected@file@percent }
 \@LN{663}{8}
 \@LN{664}{8}
 \@LN{665}{8}
 \@LN{666}{8}
 \@LN{667}{8}
+\@LN@col{2}
 \@LN{668}{8}
 \@LN{669}{8}
 \@LN{670}{8}
@@ -827,17 +831,65 @@
 \@LN{673}{8}
 \@LN{674}{8}
 \@LN{675}{8}
-\@LN@col{2}
+\@LN{676}{8}
+\@LN{677}{8}
+\@LN{678}{8}
+\@LN{679}{8}
+\@LN{680}{8}
+\@writefile{toc}{\contentsline {subsection}{\numberline {D.2}Training truncation length versus evaluation cap}{9}{subsection.D.2}\protected@file@percent }
+\@LN{681}{8}
+\@LN{682}{8}
+\@LN{683}{8}
+\@LN{684}{8}
+\@LN{685}{8}
+\@LN{686}{8}
+\@LN{687}{8}
+\@LN{688}{8}
+\@LN{689}{8}
 \@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Synthetic-trace distillation results for Phi4-mini.}}{10}{figure.caption.28}\protected@file@percent }
 \newlabel{fig:synth_phi_individual}{{7}{10}{Synthetic-trace distillation results for Phi4-mini}{figure.caption.28}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Distillation pipeline last epoch accuracy for different sampling methods (4096-token thinking budget)}}{10}{table.caption.29}\protected@file@percent }
-\newlabel{tab:sampler_ablation_full}{{3}{10}{Distillation pipeline last epoch accuracy for different sampling methods (4096-token thinking budget)}{table.caption.29}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Distillation by sampling strategy for LLaMA-3B.}}{10}{figure.caption.30}\protected@file@percent }
-\newlabel{fig:sensitivity_llama}{{8}{10}{Distillation by sampling strategy for LLaMA-3B}{figure.caption.30}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Distillation by sampling strategy for Qwen-3B.}}{10}{figure.caption.31}\protected@file@percent }
-\newlabel{fig:sensitivity_qwen}{{9}{10}{Distillation by sampling strategy for Qwen-3B}{figure.caption.31}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Distillation by sampling strategy for Phi4-mini.}}{11}{figure.caption.32}\protected@file@percent }
-\newlabel{fig:sensitivity_phi}{{10}{11}{Distillation by sampling strategy for Phi4-mini}{figure.caption.32}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Sampler comparisons and question coverage across all three models. In the accuracy panels, thin dashed curves show individual models, thick solid curves their equal-weight means, and the thick dashed curve the direct-trace baseline mean.}}{11}{figure.caption.33}\protected@file@percent }
-\newlabel{fig:sensitivity_sampler_comparisons}{{11}{11}{Sampler comparisons and question coverage across all three models. In the accuracy panels, thin dashed curves show individual models, thick solid curves their equal-weight means, and the thick dashed curve the direct-trace baseline mean}{figure.caption.33}{}}
-\gdef \@abspage@last{11}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Training truncation policies at the nominal 24,000-character setting, evaluated with an 8,192-token reasoning cap. Dashed lines and epoch-zero points give the base model's chain-of-thought accuracy.}}{10}{figure.caption.30}\protected@file@percent }
+\newlabel{fig:trace_truncation_modes}{{8}{10}{Training truncation policies at the nominal 24,000-character setting, evaluated with an 8,192-token reasoning cap. Dashed lines and epoch-zero points give the base model's chain-of-thought accuracy}{figure.caption.30}{}}
+\@LN@col{1}
+\@LN{690}{9}
+\@writefile{toc}{\contentsline {section}{\numberline {E}Sensitivity Study Details}{10}{appendix.E}\protected@file@percent }
+\newlabel{sec:sensitivity_details}{{E}{10}{Sensitivity Study Details}{appendix.E}{}}
+\@LN{691}{9}
+\@LN{692}{9}
+\@LN{693}{9}
+\@LN{694}{9}
+\@LN{695}{9}
+\@LN{696}{9}
+\@LN{697}{9}
+\@LN{698}{9}
+\@LN{699}{9}
+\@LN{700}{9}
+\@LN{701}{9}
+\@LN{702}{9}
+\@LN{703}{9}
+\@LN{704}{9}
+\@LN{705}{9}
+\@LN{706}{9}
+\@LN{707}{9}
+\@LN{708}{9}
+\@LN{709}{9}
+\@LN{710}{9}
+\@LN{711}{9}
+\@LN{712}{9}
+\@LN@col{2}
+\@LN{713}{9}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Best-checkpoint accuracy versus evaluation reasoning cap for each training truncation length.}}{11}{figure.caption.31}\protected@file@percent }
+\newlabel{fig:trace_caps_best}{{9}{11}{Best-checkpoint accuracy versus evaluation reasoning cap for each training truncation length}{figure.caption.31}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Last-checkpoint accuracy versus evaluation reasoning cap for each training truncation length.}}{11}{figure.caption.32}\protected@file@percent }
+\newlabel{fig:trace_caps_last}{{10}{11}{Last-checkpoint accuracy versus evaluation reasoning cap for each training truncation length}{figure.caption.32}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Distillation pipeline last epoch accuracy for different sampling methods (4096-token thinking budget)}}{11}{table.caption.33}\protected@file@percent }
+\newlabel{tab:sampler_ablation_full}{{4}{11}{Distillation pipeline last epoch accuracy for different sampling methods (4096-token thinking budget)}{table.caption.33}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Distillation by sampling strategy for LLaMA 3.2 3B.}}{11}{figure.caption.34}\protected@file@percent }
+\newlabel{fig:sensitivity_llama}{{11}{11}{Distillation by sampling strategy for LLaMA 3.2 3B}{figure.caption.34}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Distillation by sampling strategy for Qwen 2.5 3B.}}{11}{figure.caption.35}\protected@file@percent }
+\newlabel{fig:sensitivity_qwen}{{12}{11}{Distillation by sampling strategy for Qwen 2.5 3B}{figure.caption.35}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Distillation by sampling strategy for Phi4-mini.}}{12}{figure.caption.36}\protected@file@percent }
+\newlabel{fig:sensitivity_phi}{{13}{12}{Distillation by sampling strategy for Phi4-mini}{figure.caption.36}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces Sampler comparisons and question coverage across all three models. In the accuracy panels, thin dashed curves show individual models, thick solid curves their equal-weight means, and the thick dashed curve the direct-trace baseline mean.}}{12}{figure.caption.37}\protected@file@percent }
+\newlabel{fig:sensitivity_sampler_comparisons}{{14}{12}{Sampler comparisons and question coverage across all three models. In the accuracy panels, thin dashed curves show individual models, thick solid curves their equal-weight means, and the thick dashed curve the direct-trace baseline mean}{figure.caption.37}{}}
+\gdef \@abspage@last{12}
