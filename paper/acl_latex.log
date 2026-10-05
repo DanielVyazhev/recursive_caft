@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.7)  5 OCT 2026 15:01
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.7)  5 OCT 2026 15:54
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -766,12 +766,17 @@ File: img/student_entropy_roc_auc_all_models.pdf Graphic file (type pdf)
 Package pdftex.def Info: img/student_entropy_roc_auc_all_models.pdf  used on input line 202.
 (pdftex.def)             Requested size: 132.01773pt x 94.72783pt.
 
+Underfull \hbox (badness 7344) in paragraph at lines 241--243
+ []\T1/ptm/b/n/10.95 (+20) Dataset:[] \T1/ptm/m/n/10.95 (+20) Multiple-choice question-answering
+ []
+
+
 Underfull \hbox (badness 2547) in paragraph at lines 245--248
  []\T1/ptm/b/n/10.95 (+20) LLMs:[] \T1/ptm/m/n/10.95 (+20) Aleatoric proxy: en-sem-ble of two
  []
 
 
-Underfull \vbox (badness 1137) has occurred while \output is active []
+Underfull \vbox (badness 1102) has occurred while \output is active []
 
  [2]
 <img/performance_vs_truncation_mode_mode_best_acc_bars.pdf, id=283, 973.9788pt x 679.13208pt>
@@ -795,8 +800,8 @@ Underfull \hbox (badness 10000) in paragraph at lines 330--332
  []
 
 
-Underfull \hbox (badness 2846) in paragraph at lines 330--332
-\T1/ptm/m/n/10.95 (+20) hy-poth-e-siz-ing that as the stu-dent un-der-goes
+Underfull \hbox (badness 1728) in paragraph at lines 330--332
+\T1/ptm/m/n/10.95 (+20) hy-poth-e-siz-ing that, as the stu-dent un-der-goes
  []
 
 [4 <./img/performance_vs_truncation_mode_mode_best_acc_bars.pdf> <./img/distillation_on_synthetic_traces_all_models_head_truncated_by_model.pdf> <./img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf>]
@@ -1002,18 +1007,18 @@ LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
  ***********
 Package rerunfilecheck Info: File `acl_latex.out' has not changed.
-(rerunfilecheck)             Checksum: DE46B3979A22B3447742C4840E6C931B;3382.
+(rerunfilecheck)             Checksum: 994E147BEE1517C13E557D9BDDBC92F2;3377.
  ) 
 Here is how much of TeX's memory you used:
- 27026 strings out of 474116
- 515392 string characters out of 5743682
- 1966187 words of memory out of 5000000
+ 27008 strings out of 474116
+ 515227 string characters out of 5743682
+ 1965187 words of memory out of 5000000
  48359 multiletter control sequences out of 15000+600000
- 640155 words of font info for 386 fonts, out of 8000000 for 9000
+ 639283 words of font info for 374 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  99i,17n,101p,4617b,675s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/inconsolata/Inconsolata-zi4r.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/helvetic/uhvb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on acl_latex.pdf (12 pages, 1947461 bytes).
+Output written on acl_latex.pdf (12 pages, 1947347 bytes).
 PDF statistics:
  2202 PDF objects out of 2487 (max. 8388607)
  746 compressed objects within 8 object streams

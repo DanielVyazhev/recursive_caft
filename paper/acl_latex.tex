@@ -84,10 +84,10 @@
 \maketitle
 \begin{abstract}
   Distillation of reasoning chains from Large Language Models (LLMs) into their smaller siblings is a standard training approach.
-  Frequently researchers do not have full access to a teacher model and its internal representations, which limits the resulting performance.
+  Frequently, researchers do not have full access to a teacher model and its internal representations, which limits the resulting performance.
   We propose a novel blueprint for efficient offline distillation that recursively uses lightweight epistemic and aleatoric complexity approximations for selective distillation.
-  Specifically, for three open models (3-4B) at each epoch we estimate epistemic uncertainty using a medium model (70-72B) as an aleatoric proxy and sample only a small subset of the reasoning chains for distillation.
-  Our approach consistently outperforms naive distillation on comparable computational budget ($57.15 \pm 1.01$ vs 51.61 on average) and offers a much steeper learning curve.
+  Specifically, for three open models (3-4B), at each epoch, we estimate epistemic uncertainty using a medium model (70-72B) as an aleatoric proxy and sample only a small subset of the reasoning chains for training.
+  Our approach consistently outperforms naive distillation with comparable computational budgets ($57.15 \pm 1.01$ vs 51.61 on average) and offers a much steeper learning curve.
   Additionally, we present a comparative analysis of methods to generate and normalize distillation traces.
   We publish our code and data\footnote{TODO}.
 \end{abstract}
@@ -108,11 +108,11 @@ It prompts the need for capable smaller models \citep{chen2026rolesmallmodelsllm
 
 A prominent approach for small model training is distillation from a larger teacher model \citep{hinton2015distillingknowledgeneuralnetwork, sanh2020distilbertdistilledversionbert, xu2024surveyknowledgedistillationlarge}.
 Many methods rely on having access to the online teacher \citep{ICLR2024_5be69a58, jiao-etal-2020-tinybert, ICLR2024_8ac015d4}, which is not always possible \citep{zhou-etal-2023-bridging, ryskulov2026efficientknowledgedistillationllms}.
-It forces practitioners to explore offline distillation, where the student model is trained on the pre-generated teacher's text output \citep{li-etal-2023-symbolic, hsieh-etal-2023-distilling}.
+It forces practitioners to explore offline distillation, where the student model is trained on the teacher's pre-generated text output \citep{li-etal-2023-symbolic, hsieh-etal-2023-distilling}.
 
 We propose a fully automated recursive pipeline for offline distillation (Figure \ref{fig:recursive_caft_scheme}, described in \ref{sec:method}) based on uncertainty decomposition \citep{wang2025aleatoricepistemicexploringuncertainty}. The method consistently outperforms naive distillation ($57.15 \pm 1.01$ vs 51.61 on average), and it is designed to work in resource-constrained environments.
 
-Additionally, we provide a comparative analysis of augmentation strategies for synthetic reasoning chains when the teacher model does not perform perfectly on the target distillation domain and conduct sensitivity studies of the synthetic trace generation and normalization methods and sampling strategies.
+Additionally, we provide a comparative analysis of augmentation strategies for synthetic reasoning chains when the teacher model does not perform perfectly in the target distillation domain and conduct sensitivity studies of the synthetic trace generation and normalization methods and sampling strategies.
 
 \section{Related Work}
 
@@ -133,10 +133,10 @@ We compare direct generation and various augmentations on the same task under co
 \citet{goncharov2026complexityawarefinetuning} show that a single-token entropy (Figure \ref{fig:single_token_entropy_illustration}) is a reasonable complexity predictor for a given entry in a question-answering dataset.
 We assume that it approximates the total uncertainty and that we can decompose it into epistemic and aleatoric components \citep{pmlr-v80-depeweg18a, malinin2021uncertaintyestimationautoregressivestructured}.
 With scaling laws \citep{kaplan2020scalinglawsneurallanguage} in mind, we hypothesize that larger models should have lower total uncertainty.
-Therefore, in comparison to a small student model (3-4B) its substantially larger sibling (70-72B\footnote{This particular size is chosen based on the imposed resource constraints (80GB VRAM) and open model availability}) could be treated as a weak aleatoric proxy.
+Therefore, in comparison to a small student model (3-4B), its substantially larger sibling (70-72B\footnote{This particular size is chosen based on the imposed resource constraints (80GB VRAM) and open model availability}) could be treated as a weak aleatoric proxy.
 
-For a question $x$, assume $H(x)=A(x)+E(x)$, where $H_S$, $H_P$ - single-token entropy (student and proxy), $A$ - shared aleatoric component, and $E_S$, $E_P$ - model-specific epistemic component.
-If proxy's residual epistemic uncertainty satisfies $E_P(x)\leq\varepsilon(x)$, then
+For a question $x$, assume $H(x)=A(x)+E(x)$, where $H_S$, $H_P$ - single-token entropies (student and proxy), $A$ - shared aleatoric component, and $E_S$, $E_P$ - model-specific epistemic components.
+If its residual epistemic uncertainty satisfies $E_P(x)\leq\varepsilon(x)$, then
 \begin{equation}
   \begin{aligned}
     A(x) &= H_P(x)-E_P(x) \geq H_P(x) - \varepsilon(x) \\
@@ -173,12 +173,12 @@ Thus, the entropy difference (\emph{entropy gain}) approximates the student's ep
 \end{algorithm}
 
 \paragraph{The proposed pipeline} consists of the following steps (Figure \ref{fig:recursive_caft_scheme}, Algorithm \ref{alg:recursive_distillation}):
-(1) prompt the larger model to answer all questions in the dataset with a single token once (or an ensemble of models taking average), collect entropy, assume it is an aleatoric uncertainty proxy;
+(1) prompt the larger model to answer all questions in the dataset with a single token once (or an ensemble, averaging entropies), collect entropy, assume it is an aleatoric uncertainty proxy;
 (2) for each training epoch,
 (2.1) prompt the student model to answer all questions in the dataset with a single token, collect entropy;
 (2.2) calculate entropy gain $EG(x) = \max\{H_S(x)-H_P(x),0\}$;
 (2.3.1) sample 1024 synthetic reasoning chains without replacement, weighted by positive entropy gain;
-(2.3.2) sample 256 single-token answers in similar fashion as a subset of the previous sample;
+(2.3.2) sample 256 single-token answers similarly, as a subset of the previous sample;
 (2.4) concatenate samples;
 (2.5) train the student using LoRA \citep{hu2021loralowrankadaptationlarge} on reasoning traces first, followed by single-token responses.
 
@@ -232,18 +232,18 @@ Thus, the entropy difference (\emph{entropy gain}) approximates the student's ep
     \end{tabular} \\
     \hline
   \end{tabular}
-  \caption{Distillation pipeline last epoch accuracy (4096-token / 2,048-token thinking budget) on MMLU-Pro.}
+  \caption{Distillation pipeline last-epoch accuracy (4096-token / 2,048-token thinking budget) on MMLU-Pro.}
   \label{tab:distillation_main_results}
 \end{table*}
 
 \subsection{Experimental Setup}
 
-\paragraph{Dataset:} Multiple choice question answering dataset MMLU Pro \citep{wang2024mmluprorobustchallengingmultitask}.
-It has questions of different complexities from 14 domains, ten options for each, single correct one. Random train/test split - 80/20.
+\paragraph{Dataset:} Multiple-choice question-answering dataset MMLU Pro \citep{wang2024mmluprorobustchallengingmultitask}.
+It has questions of different complexities from 14 domains: ten options each, one correct option. Random train/test split - 80/20.
 
 \paragraph{LLMs:}
-Aleatoric proxy: ensemble of two medium models\footnote{All models and datasets are published under permissive licenses that allow them to be used for research purposes} (taking average of their entropies) - LLaMA 3.3 70B \citep{grattafiori2024llama3herdmodels}, Qwen 2.5 72B \citep{qwen2.5}.
-Students: three small models Qwen2.5 3B \citep{qwen2.5}, Phi-4-Mini \citep{microsoft2025phi4minitechnicalreportcompact}, LLaMA 3.2 3B \citep{grattafiori2024llama3herdmodels}.
+Aleatoric proxy: ensemble of two medium models\footnote{All models and datasets are published under permissive licenses that allow them to be used for research purposes} (averaging their entropies) - LLaMA 3.3 70B \citep{grattafiori2024llama3herdmodels}, Qwen 2.5 72B \citep{qwen2.5}.
+Students: Qwen2.5 3B \citep{qwen2.5}, Phi-4-Mini \citep{microsoft2025phi4minitechnicalreportcompact}, LLaMA 3.2 3B \citep{grattafiori2024llama3herdmodels}.
 Reasoning trace source: DeepSeek V4 Pro and Flash \citep{deepseekai2026deepseekv4highlyefficientmilliontoken} via API.
 
 \paragraph{Hardware:} We run all experiments\footnote{Training hyperparameters can be found in Appendix~\ref{sec:training_hyperparameters}.} on a single A100/H100\footnote{We had to switch cards depending on availability} GPU with 80GB of VRAM to validate the method in resource-constrained environments.
@@ -251,16 +251,16 @@ Reasoning trace source: DeepSeek V4 Pro and Flash \citep{deepseekai2026deepseekv
 \subsubsection{Our method and results}
 
 We evaluate the proposed pipeline for 200 epochs (205k questions seen) and 2 thinking budgets (2048 and 4096 tokens).
-It is compared at similar data budget with:\\
+It is compared under similar data budgets with:\\
 \emph{Direct reasoning trace, Corrected answer} - naive distillation on the most promising types of reasoning traces (see \ref{sec:synth_trace_analysis});\\
-\emph{Student entropy (deterministic), Entropy gain (deterministic)} - alternative pipeline with weighted sampling replaced with greedy sampling;\\
+\emph{Student entropy (deterministic), Entropy gain (deterministic)} - alternative pipelines with weighted sampling replaced with greedy sampling;\\
 \emph{Student entropy (sampled once, k={x})} - distillation executed against k samples selected once by student entropy (not recursively at each epoch).
 
-\emph{Entropy gain (sampled), Student entropy (deterministic), Entropy gain (deterministic)} use the proposed data mix (reasoning traces/single-token answers = 1024/256), other methods use only reasoning traces.
+\emph{Entropy gain (sampled), Student entropy (deterministic), Entropy gain (deterministic)} use the proposed data mix (reasoning traces/single-token answers = 1024/256); other methods use only reasoning traces.
 
-Notably, the proposed data mix increases the number of training tokens only by 0.003\% - 256 extra tokens compared to 8,388,608 tokens in 1024 reasoning chains.
+Notably, the proposed data mix increases the number of training tokens by only 0.003\% - 256 extra tokens compared to 8,388,608 tokens in 1024 reasoning chains.
 
-All randomly sampled methods use 3 random seeds, reporting $\pm$ 95\% confidence-intervals, and deterministic methods are evaluated once with greedy sampling.
+All randomly sampled methods use 3 random seeds, reporting $\pm$ 95\% confidence intervals, and deterministic methods are evaluated once with greedy sampling.
 
 \subsection{Main Results}
 
@@ -271,8 +271,8 @@ Greedy sampling demonstrates subpar and less stable curves, though surpassing th
 Greedy distillation based on student entropy sampled once \citep{goncharov2026complexityawarefinetuning} shows signs of severe degradation after the initial uplift.
 However, Qwen 2.5 3B, notably, demonstrates the best performance with it at k=3072, but degrades at smaller sample sizes, revealing the fragility of the approach.
 
-We also note that our method helps with the model calibration significantly enhancing ROC AUC of single-token entropy for the first half of training.
-Shortly after, it starts declining which is loosely correlated with the method's plateau.
+We also note that our method helps with the model calibration, significantly enhancing ROC AUC of single-token entropy for the first half of training.
+Shortly after, it starts declining, which is loosely correlated with the method's plateau.
 
 \begin{figure*}[t]
   \centering
@@ -297,16 +297,16 @@ Shortly after, it starts declining which is loosely correlated with the method's
   \label{fig:synth_comparison}
 \end{figure*}
 
-\subsection{Synthetic Traces Generation}
+\subsection{Synthetic Trace Generation}
 \label{sec:synth_trace_analysis}
 
 In resource-constrained environments, available VRAM imposes a strict limitation on the length of distilled reasoning chains.
-As soon we start truncating them, we face a new challenge - which part of the trace contains the most useful signal?
-At last, how exactly do we prompt the teacher model to generate reasoning traces?
+Once we start truncating them, we face a new challenge: which part of the trace contains the most useful signal?
+Finally, how exactly do we prompt the teacher model to generate reasoning traces?
 
 We evaluate reasoning traces by:
 (a) \emph{truncation type} - which part of the trace we keep when it exceeds the maximum length;
-(b) \emph{length} - what is the optimal training truncation limit (characters) and evaluation thinking budget (tokens);
+(b) \emph{length} - the optimal training truncation limit (characters) and evaluation thinking budget (tokens);
 (c) \emph{generation method} (below).
 
 Generation methods (details in Appendix~\ref{sec:synth_genration_methods_details}):
@@ -314,10 +314,10 @@ Generation methods (details in Appendix~\ref{sec:synth_genration_methods_details
 (2) \emph{Direct reasoning trace (correct only)} - same as (1), but we keep only traces with correct answers;
 (3) \emph{Explained answer} - we give a correct answer to the model and prompt it to explain it;
 (4) \emph{Direct reasoning trace (with explained)} - same as (1), but replace incorrect traces with (3);
-(5) \emph{Corrected answer} - same as (1), but for incorrect traces we give the model correct answers and ask it to update its reasoning.
+(5) \emph{Corrected answer} - same as (1), but for incorrect traces, we give the model correct answers and ask it to update its reasoning.
 
-Figure~\ref{fig:synth_comparison} shows that models have a slight preference towards head truncation, medium to short reasoning chains in training and thinking budgets.
-Surprisingly, longer reasoning chains and greater thinking budgets lead to notable performance decrease.
+Figure~\ref{fig:synth_comparison} shows that models have a slight preference for head truncation, medium to short training chains and thinking budgets.
+Surprisingly, longer reasoning chains and greater thinking budgets lead to notable performance decreases.
 As to the generation methods, we see that augmented reasoning traces lead to elevated performance, while the consistent data leakage results in degradation.
 Based on the findings, we use 8,192-character head truncation and \emph{Corrected answer} generation for the pipeline.
 
@@ -325,13 +325,13 @@ Based on the findings, we use 8,192-character head truncation and \emph{Correcte
 
 To attribute performance gains to either the data mix or the entropy-based score and sampler, we compare the proposed pipeline (\emph{entropy gain}) with:
 (1) alternative pipelines where we sample according to \emph{student entropy} and \emph{discounted entropy gain} (see below);
-(2) alternative pipeline where we use a random sampler.
+(2) an alternative pipeline where we use a random sampler.
 
-\emph{Discounted entropy gain} is defined as $\max\{H_S(x)- k(t) * H_P(x),0\}, k(t) \in [0, 1]$, where $t$ - training epoch.
-We set $k(t)$ initially to 0.8 and decrease it according to a schedule, hypothesizing that as the student undergoes training the static medium model stops being a good aleatoric proxy.
+\emph{Discounted entropy gain} is defined as $\max\{H_S(x)- k(t) * H_P(x),0\}, k(t) \in [0, 1]$, where $t$ is the training epoch.
+We set $k(t)$ initially to 0.8 and decrease it according to a schedule, hypothesizing that, as the student undergoes training, the static medium model stops being a good aleatoric proxy.
 
-Table \ref{tab:sampler_ablation} shows that across three models on average entropy gain provides the best results confirming the contribution of the aleatoric uncertainty approximation.
-At the same time, we notice that random sampler performs exceptionally well (confirming findings of \citet{okanovic2023repeatedrandomsamplingminimizing}) compared to the baseline, which points to the proposed data mix as a significant contributor to the gains.
+Table \ref{tab:sampler_ablation} shows that, across three models on average, entropy gain provides the best results, confirming the contribution of the aleatoric uncertainty approximation.
+At the same time, we notice that random sampling performs exceptionally well (confirming findings of \citet{okanovic2023repeatedrandomsamplingminimizing}) compared to the baseline, which points to the proposed data mix as a significant contributor to the gains.
 
 \begin{table}
   \centering
@@ -348,26 +348,26 @@ At the same time, we notice that random sampler performs exceptionally well (con
     Entropy gain & \textbf{57.15} & $\pm\,1.01$ \\
     \hline
   \end{tabular}
-  \caption{Distillation pipeline last epoch accuracy for different sampling methods (4096-token thinking budget)}
+  \caption{Distillation pipeline last-epoch accuracy for different sampling methods (4096-token thinking budget)}
   \label{tab:sampler_ablation}
 \end{table}
 
 \section{Conclusion and Discussion}
 
-This paper introduces a recursive offline distillation method rooted in epistemic uncertainty approximation ($57.15 \pm 1.01$ mean accuracy across three students on MMLU-Pro vs $51.61$ for direct distillation, offers a much steeper learning curve (baseline score at 15\% of its data budget)).
+This paper introduces a recursive offline distillation method rooted in epistemic uncertainty approximation ($57.15 \pm 1.01$ mean accuracy across three students on MMLU-Pro vs $51.61$ for direct distillation) with a much steeper learning curve (baseline score at 15\% of its data budget).
 We confirm that both the entropy difference sampler and the data mix contribute to the gains.
 Surprisingly, shorter traces and reasoning budgets perform better.
-Further exploration of the more rigorous epistemic uncertainty estimation and the surprising effect of the small data mix augmentation remain future work.
+Further exploration of more rigorous epistemic uncertainty estimation and the surprising effect of the small data mix augmentation remains future work.
 
 \section*{Limitations}
 
 \begin{itemize}
-  \item Method is tested only with small models. We do not know how well it is going to generalize to larger LLMs. Additionally, it might be challenging to find a suitable aleatoric proxy for larger students.
+  \item The method is tested only with small models. We do not know how well it is going to generalize to larger LLMs. Additionally, it might be challenging to find a suitable aleatoric proxy for larger students.
   \item We use a single dataset. We do not know how well it translates to other settings.
-  \item Alternative aleatoric approximations, such as agreement of the ensemble and other, are left unexplored.
+  \item Alternative aleatoric approximations, such as ensemble agreement and others, are left unexplored.
   \item We did not test and compare multiple sizes of aleatoric proxies and their impact on performance.
   \item Different compositions of the data mix are not tested due to lack of resources.
-  \item We tested only a single schedule for \emph{Discounted Entropy Gain}. Alternatives are yet to explore.
+  \item We tested only a single schedule for \emph{Discounted Entropy Gain}. Alternatives remain to be explored.
   \item Some low-resource environments might have even more constraints and therefore struggle to fit a suitable aleatoric proxy into VRAM.
 \end{itemize}
 
@@ -495,7 +495,7 @@ Given the original reasoning, incorrect option a, and correct option b, a contin
 
 \subsection{Per-model results}
 \label{sec:synth_per_model}
-Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show test accuracy across training epochs for each student. The left panels compare head-truncation limits of 3,072, 8,192, and 24,000 characters for direct reasoning traces; each legend separately specifies the evaluation cap in tokens. The generation-method panels hold head truncation fixed at 8,192 characters and compare methods at the stated evaluation cap. Dashed horizontal lines and epoch-zero values use the base model's accuracy prompted to answer with chain-of-thought (base models originally are not reasoners), shared across evaluation budgets.
+Figures~\ref{fig:synth_llama_individual}--\ref{fig:synth_phi_individual} show test accuracy across training epochs for each student. The left panels compare head-truncation limits of 3,072, 8,192, and 24,000 characters for direct reasoning traces; each legend separately specifies the evaluation cap in tokens. The generation-method panels hold head truncation fixed at 8,192 characters and compare methods at the stated evaluation cap. Dashed horizontal lines and epoch-zero values use the base model's accuracy when prompted to answer with chain-of-thought (base models are not originally reasoners), shared across evaluation budgets.
 
 \begin{figure*}[t]
   \centering
@@ -685,7 +685,7 @@ Coverage counts distinct question IDs selected at least once, so repeated epochs
     Entropy gain & \textbf{52.58} & $\pm\,1.94$ & 56.64 & $\pm\,3.79$ & \textbf{62.22} & $\pm\,2.42$ & \textbf{57.15} & $\pm\,1.01$ \\
     \hline
   \end{tabular}
-  \caption{Distillation pipeline last epoch accuracy for different sampling methods (4096-token thinking budget)}
+  \caption{Distillation pipeline last-epoch accuracy for different sampling methods (4096-token thinking budget)}
   \label{tab:sampler_ablation_full}
 \end{table*}
 
