@@ -319,6 +319,7 @@ Generation methods (details in Appendix~\ref{sec:synth_genration_methods_details
 Figure~\ref{fig:synth_comparison} shows that models have a slight preference towards head truncation, medium to short reasoning chains in training and thinking budgets.
 Surprisingly, longer reasoning chains and greater thinking budgets lead to notable performance decrease.
 As to the generation methods, we see that augmented reasoning traces lead to elevated performance, while the consistent data leakage results in degradation.
+Based on the findings, we use 8,192-token head truncation and \emph{Corrected answer} generation for the pipeline.
 
 \subsection{Sensitivity Study}
 
@@ -353,10 +354,10 @@ At the same time, we notice that random sampler performs exceptionally well (con
 
 \section{Conclusion and Discussion}
 
-This paper introduces a fully automated recursive offline distillation method rooted in epistemic uncertainty approximation. It achieves $57.15 \pm 1.01$ mean accuracy across three students on MMLU-Pro vs $51.61$ for direct distillation at a comparable training data budget and offers a much steeper learning curve (baseline score at 15\% of its data budget).
+This paper introduces a recursive offline distillation method rooted in epistemic uncertainty approximation ($57.15 \pm 1.01$ mean accuracy across three students on MMLU-Pro vs $51.61$ for direct distillation, offers a much steeper learning curve (baseline score at 15\% of its data budget)).
 We confirm that both the entropy difference sampler and the data mix contribute to the gains.
-Surprisingly, shorter traces and reasoning budgets exhibit better performance.
-Further exploration of the more rigorous epistemic uncertainty estimation and the surprising effect of such a small data mix augmentation remain future work.
+Surprisingly, shorter traces and reasoning budgets perform better.
+Further exploration of the more rigorous epistemic uncertainty estimation and the surprising effect of the small data mix augmentation remain future work.
 
 \section*{Limitations}
 
@@ -377,11 +378,10 @@ Further exploration of the more rigorous epistemic uncertainty estimation and th
 
 \appendix
 
-\section{Experimental Hyperparameters}
 \label{sec:appendix}
-\label{sec:training_hyperparameters}
 
-\subsection{Optimization and Batching}
+\section{Experimental Hyperparameters}
+\label{sec:training_hyperparameters}
 
 \begin{center}
   \small
@@ -400,24 +400,11 @@ Further exploration of the more rigorous epistemic uncertainty estimation and th
     Mixed precision & BF16 enabled \\
     Gradient checkpointing & Enabled \\
     \texttt{torch.compile} & Enabled \\
-    \bottomrule
-  \end{tabularx}
-\end{center}
-
-\subsection{LoRA and Trainable Parameters}
-
-\begin{center}
-  \small
-  \begin{tabularx}{\linewidth}{@{}p{0.48\linewidth}X@{}}
-    \toprule
-    Hyperparameter & Value \\
-    \midrule
     LoRA rank $r$ & 8 \\
     LoRA alpha & 16 \\
     LoRA scaling $\alpha/r$ & 2 \\
     LoRA dropout & 0.1 \\
     Initialization & Gaussian \\
-    Bias adaptation & None \\
     \bottomrule
   \end{tabularx}
 \end{center}

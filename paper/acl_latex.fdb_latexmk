@@ -1,14 +1,14 @@
 # Fdb version 4
-["bibtex acl_latex"] 1791204570.74655 "acl_latex.aux" "acl_latex.bbl" "acl_latex" 1791204622.15383 0
+["bibtex acl_latex"] 1791205097.5966 "acl_latex.aux" "acl_latex.bbl" "acl_latex" 1791205128.32722 0
   "./acl_natbib.bst" 1782748040 45442 bb9ea745fc0a84096e0948d1c1b99bbe ""
   "./custom.bib" 1791203818.58668 64798 17780174ace5501aac94d10a57656cb0 ""
-  "acl_latex.aux" 1791204621.8958 25422 8595705690d988d242e6e64fa04994da "pdflatex"
+  "acl_latex.aux" 1791205128.06694 25099 5d593cc640bd4089759e591a9b150c13 "pdflatex"
   (generated)
   "acl_latex.bbl"
   "acl_latex.blg"
   (rewritten before read)
-["pdflatex"] 1791204619.84292 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1791204622.154 0
-  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1791204620.03983 25937 76011c13153f5f0884b148019db04be0 ""
+["pdflatex"] 1791205125.9647 "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" "acl_latex.pdf" "acl_latex" 1791205128.32739 0
+  "/Users/aigoncharov/dev/sktech/recursive_caft/paper/acl_latex.tex" 1791205125.73049 25673 48e6c61723b7ff1f2278b7f60c37806c ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc" 1558214095 7631 5169ff1acd97ff1c4ab83563c99f96f4 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -224,10 +224,10 @@
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1728286097 8221418 5f60306fce482631c48243f3fbe1cf27 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
   "acl.sty" 1782748040 11615 e2c027f483aa40e577ed34264c8b0655 ""
-  "acl_latex.aux" 1791204621.8958 25422 8595705690d988d242e6e64fa04994da "pdflatex"
-  "acl_latex.bbl" 1791204570.8709 24623 bc1483a63d5c5833e4fee6323303dae7 "bibtex acl_latex"
-  "acl_latex.out" 1791204621.89715 2297 a8f4a86723d5428c7d41fc5e64d574fb "pdflatex"
-  "acl_latex.tex" 1791204620.03983 25937 76011c13153f5f0884b148019db04be0 ""
+  "acl_latex.aux" 1791205128.06694 25099 5d593cc640bd4089759e591a9b150c13 "pdflatex"
+  "acl_latex.bbl" 1791205097.70841 24623 bc1483a63d5c5833e4fee6323303dae7 "bibtex acl_latex"
+  "acl_latex.out" 1791205128.06838 1894 abfff956faf46a3fbab51e0e77a4b09a "pdflatex"
+  "acl_latex.tex" 1791205125.73049 25673 48e6c61723b7ff1f2278b7f60c37806c ""
   "img/all_models_reasoning_evals_cap2048.pdf" 1790966803.77789 17496 7f962ed1bec8a7d0156875a55c98ee54 ""
   "img/all_models_reasoning_evals_cap4096.pdf" 1790956533.61022 17549 1127efd2146efc89f52c6b8afc549ff2 ""
   "img/distillation_on_synthetic_traces_all_models_head_truncated8192_reasoning_evals_mixed_caps.pdf" 1790959857.46057 16101 13993d1bdcd13d8a69e6aba58c18ad89 ""
