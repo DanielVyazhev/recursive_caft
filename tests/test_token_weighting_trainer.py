@@ -412,4 +412,4 @@ def test_log_reports_running_token_statistics(cache_dir, student, rows, tmp_path
     assert {"tw/kl", "tw/h_p", "tw/h_s", "tw/rho", "tw/eg", "tw/discord", "tw/weight", "tw/weight_structural"} <= set(logs)
     assert 0 <= logs["tw/rho"] <= 1
     assert logs["tw/missing_frac"] == 0
-    assert trainer._tw_count == 0  # reset after logging
+    assert trainer._tw_sums == {}  # reset after logging

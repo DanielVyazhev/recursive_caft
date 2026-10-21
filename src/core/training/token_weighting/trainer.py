@@ -100,9 +100,7 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
     def __init__(self, *args, token_weighting: TokenWeightingConfig, **kwargs):
         super().__init__(*args, **kwargs)
         self.token_weighting = token_weighting
-        self._tw_sums: dict[str, float] = {}
-        self._tw_count = 0.0
-        self._tw_structural_count = 0.0
+        self._tw_sums: dict[str, torch.Tensor] = {}
         self._warned_no_num_items = False
 
     @override
@@ -178,17 +176,15 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
         return (loss, outputs) if return_outputs else loss
 
     def _accumulate_stats(self, *, kl, h_p, h_s, logp_p, logp_s, weights, selected, valid, structural) -> None:
+        # Everything stays on the device: a .item()/float() here would sync the GPU on every
+        # micro-step (64 per update) and serialise the collator with the model.
         cfg = self.token_weighting
         content = selected & valid & ~structural
-        count = float(content.sum())
-        self._tw_count += count
-        self._tw_structural_count += float((selected & structural).sum())
-        if count == 0:
-            return
+        structural_sel = selected & structural
         rho = reducible_fraction(kl, h_p, cfg.rho_eps)
         eg = entropy_gain(h_s, h_p)
         disc = discord_weight(logp_s, logp_p, cfg.discord_tau)
-        sums = {
+        values = {
             "kl": kl,
             "h_p": h_p,
             "h_s": h_s,
@@ -198,27 +194,31 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
             "ce_p": -logp_p,
             "ce_s": -logp_s,
             "weight": weights,
-            "weight_structural": weights,
         }
+        content_f = content.to(kl.dtype)
+        sums = {name: (value * content_f).sum() for name, value in values.items()}
+        sums["weight_structural"] = (weights * structural_sel.to(kl.dtype)).sum()
+        sums["missing"] = (selected & ~valid).sum().to(kl.dtype)
+        sums["selected"] = selected.sum().to(kl.dtype)
+        sums["count"] = content.sum().to(kl.dtype)
+        sums["structural_count"] = structural_sel.sum().to(kl.dtype)
         for name, value in sums.items():
-            mask = (selected & structural) if name == "weight_structural" else content
-            self._tw_sums[name] = self._tw_sums.get(name, 0.0) + float((value * mask).sum())
-        missing = float((selected & ~valid).sum())
-        self._tw_sums["missing"] = self._tw_sums.get("missing", 0.0) + missing
-        self._tw_sums["selected"] = self._tw_sums.get("selected", 0.0) + float(selected.sum())
+            self._tw_sums[name] = self._tw_sums[name] + value if name in self._tw_sums else value
+
+    def _reset_stats(self) -> None:
+        self._tw_sums = {}
 
     @override
     def log(self, logs: dict[str, float], start_time: float | None = None) -> None:
-        if "loss" in logs and self._tw_count > 0:
-            count = self._tw_count
-            for name in ("kl", "h_p", "h_s", "rho", "eg", "discord", "ce_p", "ce_s", "weight"):
-                if name in self._tw_sums:
-                    logs[f"tw/{name}"] = round(self._tw_sums[name] / count, 4)
-            if self._tw_structural_count > 0 and "weight_structural" in self._tw_sums:
-                logs["tw/weight_structural"] = round(self._tw_sums["weight_structural"] / self._tw_structural_count, 4)
-            if self._tw_sums.get("selected", 0.0) > 0:
-                logs["tw/missing_frac"] = round(self._tw_sums.get("missing", 0.0) / self._tw_sums["selected"], 4)
-            self._tw_sums = {}
-            self._tw_count = 0.0
-            self._tw_structural_count = 0.0
+        if "loss" in logs and self._tw_sums:
+            sums = {name: float(value) for name, value in self._tw_sums.items()}
+            count = sums.get("count", 0.0)
+            if count > 0:
+                for name in ("kl", "h_p", "h_s", "rho", "eg", "discord", "ce_p", "ce_s", "weight"):
+                    logs[f"tw/{name}"] = round(sums[name] / count, 4)
+            if sums.get("structural_count", 0.0) > 0:
+                logs["tw/weight_structural"] = round(sums["weight_structural"] / sums["structural_count"], 4)
+            if sums.get("selected", 0.0) > 0:
+                logs["tw/missing_frac"] = round(sums["missing"] / sums["selected"], 4)
+            self._reset_stats()
         super().log(logs, start_time)
