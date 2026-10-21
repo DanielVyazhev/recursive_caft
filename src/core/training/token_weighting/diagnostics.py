@@ -120,7 +120,7 @@ def summarize(df: pd.DataFrame, corr_sample: int = 1_000_000, seed: int = 0) -> 
     for tau in DISCORD_EXTRA_TAUS:
         name = f"discord_tau{tau:g}"
         content[name] = discord_weight(
-            torch.as_tensor(content["logp_s"].to_numpy()), torch.as_tensor(content["logp_p"].to_numpy()), tau
+            torch.tensor(content["logp_s"].to_numpy()), torch.tensor(content["logp_p"].to_numpy()), tau
         ).numpy()
         extra_discord.append(name)
     quant = {}
