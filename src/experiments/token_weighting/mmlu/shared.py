@@ -22,6 +22,7 @@ when it exists (dataminer8 layout, dirs named after the HF repos), else artifact
 bf16 on one 40 GB card.
 """
 
+import importlib.util
 import os
 from pathlib import Path
 
@@ -88,6 +89,12 @@ def base_model_path(model_name: str) -> str:
 
 def split_path(dataset_name: str) -> str:
     return (SPLITS_DIR / f"{dataset_name}.parquet").as_posix()
+
+
+def eval_attn_implementation() -> str:
+    # The evaluator defaults to FlashAttention-2; fall back to SDPA where flash_attn is not
+    # installed (the training arms do not need it either without packing).
+    return "flash_attention_2" if importlib.util.find_spec("flash_attn") is not None else "sdpa"
 
 
 def proxy_cache_path(model_name: str, dataset_name: str = TRAIN_FIXED, proxy_nick: str = PROXY_NICK) -> str:
@@ -170,7 +177,10 @@ def run(
                 add_thinking_start_token=True,
             ),
             generation=GenerationConfig(
-                max_new_tokens=max_thinking_tokens + 10, max_thinking_tokens=max_thinking_tokens, max_batch_size=256
+                max_new_tokens=max_thinking_tokens + 10,
+                max_thinking_tokens=max_thinking_tokens,
+                max_batch_size=256,
+                attn_implementation=eval_attn_implementation(),
             ),
             summary_filename=f"summary_reasoning_evals_{eval_split}_cap{max_thinking_tokens}.json",
             skip_missing_checkpoints=skip_missing_checkpoints,
