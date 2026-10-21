@@ -30,6 +30,9 @@ from core.training.token_weighting.token_stats import (
 H_P_BINS = [0.0, 0.1, 0.5, 1.0, 2.0, float("inf")]
 KL_BINS = [0.0, 0.1, 0.5, 1.0, 2.0, float("inf")]
 MODES = ("rho", "kl", "eg", "discord")
+# DISCORD tunes its sigmoid temperature per teacher-student pair; the frame keeps the paper
+# default (tau = 1) in `discord`, and the summary adds the weights at these temperatures.
+DISCORD_EXTRA_TAUS = (4.0,)
 
 
 @torch.inference_mode()
@@ -112,9 +115,16 @@ def _top_decile_share(weights: np.ndarray) -> float:
 
 
 def summarize(df: pd.DataFrame, corr_sample: int = 1_000_000, seed: int = 0) -> dict[str, Any]:
-    content = df[~df["structural"]]
+    content = df[~df["structural"]].copy()
+    extra_discord = []
+    for tau in DISCORD_EXTRA_TAUS:
+        name = f"discord_tau{tau:g}"
+        content[name] = discord_weight(
+            torch.as_tensor(content["logp_s"].to_numpy()), torch.as_tensor(content["logp_p"].to_numpy()), tau
+        ).numpy()
+        extra_discord.append(name)
     quant = {}
-    for col in ("h_p", "h_s", "kl", "rho", "eg", "discord"):
+    for col in ("h_p", "h_s", "kl", "rho", "eg", "discord", *extra_discord):
         values = content[col].to_numpy(dtype=np.float64)
         quant[col] = {
             "mean": float(values.mean()),
@@ -128,16 +138,17 @@ def summarize(df: pd.DataFrame, corr_sample: int = 1_000_000, seed: int = 0) -> 
     joint = pd.crosstab(h_bins, kl_bins, normalize=True)
     joint_table = {str(h): {str(k): float(v) for k, v in row.items()} for h, row in joint.iterrows()}
 
-    discord_low = content["discord"] < 0.2
     rho_high = content["rho"] > 0.8
-    conflicts = {
-        "share_discord_lt_0.2": float(discord_low.mean()),
+    conflicts: dict[str, float] = {
         "share_rho_gt_0.8": float(rho_high.mean()),
-        "share_rho_gt_0.8_and_discord_lt_0.2": float((rho_high & discord_low).mean()),
-        "share_rho_lt_0.2_and_discord_gt_0.8": float(((content["rho"] < 0.2) & (content["discord"] > 0.8)).mean()),
         "share_h_p_lt_0.5_and_kl_gt_1": float(((content["h_p"] < 0.5) & (content["kl"] > 1.0)).mean()),
         "share_h_p_gt_2": float((content["h_p"] > 2.0).mean()),
     }
+    for name in ("discord", *extra_discord):
+        low = content[name] < 0.2
+        conflicts[f"share_{name}_lt_0.2"] = float(low.mean())
+        conflicts[f"share_rho_gt_0.8_and_{name}_lt_0.2"] = float((rho_high & low).mean())
+        conflicts[f"share_rho_lt_0.2_and_{name}_gt_0.8"] = float(((content["rho"] < 0.2) & (content[name] > 0.8)).mean())
 
     sample = content.sample(n=min(corr_sample, len(content)), random_state=seed)
     spearman = sample[["rho", "kl", "eg", "discord", "h_p", "h_s"]].corr(method="spearman")
@@ -151,7 +162,7 @@ def summarize(df: pd.DataFrame, corr_sample: int = 1_000_000, seed: int = 0) -> 
 
     # Weight concentration after per-row mean-1 normalisation (what the trainer does per pack).
     concentration = {}
-    for mode in MODES:
+    for mode in (*MODES, *extra_discord):
         per_row_mean = content.groupby("row_id")[mode].transform("mean").replace(0, np.nan)
         normalized = (content[mode] / per_row_mean).fillna(1.0).to_numpy(dtype=np.float64)
         concentration[mode] = _top_decile_share(normalized)

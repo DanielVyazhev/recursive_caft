@@ -46,4 +46,5 @@ def test_diagnostics_frame_and_summary(tmp_path):
     json.dumps(summary)  # serialisable
     assert summary["rows"] == 2 and summary["tokens"] == labeled
     assert abs(sum(sum(r.values()) for r in summary["h_p_x_kl_share"].values()) - 1.0) < 1e-6
-    assert set(summary["top_decile_weight_share"]) == {"rho", "kl", "eg", "discord"}
+    assert set(summary["top_decile_weight_share"]) == {"rho", "kl", "eg", "discord", "discord_tau4"}
+    assert "share_rho_gt_0.8_and_discord_tau4_lt_0.2" in summary["conflicts"]
