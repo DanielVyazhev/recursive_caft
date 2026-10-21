@@ -1,11 +1,14 @@
 """
-Hold out a small development set from an MMLU train split for cheap checkpoint evals.
+Hold out a small development set from an MMLU train split for cheap checkpoint evals, and a
+fixed training subset for the token-weighting pilot.
 
 Draws `DEV_SIZE` questions stratified by `base_cluster` (proportional allocation, largest
-remainder for the rounding) with a fixed seed and writes two parquets next to the source:
+remainder for the rounding) with a fixed seed and writes three parquets next to the source:
 
-    <name>_dev<DEV_SIZE>.parquet         the held-out rows (evaluated with max_thinking_tokens caps)
-    <name>_minus_dev<DEV_SIZE>.parquet   the remaining rows (what every arm trains on)
+    <name>_dev<DEV_SIZE>.parquet                       held-out rows (evaluated with thinking caps)
+    <name>_minus_dev<DEV_SIZE>.parquet                 the remaining pool
+    <name>_minus_dev<DEV_SIZE>_fixed<FIXED_SIZE>.parquet  a stratified draw from the pool, made once;
+                                                       every arm of the pilot trains on it for all epochs
 
 The test split stays untouched for the final comparison.
 
@@ -22,6 +25,7 @@ import pandas as pd
 SPLITS_DIR = Path(__file__).resolve().parents[2] / "data" / "out" / "splits" / "random" / "mmlu"
 DEFAULT_TRAIN = "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192"
 DEV_SIZE = 500
+FIXED_SIZE = 1024
 SEED = 42
 STRATIFY_COLUMN = "base_cluster"
 
@@ -52,17 +56,32 @@ def main(train_name: str = DEFAULT_TRAIN) -> None:
     dev_idx = stratified_indices(df[STRATIFY_COLUMN], DEV_SIZE, SEED)
     mask = np.zeros(len(df), dtype=bool)
     mask[dev_idx] = True
-    dev, rest = df[mask], df[~mask]
+    dev, rest = df[mask], df[~mask].reset_index(drop=True)
+
+    fixed_idx = stratified_indices(rest[STRATIFY_COLUMN], FIXED_SIZE, SEED + 1)
+    fixed = rest.iloc[fixed_idx]
 
     dev_path = SPLITS_DIR / f"{train_name}_dev{DEV_SIZE}.parquet"
     rest_path = SPLITS_DIR / f"{train_name}_minus_dev{DEV_SIZE}.parquet"
+    fixed_path = SPLITS_DIR / f"{train_name}_minus_dev{DEV_SIZE}_fixed{FIXED_SIZE}.parquet"
     dev.to_parquet(dev_path, index=False)
     rest.to_parquet(rest_path, index=False)
+    fixed.to_parquet(fixed_path, index=False)
 
     print(f"{src.name}: {len(df)} rows")
-    print(f"  dev  -> {dev_path.name}: {len(dev)} rows")
-    print(f"  rest -> {rest_path.name}: {len(rest)} rows")
-    print(pd.concat({"all": df[STRATIFY_COLUMN].value_counts(), "dev": dev[STRATIFY_COLUMN].value_counts()}, axis=1))
+    print(f"  dev   -> {dev_path.name}: {len(dev)} rows")
+    print(f"  rest  -> {rest_path.name}: {len(rest)} rows")
+    print(f"  fixed -> {fixed_path.name}: {len(fixed)} rows")
+    print(
+        pd.concat(
+            {
+                "all": df[STRATIFY_COLUMN].value_counts(),
+                "dev": dev[STRATIFY_COLUMN].value_counts(),
+                "fixed": fixed[STRATIFY_COLUMN].value_counts(),
+            },
+            axis=1,
+        )
+    )
 
 
 if __name__ == "__main__":

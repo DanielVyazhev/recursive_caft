@@ -35,8 +35,11 @@ def coarse_kl(topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor, eps: float =
 
 
 def entropy_from_logp(logp: torch.Tensor) -> torch.Tensor:
-    """Entropy (nats) of a full distribution given as [..., V] log-probabilities."""
-    return -(logp.exp() * logp).sum(-1)
+    """Entropy (nats) of a full distribution given as [..., V] log-probabilities.
+    One [..., V] temporary (in-place product), which matters for 150k-vocab chunks."""
+    p = logp.exp()
+    p.mul_(logp)
+    return -p.sum(-1)
 
 
 def reducible_fraction(kl: torch.Tensor, h_p: torch.Tensor, eps: float = 1e-3) -> torch.Tensor:

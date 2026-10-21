@@ -1,20 +1,27 @@
 """Token-weighted distillation on MMLU reasoning traces: shared runner.
 
-Pilot protocol (one model, one seed): every arm trains on the same train-minus-dev split,
-same data order and seed, full 20 epochs with checkpoints at `SAVE_SCHEDULE`, and is
-evaluated on the 500-question dev split held out of train (make_mmlu_dev_split.py) with a
-2048-token thinking cap. The arms differ only in `token_weighting`:
+Pilot protocol (one model, one seed, one 40 GB GPU): every arm trains on the same fixed
+1024-trace subset of train-minus-dev (make_mmlu_dev_split.py), same data order and seed,
+no single-token mix, no packing (as the budget20 runs), 20 epochs with checkpoints at
+`SAVE_SCHEDULE`, evaluated on the 500-question dev split held out of train with a 2048-token
+thinking cap. The arms differ only in `token_weighting`:
 
-    uniform  -> Full SFT (stock loss; the reference the other arms are compared against)
+    uniform  -> Full SFT (stock loss and collator; the reference the other arms are compared to)
     rho      -> reducible-fraction weights (the method)
     discord  -> DISCORD baseline with the same proxy as reference
     kl / eg  -> ablations
 
-Proxy statistics come from one teacher-forced pass of Qwen2.5-72B-Instruct over the traces
-(qwen_3b_proxy_pass.py); the cache is keyed by the student tokenization, so it is per
-student model.
+Proxy statistics come from one teacher-forced pass of the proxy over the traces
+(qwen_3b_proxy_pass.py); the cache is keyed by the student tokenization, so it is per student
+model and per dataset file.
+
+Paths: student models are read from $RECURSIVE_CAFT_MODELS_DIR, else /mnt/data198/LLM/agents
+when it exists, else artifacts/base_models_v0 (the zhores layout). The proxy is
+$RECURSIVE_CAFT_PROXY_MODEL (hub id or local path), default Qwen/Qwen2.5-14B-Instruct: the
+largest Qwen2.5 that runs in bf16 on one 40 GB card.
 """
 
+import os
 from pathlib import Path
 
 from transformers import AutoTokenizer
@@ -43,30 +50,41 @@ from core.training.token_weighting import TokenWeightingConfig
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SPLITS_DIR = REPO_ROOT / "data" / "out" / "splits" / "random" / "mmlu"
 ARTIFACTS_DIR = REPO_ROOT / "artifacts" / "token_weighting" / "mmlu"
+SERVER_MODELS_DIR = Path("/mnt/data198/LLM/agents")
 
 TRAIN_DATASET = "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192"
 DEV_SPLIT = "dev500"
 TRAIN_MINUS_DEV = f"{TRAIN_DATASET}_minus_{DEV_SPLIT}"
+TRAIN_FIXED = f"{TRAIN_MINUS_DEV}_fixed1024"
 DEV_DATASET = f"{TRAIN_DATASET}_{DEV_SPLIT}"
 
-PROXY_MODEL_ID = "Qwen/Qwen2.5-72B-Instruct"
-PROXY_NICK = "qwen_72b"
+PROXY_MODEL_ID = os.environ.get("RECURSIVE_CAFT_PROXY_MODEL", "Qwen/Qwen2.5-14B-Instruct")
+PROXY_NICK = Path(PROXY_MODEL_ID).name.lower()
 PROXY_TOP_K = 32
 
 SAVE_SCHEDULE = [2, 5, 10, 15, 20]
 MAX_THINKING_TOKENS = 2048
 
 
+def models_dir() -> Path:
+    env = os.environ.get("RECURSIVE_CAFT_MODELS_DIR")
+    if env:
+        return Path(env)
+    if SERVER_MODELS_DIR.exists():
+        return SERVER_MODELS_DIR
+    return REPO_ROOT / "artifacts" / "base_models_v0"
+
+
 def base_model_path(model_name: str) -> str:
-    return (REPO_ROOT / "artifacts" / "base_models_v0" / model_name).as_posix()
+    return (models_dir() / model_name).as_posix()
 
 
 def split_path(dataset_name: str) -> str:
     return (SPLITS_DIR / f"{dataset_name}.parquet").as_posix()
 
 
-def proxy_cache_path(model_name: str, proxy_nick: str = PROXY_NICK, train_dataset: str = TRAIN_DATASET) -> str:
-    return (REPO_ROOT / "data" / "out" / "proxy_cache" / "mmlu" / proxy_nick / model_name / train_dataset).as_posix()
+def proxy_cache_path(model_name: str, dataset_name: str = TRAIN_FIXED, proxy_nick: str = PROXY_NICK) -> str:
+    return (REPO_ROOT / "data" / "out" / "proxy_cache" / "mmlu" / proxy_nick / model_name / dataset_name).as_posix()
 
 
 def load_tokenizer(model_name: str):
@@ -90,11 +108,13 @@ def run(
     model_name: str,
     relative_out_path: str,
     token_weighting: TokenWeightingConfig | None,
-    train_dataset: str = TRAIN_MINUS_DEV,
+    train_dataset: str = TRAIN_FIXED,
     eval_dataset: str = DEV_DATASET,
     eval_split: str = DEV_SPLIT,
     save_schedule: list[int] | None = None,
     max_thinking_tokens: int = MAX_THINKING_TOKENS,
+    packing: bool = False,
+    seed: int = 42,
     skip_missing_checkpoints: bool = True,
     run_evaluation: bool = True,
     lora_training_args: LoRASpecificTrainingArgs | None = None,
@@ -113,9 +133,11 @@ def run(
             out_path=out_path,
             model_id=base_model_path(model_name),
             train_dataset=reasoning_adapter(tokenizer, train_dataset),
-            training_args=LoRATrainingArgs(num_train_epochs=save_schedule[-1], per_device_train_batch_size=1),
+            training_args=LoRATrainingArgs(
+                num_train_epochs=save_schedule[-1], per_device_train_batch_size=1, seed=seed, data_seed=seed
+            ),
             lora_training_args=lora_training_args,
-            packing=PackingConfig(budget=packing_budget(model_name)),
+            packing=PackingConfig(budget=packing_budget(model_name)) if packing else None,
             save_schedule=save_schedule,
             token_weighting=token_weighting,
         ),

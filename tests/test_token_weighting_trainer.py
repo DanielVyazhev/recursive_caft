@@ -13,7 +13,7 @@ from datasets import Dataset
 from transformers import Qwen2Config, Qwen2ForCausalLM, Seq2SeqTrainingArguments
 
 from core.datasets.sequence_packing import IGNORE_LABEL, pack_dataset, row_key
-from core.training.token_weighting.collator import ProxyAwarePackedCollator, structural_mask
+from core.training.token_weighting.collator import ProxyAwarePackedCollator, ProxyAwarePaddedCollator, structural_mask
 from core.training.token_weighting.config import TokenWeightingConfig
 from core.training.token_weighting.proxy_cache import ProxyCache, ProxyCacheWriter, build_proxy_cache
 from core.training.token_weighting.token_stats import coarse_kl, finalize_weights, raw_weights
@@ -164,6 +164,100 @@ def test_collator_aligns_cache_entries_with_label_positions(cache_dir, rows):
             assert not batch["tw_structural"][b, start + int((ids == THINK_START).nonzero()[0]) + 1 : end_pos].any()
             start += length
     assert collator.missing_members == 0
+
+
+class _FakeTokenizer:
+    """Just enough of PreTrainedTokenizer for DataCollatorForTokenClassification."""
+
+    def __init__(self, padding_side: str):
+        self.padding_side = padding_side
+        self.pad_token_id = PAD
+
+    def pad(self, encoded_inputs, padding=True, max_length=None, pad_to_multiple_of=None, return_tensors=None):
+        length = max(len(f["input_ids"]) for f in encoded_inputs)
+        if pad_to_multiple_of:
+            length = ((length + pad_to_multiple_of - 1) // pad_to_multiple_of) * pad_to_multiple_of
+        out = {"input_ids": [], "attention_mask": []}
+        for f in encoded_inputs:
+            ids = list(f["input_ids"])
+            pad = [PAD] * (length - len(ids))
+            mask = [1] * len(ids)
+            if self.padding_side == "right":
+                out["input_ids"].append(ids + pad)
+                out["attention_mask"].append(mask + [0] * len(pad))
+            else:
+                out["input_ids"].append(pad + ids)
+                out["attention_mask"].append([0] * len(pad) + mask)
+        return {k: torch.tensor(v, dtype=torch.long) for k, v in out.items()}
+
+
+def _padded_features(rows: Dataset) -> list[dict]:
+    return [
+        {"input_ids": r["input_ids"], "attention_mask": [1] * len(r["input_ids"]), "labels": r["labels"]}
+        for r in rows
+    ]
+
+
+@pytest.mark.parametrize("padding_side", ["right", "left"])
+def test_padded_collator_aligns_cache_entries(cache_dir, rows, padding_side):
+    cache = ProxyCache(str(cache_dir))
+    collator = ProxyAwarePaddedCollator(_FakeTokenizer(padding_side), cache, (THINK_START, THINK_END))
+    batch = collator(_padded_features(rows))
+    bsz, seq = batch["labels"].shape
+    assert bsz == len(rows) and seq % 8 == 0
+    assert batch["attention_mask"].sum() == sum(len(r["input_ids"]) for r in rows)
+    for b, row in enumerate(rows):
+        sl = cache.slice(row_key(row["input_ids"]))
+        length = len(row["input_ids"])
+        start = seq - length if padding_side == "left" else 0
+        assert torch.equal(batch["input_ids"][b, start : start + length], torch.tensor(row["input_ids"]))
+        labeled = (batch["labels"][b] != IGNORE_LABEL).nonzero(as_tuple=True)[0]
+        assert labeled.numel() == len(sl["entropy"])
+        assert torch.allclose(batch["tw_entropy"][b, labeled], torch.as_tensor(np.array(sl["entropy"])))
+        assert torch.equal(batch["tw_topk_ids"][b, labeled], torch.as_tensor(np.array(sl["topk_ids"], dtype=np.int64)))
+        assert batch["tw_valid"][b, labeled].all()
+        assert batch["tw_structural"][b].sum() == 4  # <think>, </think>, answer, eos
+    assert not (batch["tw_valid"] & (batch["labels"] == IGNORE_LABEL)).any()
+    assert collator.missing_members == 0
+
+
+def test_padded_weighted_loss_matches_packed_formula(cache_dir, student, rows, tmp_path):
+    """Same documents, padded instead of packed: loss = sum_i w_i CE_i / N with per-document
+    normalisation, attention_mask passed through to the model."""
+    cache = ProxyCache(str(cache_dir))
+    collator = ProxyAwarePaddedCollator(_FakeTokenizer("right"), cache, (THINK_START, THINK_END))
+    batch = collator(_padded_features(rows))
+    num_items = torch.tensor(int((batch["labels"] != IGNORE_LABEL).sum()))
+    trainer = _trainer(student, tmp_path, TokenWeightingConfig(mode="rho", chunk_size=7), collator)
+    loss = trainer.compute_loss(student, dict(batch), num_items_in_batch=num_items)
+
+    with torch.no_grad():
+        logits = student(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"]).logits[:, :-1].float()
+    lp = torch.log_softmax(logits, dim=-1)
+    labels = batch["labels"][:, 1:]
+    selected = labels != IGNORE_LABEL
+    ce = -lp.gather(2, labels.clamp_min(0)[..., None]).squeeze(-1)
+    kl = coarse_kl(batch["tw_topk_logp"][:, 1:], lp.gather(2, batch["tw_topk_ids"][:, 1:]))
+    raw = raw_weights(
+        "rho",
+        kl=kl,
+        h_p=batch["tw_entropy"][:, 1:],
+        h_s=-(lp.exp() * lp).sum(-1),
+        logp_p=batch["tw_logp"][:, 1:],
+        logp_s=-ce,
+        rho_eps=1e-3,
+        discord_tau=1.0,
+    )
+    w = finalize_weights(
+        raw,
+        selected=selected,
+        structural=batch["tw_structural"][:, 1:] & selected,
+        valid=batch["tw_valid"][:, 1:] & selected,
+        structural_weight=1.0,
+        normalize_per_pack=True,
+    )
+    assert torch.isclose(loss, (w * ce).sum() / num_items, atol=1e-5)
+    assert torch.allclose(w.sum(-1), selected.sum(-1).float())
 
 
 def test_collator_without_cache_or_members_yields_no_valid_positions(rows):

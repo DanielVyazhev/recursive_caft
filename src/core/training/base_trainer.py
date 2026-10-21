@@ -22,7 +22,7 @@ from core.datasets.sequence_packing import pack_dataset, sequence_length_stats
 from core.training.callbacks.save_by_schedule import SaveByScheduleCallback
 from core.training.packed_data_collator import PackedSequenceCollator
 from core.training.thinking_tokens import new_token_ids
-from core.training.token_weighting.collator import ProxyAwarePackedCollator
+from core.training.token_weighting.collator import ProxyAwarePackedCollator, ProxyAwarePaddedCollator
 from core.training.token_weighting.config import TokenWeightingConfig
 from core.training.token_weighting.proxy_cache import ProxyCache
 from core.training.token_weighting.trainer import WeightedTokenLossTrainer
@@ -76,18 +76,16 @@ class BaseTrainerConfig[TTrainingArgs: BaseTrainingArgs = BaseTrainingArgs](Pydr
     # per_device_train_batch_size=1 -- each pack already fills the budget.
     packing: PackingConfig | None = None
     # When set, replace the stock token-mean loss by the proxy-weighted one
-    # (core.training.token_weighting). Requires packing: the weights are attached per
-    # packed block by ProxyAwarePackedCollator.
+    # (core.training.token_weighting). Works with and without packing: the proxy statistics
+    # are attached per document by the matching ProxyAware*Collator.
     token_weighting: TokenWeightingConfig | None = None
 
     @model_validator(mode="after")
     def _validate_token_weighting(self):
-        if self.token_weighting is not None:
-            assert self.packing is not None, "token_weighting requires packing (the weights ride on the packed blocks)"
-            if self.token_weighting.needs_proxy():
-                assert self.token_weighting.proxy_cache_path is not None, (
-                    f"token_weighting mode {self.token_weighting.mode!r} needs proxy_cache_path"
-                )
+        if self.token_weighting is not None and self.token_weighting.needs_proxy():
+            assert self.token_weighting.proxy_cache_path is not None, (
+                f"token_weighting mode {self.token_weighting.mode!r} needs proxy_cache_path"
+            )
         return self
 
 
@@ -163,7 +161,14 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
     def data_collator(self):
         if self.config.token_weighting is not None:
             think_start, think_end = new_token_ids(self.tokenizer)
-            return ProxyAwarePackedCollator(
+            if self.config.packing is not None:
+                return ProxyAwarePackedCollator(
+                    cache=self.proxy_cache,
+                    thinking_token_ids=(think_start, think_end),
+                    strict=self.config.token_weighting.strict_cache,
+                )
+            return ProxyAwarePaddedCollator(
+                tokenizer=self.tokenizer,
                 cache=self.proxy_cache,
                 thinking_token_ids=(think_start, think_end),
                 strict=self.config.token_weighting.strict_cache,
@@ -177,7 +182,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
     @property
     def training_args(self):
         extra: dict[str, Any] = {}
-        if self.config.token_weighting is not None:
+        if self.config.token_weighting is not None and self.config.packing is not None:
             # The packed dataset carries member_keys/member_lengths for the collator; they are
             # not model inputs, so keep HF from dropping them by forward-signature matching.
             extra["remove_unused_columns"] = False
