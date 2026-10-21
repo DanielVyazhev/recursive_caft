@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import torch
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from pydraconf import PydraConfig
 from transformers import (
     AutoModelForCausalLM,
@@ -21,6 +21,11 @@ from core.datasets.abstract_dataset_adapter import AbstractDatasetAdapter
 from core.datasets.sequence_packing import pack_dataset, sequence_length_stats
 from core.training.callbacks.save_by_schedule import SaveByScheduleCallback
 from core.training.packed_data_collator import PackedSequenceCollator
+from core.training.thinking_tokens import new_token_ids
+from core.training.token_weighting.collator import ProxyAwarePackedCollator
+from core.training.token_weighting.config import TokenWeightingConfig
+from core.training.token_weighting.proxy_cache import ProxyCache
+from core.training.token_weighting.trainer import WeightedTokenLossTrainer
 from core.utils.last_checkpoint_dir import get_last_checkpoint_dir
 from core.utils.logger import logger
 from core.utils.seed import set_seed
@@ -70,6 +75,20 @@ class BaseTrainerConfig[TTrainingArgs: BaseTrainingArgs = BaseTrainingArgs](Pydr
     # When set, enable sequence packing (see PackingConfig). Pair with
     # per_device_train_batch_size=1 -- each pack already fills the budget.
     packing: PackingConfig | None = None
+    # When set, replace the stock token-mean loss by the proxy-weighted one
+    # (core.training.token_weighting). Requires packing: the weights are attached per
+    # packed block by ProxyAwarePackedCollator.
+    token_weighting: TokenWeightingConfig | None = None
+
+    @model_validator(mode="after")
+    def _validate_token_weighting(self):
+        if self.token_weighting is not None:
+            assert self.packing is not None, "token_weighting requires packing (the weights ride on the packed blocks)"
+            if self.token_weighting.needs_proxy():
+                assert self.token_weighting.proxy_cache_path is not None, (
+                    f"token_weighting mode {self.token_weighting.mode!r} needs proxy_cache_path"
+                )
+        return self
 
 
 class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
@@ -79,6 +98,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         self._model: PreTrainedModel | None = None
         # Populated by _prepare_data when packing is on: {num_docs, num_packs, budget}.
         self._packing_stats: dict[str, int] | None = None
+        self._proxy_cache: ProxyCache | None = None
 
     def train(self):
         if not self._directory_is_empty(self.config.out_path, self.config.training_args.num_train_epochs):
@@ -126,7 +146,28 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         return {"attn_implementation": "flash_attention_2"}
 
     @property
+    def proxy_cache(self) -> ProxyCache | None:
+        weighting = self.config.token_weighting
+        if weighting is None or not weighting.needs_proxy():
+            return None
+        if self._proxy_cache is None:
+            assert weighting.proxy_cache_path is not None
+            self._proxy_cache = ProxyCache(weighting.proxy_cache_path)
+            logger.info(
+                f"Token weighting '{weighting.mode}': proxy cache {weighting.proxy_cache_path} "
+                f"({len(self._proxy_cache)} rows, top_k={self._proxy_cache.top_k})"
+            )
+        return self._proxy_cache
+
+    @property
     def data_collator(self):
+        if self.config.token_weighting is not None:
+            think_start, think_end = new_token_ids(self.tokenizer)
+            return ProxyAwarePackedCollator(
+                cache=self.proxy_cache,
+                thinking_token_ids=(think_start, think_end),
+                strict=self.config.token_weighting.strict_cache,
+            )
         if self.config.packing is not None:
             return PackedSequenceCollator()
         return DataCollatorForTokenClassification(
@@ -135,6 +176,11 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
 
     @property
     def training_args(self):
+        extra: dict[str, Any] = {}
+        if self.config.token_weighting is not None:
+            # The packed dataset carries member_keys/member_lengths for the collator; they are
+            # not model inputs, so keep HF from dropping them by forward-signature matching.
+            extra["remove_unused_columns"] = False
         return Seq2SeqTrainingArguments(
             **self.config.training_args.model_dump(
                 exclude={"effective_train_batch_size", "per_device_train_batch_size", "gradient_accumulation_steps"}
@@ -144,6 +190,7 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
                 self.config.training_args.per_device_train_batch_size,
             ),
             output_dir=self.config.out_path,
+            **extra,
         )
 
     def _resolve_effective_train_batch_size(self) -> int:
@@ -188,7 +235,12 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
             num_docs = len(train_ds)
             pad_token_id = self.tokenizer.pad_token_id
             assert isinstance(pad_token_id, int), "Tokenizer must have an integer pad_token_id for packing"
-            train_ds = pack_dataset(train_ds, budget=budget, pad_token_id=pad_token_id)
+            train_ds = pack_dataset(
+                train_ds,
+                budget=budget,
+                pad_token_id=pad_token_id,
+                with_members=self.config.token_weighting is not None,
+            )
             self._packing_stats = {"num_docs": num_docs, "num_packs": len(train_ds), "budget": budget}
 
         logger.info("Dataset samples")
@@ -200,13 +252,21 @@ class BaseTrainer[TConfig: BaseTrainerConfig[Any] = BaseTrainerConfig]:
         return cast(torch.utils.data.Dataset, train_ds.with_format("torch"))
 
     def _build_trainer(self, train_ds):
-        trainer = Seq2SeqTrainer(
+        trainer_kwargs: dict[str, Any] = dict(
             model=self.model,
             args=self.training_args,
             train_dataset=train_ds,
             data_collator=self.data_collator,
             processing_class=self.tokenizer,
         )
+        if self.config.token_weighting is not None:
+            trainer = WeightedTokenLossTrainer(**trainer_kwargs, token_weighting=self.config.token_weighting)
+            assert trainer.model_accepts_loss_kwargs, (
+                "Token weighting divides a sum-CE by num_items_in_batch, which the Trainer only "
+                "computes when the model forward accepts loss kwargs."
+            )
+        else:
+            trainer = Seq2SeqTrainer(**trainer_kwargs)
 
         if self.config.save_schedule is not None:
             trainer.add_callback(SaveByScheduleCallback(schedule=self.config.save_schedule))
