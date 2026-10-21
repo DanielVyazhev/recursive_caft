@@ -18,6 +18,8 @@ which is why the packed batch must be fed with no `attention_mask`.
 """
 
 import bisect
+import hashlib
+from collections.abc import Sequence
 
 import numpy as np
 from datasets import Dataset
@@ -28,6 +30,18 @@ from core.utils.logger import logger
 # Matches the loss-ignore index used by the dataset adapters (-100 on the prompt
 # prefix) and torch's CrossEntropyLoss default.
 IGNORE_LABEL = -100
+
+
+def row_key(input_ids: Sequence[int]) -> int:
+    """Content hash of a tokenized row, as a signed int64 (Arrow/torch friendly).
+
+    Keys the per-token proxy cache (core.training.token_weighting.proxy_cache): the proxy
+    pass and the trainer tokenize the same parquet with the same tokenizer, so hashing the
+    token ids ties a cache entry to a row without relying on row_id uniqueness. Identical
+    rows share a key, which is harmless (same tokens -> same proxy statistics).
+    """
+    digest = hashlib.blake2b(np.asarray(input_ids, dtype="<i4").tobytes(), digest_size=8).digest()
+    return int.from_bytes(digest, "little", signed=True)
 
 
 def sequence_length_stats(lengths: list[int]) -> dict[str, float]:
@@ -50,7 +64,7 @@ def sequence_length_stats(lengths: list[int]) -> dict[str, float]:
     return stats
 
 
-def pack_dataset(ds: Dataset, budget: int, pad_token_id: int) -> Dataset:
+def pack_dataset(ds: Dataset, budget: int, pad_token_id: int, with_members: bool = False) -> Dataset:
     """Greedily bin-pack tokenized rows into fixed `budget`-sized blocks.
 
     Uses best-fit-decreasing (place the largest remaining row into the tightest
@@ -65,6 +79,13 @@ def pack_dataset(ds: Dataset, budget: int, pad_token_id: int) -> Dataset:
                      loss shift lands on is ignored -- no special handling needed.
     - `position_ids`: range(len) restarted per member document and again for the pad
                       segment, so FA2 treats each as an isolated sequence.
+
+    With `with_members=True` two more columns record the block layout so a collator can
+    map each member back to its per-token proxy statistics (token-weighted loss):
+
+    - `member_keys`   : `row_key(input_ids)` of every member, in block order.
+    - `member_lengths`: token length of every member, in block order (the pad segment
+                        is not a member).
 
     Deterministic (sorts by length, no RNG) so runs stay reproducible under the
     seeded trainer. `attention_mask`/`row_id` and the original columns are dropped --
@@ -107,15 +128,22 @@ def pack_dataset(ds: Dataset, budget: int, pad_token_id: int) -> Dataset:
     packed_input_ids: list[list[int]] = []
     packed_labels: list[list[int]] = []
     packed_position_ids: list[list[int]] = []
+    packed_member_keys: list[list[int]] = []
+    packed_member_lengths: list[list[int]] = []
     for bin_docs in bins:
         ids: list[int] = []
         labs: list[int] = []
         pos: list[int] = []
+        keys: list[int] = []
+        member_lengths: list[int] = []
         for i in bin_docs:
             doc_ids = list(input_ids_col[i])
             ids.extend(doc_ids)
             labs.extend(labels_col[i])
             pos.extend(range(len(doc_ids)))
+            if with_members:
+                keys.append(row_key(doc_ids))
+                member_lengths.append(len(doc_ids))
         pad_len = budget - len(ids)
         if pad_len:
             ids.extend([pad_token_id] * pad_len)
@@ -124,6 +152,8 @@ def pack_dataset(ds: Dataset, budget: int, pad_token_id: int) -> Dataset:
         packed_input_ids.append(ids)
         packed_labels.append(labs)
         packed_position_ids.append(pos)
+        packed_member_keys.append(keys)
+        packed_member_lengths.append(member_lengths)
 
     fill = sum(lengths) / (len(bins) * budget)
     logger.info(
@@ -131,10 +161,12 @@ def pack_dataset(ds: Dataset, budget: int, pad_token_id: int) -> Dataset:
         f"(avg {len(lengths) / len(bins):.2f} docs/block, {fill:.1%} token fill)"
     )
 
-    return Dataset.from_dict(
-        {
-            "input_ids": packed_input_ids,
-            "labels": packed_labels,
-            "position_ids": packed_position_ids,
-        }
-    )
+    columns = {
+        "input_ids": packed_input_ids,
+        "labels": packed_labels,
+        "position_ids": packed_position_ids,
+    }
+    if with_members:
+        columns["member_keys"] = packed_member_keys
+        columns["member_lengths"] = packed_member_lengths
+    return Dataset.from_dict(columns)
