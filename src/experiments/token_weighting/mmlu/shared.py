@@ -16,9 +16,10 @@ Proxy statistics come from one teacher-forced pass of the proxy over the traces
 model and per dataset file.
 
 Paths: student models are read from $RECURSIVE_CAFT_MODELS_DIR, else /mnt/data198/LLM/agents
-when it exists, else artifacts/base_models_v0 (the zhores layout). The proxy is
-$RECURSIVE_CAFT_PROXY_MODEL (hub id or local path), default Qwen/Qwen2.5-14B-Instruct: the
-largest Qwen2.5 that runs in bf16 on one 40 GB card.
+when it exists (dataminer8 layout, dirs named after the HF repos), else artifacts/base_models_v0
+(the zhores layout). The proxy is $RECURSIVE_CAFT_PROXY_MODEL, else the local
+/mnt/data198/LLM/models/Qwen2.5-14B-Instruct, else the hub id: the largest Qwen2.5 that runs in
+bf16 on one 40 GB card.
 """
 
 import os
@@ -50,7 +51,14 @@ from core.training.token_weighting import TokenWeightingConfig
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SPLITS_DIR = REPO_ROOT / "data" / "out" / "splits" / "random" / "mmlu"
 ARTIFACTS_DIR = REPO_ROOT / "artifacts" / "token_weighting" / "mmlu"
-SERVER_MODELS_DIR = Path("/mnt/data198/LLM/agents")
+SERVER_AGENTS_DIR = Path("/mnt/data198/LLM/agents")
+SERVER_PROXY_DIR = Path("/mnt/data198/LLM/models/Qwen2.5-14B-Instruct")
+# Student nick (packing budgets, LoRA target modules) -> directory name under the agents dir.
+SERVER_MODEL_DIRS = {
+    "qwen_3b": "Qwen2.5-3B-Instruct",
+    "phi4_mini": "Phi-4-mini-instruct",
+    "llama_3b": "llama_3b",
+}
 
 TRAIN_DATASET = "train_corrected_answer_deepseek_v4_pro_and_others_head_truncated8192"
 DEV_SPLIT = "dev500"
@@ -58,7 +66,10 @@ TRAIN_MINUS_DEV = f"{TRAIN_DATASET}_minus_{DEV_SPLIT}"
 TRAIN_FIXED = f"{TRAIN_MINUS_DEV}_fixed1024"
 DEV_DATASET = f"{TRAIN_DATASET}_{DEV_SPLIT}"
 
-PROXY_MODEL_ID = os.environ.get("RECURSIVE_CAFT_PROXY_MODEL", "Qwen/Qwen2.5-14B-Instruct")
+PROXY_MODEL_ID = os.environ.get(
+    "RECURSIVE_CAFT_PROXY_MODEL",
+    SERVER_PROXY_DIR.as_posix() if SERVER_PROXY_DIR.exists() else "Qwen/Qwen2.5-14B-Instruct",
+)
 PROXY_NICK = Path(PROXY_MODEL_ID).name.lower()
 PROXY_TOP_K = 32
 
@@ -66,17 +77,13 @@ SAVE_SCHEDULE = [2, 5, 10, 15, 20]
 MAX_THINKING_TOKENS = 2048
 
 
-def models_dir() -> Path:
+def base_model_path(model_name: str) -> str:
     env = os.environ.get("RECURSIVE_CAFT_MODELS_DIR")
     if env:
-        return Path(env)
-    if SERVER_MODELS_DIR.exists():
-        return SERVER_MODELS_DIR
-    return REPO_ROOT / "artifacts" / "base_models_v0"
-
-
-def base_model_path(model_name: str) -> str:
-    return (models_dir() / model_name).as_posix()
+        return (Path(env) / SERVER_MODEL_DIRS.get(model_name, model_name)).as_posix()
+    if SERVER_AGENTS_DIR.exists():
+        return (SERVER_AGENTS_DIR / SERVER_MODEL_DIRS.get(model_name, model_name)).as_posix()
+    return (REPO_ROOT / "artifacts" / "base_models_v0" / model_name).as_posix()
 
 
 def split_path(dataset_name: str) -> str:
