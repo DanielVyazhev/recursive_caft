@@ -91,6 +91,8 @@ def test_raw_weights_dispatch():
     assert torch.allclose(raw_weights("rho", **kw), reducible_fraction(kw["kl"], kw["h_p"], 1e-3))
     assert torch.allclose(raw_weights("eg", **kw), entropy_gain(kw["h_s"], kw["h_p"]))
     assert torch.allclose(raw_weights("discord", **kw), discord_weight(kw["logp_s"], kw["logp_p"], 1.0))
+    assert torch.allclose(raw_weights("excess_loss", **kw), kw["logp_p"] - kw["logp_s"])
+    assert torch.equal(raw_weights("student_entropy", **kw), kw["h_s"])
     with pytest.raises(ValueError):
         raw_weights("nope", **kw)  # type: ignore[arg-type]
 
@@ -155,3 +157,32 @@ def test_pack_dataset_members_are_opt_in_and_aligned():
             seen += 1
         assert all(tok == 0 for tok in block["input_ids"][start:])
     assert seen == len(ds)
+
+
+def test_select_top_fraction_per_row():
+    from core.training.token_weighting.token_stats import select_top_fraction
+
+    score = torch.tensor([[0.1, 0.9, 0.5, 0.7, 0.3, 9.0], [0.2, 0.1, 0.0, 0.0, 0.0, 0.0]])
+    content = torch.tensor([[True, True, True, True, True, False], [True, True, False, False, False, False]])
+    w = select_top_fraction(score, content, 0.4)
+    # row 0: 5 content tokens -> ceil(2.0) = 2 kept: scores 0.9 and 0.7; the non-content 9.0 is never kept
+    assert w[0].tolist() == [0.0, 1.0, 0.0, 1.0, 0.0, 0.0]
+    # row 1: 2 content tokens -> ceil(0.8) = 1 kept
+    assert w[1].tolist() == [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    assert select_top_fraction(score, content, 1.0)[0].sum() == 5
+    # negative scores (excess loss) rank fine
+    neg = -score
+    assert select_top_fraction(neg, content, 0.4)[0].tolist() == [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+
+
+def test_excess_loss_mode_requires_selection():
+    from core.training.token_weighting.config import TokenWeightingConfig
+
+    with pytest.raises(Exception):
+        TokenWeightingConfig(mode="excess_loss", proxy_cache_path="x")
+    cfg = TokenWeightingConfig(mode="excess_loss", proxy_cache_path="x", select_top_frac=0.6)
+    assert cfg.select_top_frac == 0.6
+    with pytest.raises(Exception):
+        TokenWeightingConfig(mode="student_entropy", proxy_cache_path="x")
+    with pytest.raises(Exception):
+        TokenWeightingConfig(mode="rho", proxy_cache_path="x", select_top_frac=1.5)

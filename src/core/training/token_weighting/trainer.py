@@ -30,6 +30,7 @@ from core.training.token_weighting.token_stats import (
     finalize_weights,
     raw_weights,
     reducible_fraction,
+    select_top_fraction,
 )
 from core.utils.logger import logger
 
@@ -140,8 +141,11 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
                 rho_eps=cfg.rho_eps,
                 discord_tau=cfg.discord_tau,
             )
+            raw = raw.reshape(bsz, seq)
+            if cfg.select_top_frac is not None:
+                raw = select_top_fraction(raw, selected & valid & ~structural, cfg.select_top_frac)
             weights = finalize_weights(
-                raw.reshape(bsz, seq),
+                raw,
                 selected=selected,
                 structural=structural,
                 valid=valid,

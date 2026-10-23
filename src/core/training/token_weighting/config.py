@@ -1,13 +1,16 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 # uniform : w_t = 1 (the plain HF token-mean loss, kept for equivalence tests / ablation)
 # rho     : w_t = KL_t / (H_P(t) + KL_t)              reducible fraction (the method)
 # kl      : w_t = KL_t                                 ablation: reducible part only
 # eg      : w_t = max(H_S(t) - H_P(t), 0)              ablation: question-level EG applied per token
 # discord : w_t = sigmoid(tau * (log p_S(y_t) - log p_P(y_t)))   external baseline (DISCORD)
-WeightingMode = Literal["uniform", "rho", "kl", "eg", "discord"]
+# excess_loss : score l_S - l_P (can be negative) -- Rho-1 / Token Cleaning; only meaningful as a
+#           selection score, i.e. together with select_top_frac
+# student_entropy : score H_S(t) -- SE-KD / the "80/20 rule"; selection score (top 20%)
+WeightingMode = Literal["uniform", "rho", "kl", "eg", "discord", "excess_loss", "student_entropy"]
 
 
 class TokenWeightingConfig(BaseModel):
@@ -32,6 +35,19 @@ class TokenWeightingConfig(BaseModel):
     # Fail when a packed member has no cache entry (default). With False such members fall
     # back to weight 1 and the fraction is logged as tw/missing_frac.
     strict_cache: bool = True
+    # Hard selection instead of soft weights: per batch row, keep the content tokens with the
+    # top `select_top_frac` share of the mode's raw score (weight 1, the rest 0). With the
+    # per-pack normalisation this is the mean loss over the selected tokens, the Rho-1 /
+    # Token Cleaning objective (Rho-1 keeps 60%).
+    select_top_frac: float | None = None
+
+    @model_validator(mode="after")
+    def _validate_selection(self):
+        if self.select_top_frac is not None:
+            assert 0.0 < self.select_top_frac <= 1.0, "select_top_frac must be in (0, 1]"
+        if self.mode in ("excess_loss", "student_entropy"):
+            assert self.select_top_frac is not None, f"{self.mode} is a selection score; set select_top_frac"
+        return self
 
     def needs_proxy(self) -> bool:
         return self.mode != "uniform"

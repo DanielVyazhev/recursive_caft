@@ -413,3 +413,35 @@ def test_log_reports_running_token_statistics(cache_dir, student, rows, tmp_path
     assert 0 <= logs["tw/rho"] <= 1
     assert logs["tw/missing_frac"] == 0
     assert trainer._tw_sums == {}  # reset after logging
+
+
+def test_rho1_selection_is_mean_loss_over_selected_tokens(cache_dir, student, rows, tmp_path):
+    """mode=excess_loss + select_top_frac: the loss equals the mean CE over the kept content tokens
+    (plus the structural tokens at weight 1), i.e. Rho-1's selective objective."""
+    cache = ProxyCache(str(cache_dir))
+    packed = _packed(rows)
+    collator = ProxyAwarePackedCollator(cache, thinking_token_ids=(THINK_START, THINK_END))
+    batch = collator([packed[0]])
+    num_items = torch.tensor(int((batch["labels"] != IGNORE_LABEL).sum()))
+    config = TokenWeightingConfig(mode="excess_loss", chunk_size=5, select_top_frac=0.6)
+    trainer = _trainer(student, tmp_path, config, collator)
+    loss = trainer.compute_loss(student, dict(batch), num_items_in_batch=num_items)
+
+    with torch.no_grad():
+        logits = student(input_ids=batch["input_ids"], position_ids=batch["position_ids"]).logits[:, :-1].float()
+    lp = torch.log_softmax(logits, dim=-1)
+    labels = batch["labels"][:, 1:]
+    selected = labels != IGNORE_LABEL
+    ce = -lp.gather(2, labels.clamp_min(0)[..., None]).squeeze(-1)
+    structural = batch["tw_structural"][:, 1:] & selected
+    content = selected & batch["tw_valid"][:, 1:] & ~structural
+    excess = ce - (-batch["tw_logp"][:, 1:])
+    n_content = int(content.sum())
+    k = max(1, int(np.ceil(0.6 * n_content)))
+    order = torch.argsort(torch.where(content, excess, torch.full_like(excess, -1e9))[0], descending=True)
+    kept = torch.zeros_like(content)
+    kept[0, order[:k]] = True
+    assert int(kept.sum()) == k
+    # kept content tokens share the content mass equally (n_content / k each), structural stay at 1
+    expected = (ce[kept] * (n_content / k)).sum() + ce[structural].sum()
+    assert torch.isclose(loss, expected / num_items, atol=1e-5)

@@ -11,6 +11,8 @@ Notation (per target position t, with y_t the trace token):
     logp_P   log p_P(y_t), logp_S = log p_S(y_t)
 """
 
+import math
+
 import torch
 
 from core.training.token_weighting.config import WeightingMode
@@ -80,7 +82,27 @@ def raw_weights(
         return entropy_gain(h_s, h_p)
     if mode == "discord":
         return discord_weight(logp_s, logp_p, discord_tau)
+    if mode == "excess_loss":
+        return logp_p - logp_s  # l_S - l_P
+    if mode == "student_entropy":
+        return h_s
     raise ValueError(f"Unknown token weighting mode {mode!r}")
+
+
+def select_top_fraction(score: torch.Tensor, content: torch.Tensor, frac: float) -> torch.Tensor:
+    """Binary weights [B, T]: per row, 1 on the `frac` share of content positions with the highest
+    score (at least one), 0 elsewhere. Non-content positions are never selected."""
+    out = torch.zeros_like(score)
+    neg_inf = torch.finfo(score.dtype).min
+    masked = torch.where(content, score, torch.full_like(score, neg_inf))
+    for b in range(score.shape[0]):
+        n = int(content[b].sum())
+        if n == 0:
+            continue
+        k = max(1, min(n, int(math.ceil(frac * n))))
+        idx = torch.topk(masked[b], k).indices
+        out[b, idx] = 1.0
+    return out
 
 
 def finalize_weights(
