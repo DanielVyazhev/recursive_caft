@@ -31,6 +31,7 @@ from core.training.token_weighting.token_stats import (
     raw_weights,
     reducible_fraction,
     select_top_fraction,
+    topk_renormalized_kl,
 )
 from core.utils.logger import logger
 
@@ -38,31 +39,63 @@ TW_PREFIX = "tw_"
 
 
 class _WeightedCrossEntropy(torch.autograd.Function):
-    """loss = sum_i w_i * CE(z_i, y_i) with the forward value precomputed (no-grad pass) and
-    the gradient w.r.t. the logits recomputed chunk-wise in backward."""
+    """loss = sum_i w_i * CE(z_i, y_i) + sum_i kd_i * KL(p~_P,i || softmax_K(z_i[ids_i])), with the
+    forward value precomputed (no-grad pass) and the gradient w.r.t. the logits recomputed
+    chunk-wise in backward: w_i (softmax(z_i) - onehot(y_i)) plus, at the K proxy ids,
+    kd_i (softmax_K(z_i[ids_i]) - p~_P,i)."""
 
     @staticmethod
-    def forward(ctx, logits: torch.Tensor, targets: torch.Tensor, weights: torch.Tensor, loss_value: torch.Tensor, chunk_size: int):
-        ctx.save_for_backward(logits, targets, weights)
+    def forward(
+        ctx,
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        weights: torch.Tensor,
+        loss_value: torch.Tensor,
+        chunk_size: int,
+        topk_ids: torch.Tensor | None = None,
+        topk_prob_p: torch.Tensor | None = None,
+        kd_weights: torch.Tensor | None = None,
+    ):
+        ctx.has_kd = topk_ids is not None
+        tensors = [logits, targets, weights]
+        if ctx.has_kd:
+            tensors += [topk_ids, topk_prob_p, kd_weights]
+        ctx.save_for_backward(*tensors)
         ctx.chunk_size = chunk_size
         return loss_value.clone()
 
     @staticmethod
     def backward(ctx, grad_output):
-        logits, targets, weights = ctx.saved_tensors
+        if ctx.has_kd:
+            logits, targets, weights, topk_ids, topk_prob_p, kd_weights = ctx.saved_tensors
+        else:
+            logits, targets, weights = ctx.saved_tensors
+            topk_ids = topk_prob_p = kd_weights = None
         grad = torch.empty_like(logits)
         n = logits.shape[0]
+        scale = grad_output.to(torch.float32)
         for a in range(0, n, ctx.chunk_size):
             b = min(a + ctx.chunk_size, n)
             w = weights[a:b]
-            if not bool(w.any()):
+            kd = kd_weights[a:b] if kd_weights is not None else None
+            has_ce = bool(w.any())
+            has_kd = kd is not None and bool(kd.any())
+            if not has_ce and not has_kd:
                 grad[a:b].zero_()
                 continue
-            prob = torch.softmax(logits[a:b].float(), dim=-1)
-            prob[torch.arange(b - a, device=prob.device), targets[a:b]] -= 1.0
-            prob.mul_((w * grad_output.to(prob.dtype))[:, None])
-            grad[a:b] = prob.to(grad.dtype)
-        return grad, None, None, None, None
+            if has_ce:
+                g = torch.softmax(logits[a:b].float(), dim=-1)
+                g[torch.arange(b - a, device=g.device), targets[a:b]] -= 1.0
+                g.mul_((w * scale)[:, None])
+            else:
+                g = torch.zeros(b - a, logits.shape[1], dtype=torch.float32, device=logits.device)
+            if has_kd:
+                ids = topk_ids[a:b]
+                q = torch.softmax(logits[a:b].gather(1, ids).float(), dim=-1)
+                delta = (q - topk_prob_p[a:b]) * (kd * scale)[:, None]
+                g.scatter_add_(1, ids, delta)
+            grad[a:b] = g.to(grad.dtype)
+        return grad, None, None, None, None, None, None, None
 
 
 def student_statistics(
@@ -154,6 +187,15 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
             ).reshape(n)
             ce = -logp_s
             loss_sum = (weights * ce).sum()
+            kd_args: tuple = ()
+            kd_value = None
+            if cfg.kd_lambda > 0.0:
+                kd_mask = (selected & valid & ~structural).reshape(n)
+                kd_weights = kd_mask.to(torch.float32) * cfg.kd_lambda
+                topk_logp_p_flat = topk_logp_p.reshape(n, k)
+                kd_value = topk_renormalized_kl(topk_logp_p_flat, topk_logp_s)
+                loss_sum = loss_sum + (kd_weights * kd_value).sum()
+                kd_args = (topk_ids.reshape(n, k), torch.softmax(topk_logp_p_flat.float(), dim=-1), kd_weights)
             self._accumulate_stats(
                 kl=kl,
                 h_p=h_p.reshape(n),
@@ -164,9 +206,10 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
                 selected=selected.reshape(n),
                 valid=valid.reshape(n),
                 structural=structural.reshape(n),
+                kd=kd_value,
             )
 
-        loss = _WeightedCrossEntropy.apply(flat_logits, flat_targets, weights, loss_sum, cfg.chunk_size)
+        loss = _WeightedCrossEntropy.apply(flat_logits, flat_targets, weights, loss_sum, cfg.chunk_size, *kd_args)
         if num_items_in_batch is not None:
             loss = loss / num_items_in_batch
             if self.args.average_tokens_across_devices:
@@ -179,7 +222,7 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
 
         return (loss, outputs) if return_outputs else loss
 
-    def _accumulate_stats(self, *, kl, h_p, h_s, logp_p, logp_s, weights, selected, valid, structural) -> None:
+    def _accumulate_stats(self, *, kl, h_p, h_s, logp_p, logp_s, weights, selected, valid, structural, kd=None) -> None:
         # Everything stays on the device: a .item()/float() here would sync the GPU on every
         # micro-step (64 per update) and serialise the collator with the model.
         cfg = self.token_weighting
@@ -199,6 +242,8 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
             "ce_s": -logp_s,
             "weight": weights,
         }
+        if kd is not None:
+            values["kd"] = kd
         content_f = content.to(kl.dtype)
         sums = {name: (value * content_f).sum() for name, value in values.items()}
         sums["weight_structural"] = (weights * structural_sel.to(kl.dtype)).sum()
@@ -218,8 +263,9 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
             sums = {name: float(value) for name, value in self._tw_sums.items()}
             count = sums.get("count", 0.0)
             if count > 0:
-                for name in ("kl", "h_p", "h_s", "rho", "eg", "discord", "ce_p", "ce_s", "weight"):
-                    logs[f"tw/{name}"] = round(sums[name] / count, 4)
+                for name in ("kl", "h_p", "h_s", "rho", "eg", "discord", "ce_p", "ce_s", "weight", "kd"):
+                    if name in sums:
+                        logs[f"tw/{name}"] = round(sums[name] / count, 4)
             if sums.get("structural_count", 0.0) > 0:
                 logs["tw/weight_structural"] = round(sums["weight_structural"] / sums["structural_count"], 4)
             if sums.get("selected", 0.0) > 0:

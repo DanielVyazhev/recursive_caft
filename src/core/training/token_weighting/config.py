@@ -40,9 +40,15 @@ class TokenWeightingConfig(BaseModel):
     # per-pack normalisation this is the mean loss over the selected tokens, the Rho-1 /
     # Token Cleaning objective (Rho-1 keeps 60%).
     select_top_frac: float | None = None
+    # Proxy-KD term: adds kd_lambda * KL(p~_P || p~_S) per content token, both distributions
+    # renormalised on the proxy's cached top-K ids (DistillKit / EOPD style top-k forward KL).
+    # With mode="uniform" this is plain SFT + KD towards the proxy, the "why not distil from
+    # the proxy" baseline; it combines with any weighting mode.
+    kd_lambda: float = 0.0
 
     @model_validator(mode="after")
     def _validate_selection(self):
+        assert self.kd_lambda >= 0.0, "kd_lambda must be non-negative"
         if self.select_top_frac is not None:
             assert 0.0 < self.select_top_frac <= 1.0, "select_top_frac must be in (0, 1]"
         if self.mode in ("excess_loss", "student_entropy"):
@@ -50,4 +56,4 @@ class TokenWeightingConfig(BaseModel):
         return self
 
     def needs_proxy(self) -> bool:
-        return self.mode != "uniform"
+        return self.mode != "uniform" or self.kd_lambda > 0.0

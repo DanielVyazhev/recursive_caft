@@ -445,3 +445,49 @@ def test_rho1_selection_is_mean_loss_over_selected_tokens(cache_dir, student, ro
     # kept content tokens share the content mass equally (n_content / k each), structural stay at 1
     expected = (ce[kept] * (n_content / k)).sum() + ce[structural].sum()
     assert torch.isclose(loss, expected / num_items, atol=1e-5)
+
+
+@pytest.mark.parametrize("mode", ["uniform", "rho"])
+def test_proxy_kd_term_matches_autograd(cache_dir, student, rows, tmp_path, mode):
+    """kd_lambda adds lambda * KL(p~_P || softmax_K(z[ids])) on content tokens with proxy statistics;
+    value and logits-gradient must match a brute-force autograd implementation."""
+    cache = ProxyCache(str(cache_dir))
+    packed = _packed(rows)
+    collator = ProxyAwarePackedCollator(cache, thinking_token_ids=(THINK_START, THINK_END))
+    batch = collator([packed[0], packed[1]])
+    num_items = torch.tensor(int((batch["labels"] != IGNORE_LABEL).sum()))
+    lam = 0.7
+    config = TokenWeightingConfig(mode=mode, chunk_size=5, kd_lambda=lam)
+    trainer = _trainer(student, tmp_path, config, collator)
+
+    student.zero_grad()
+    loss = trainer.compute_loss(student, dict(batch), num_items_in_batch=num_items)
+    loss.backward()
+    got_grad = student.lm_head.weight.grad.clone()
+
+    student.zero_grad()
+    logits = student(input_ids=batch["input_ids"], position_ids=batch["position_ids"]).logits[:, :-1].float()
+    lp = torch.log_softmax(logits, dim=-1)
+    labels = batch["labels"][:, 1:]
+    selected = labels != IGNORE_LABEL
+    structural = batch["tw_structural"][:, 1:] & selected
+    valid = batch["tw_valid"][:, 1:] & selected
+    content = selected & valid & ~structural
+    ce = -lp.gather(2, labels.clamp_min(0)[..., None]).squeeze(-1)
+    with torch.no_grad():
+        topk_ids = batch["tw_topk_ids"][:, 1:]
+        kl = coarse_kl(batch["tw_topk_logp"][:, 1:], lp.gather(2, topk_ids))
+        raw = raw_weights(
+            mode, kl=kl, h_p=batch["tw_entropy"][:, 1:], h_s=-(lp.exp() * lp).sum(-1),
+            logp_p=batch["tw_logp"][:, 1:], logp_s=-ce, rho_eps=1e-3, discord_tau=1.0,
+        )
+        w = finalize_weights(raw, selected=selected, structural=structural, valid=valid, structural_weight=1.0, normalize_per_pack=True)
+        p_tilde = torch.softmax(batch["tw_topk_logp"][:, 1:], dim=-1)
+    z_k = logits.gather(2, topk_ids)
+    log_q = torch.log_softmax(z_k, dim=-1)
+    kd = (p_tilde * (torch.log(p_tilde.clamp_min(1e-30)) - log_q)).sum(-1)
+    expected = ((w * ce).sum() + lam * (kd * content).sum()) / num_items
+    assert torch.isclose(loss, expected, atol=1e-5)
+    assert float((kd * content).sum()) > 0
+    expected.backward()
+    assert torch.allclose(student.lm_head.weight.grad, got_grad, atol=1e-6)

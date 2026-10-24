@@ -36,6 +36,15 @@ def coarse_kl(topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor, eps: float =
     return (head + tail).clamp_min(0.0)
 
 
+def topk_renormalized_kl(topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor) -> torch.Tensor:
+    """KL(p~_P || p~_S) with both [..., K] log-probability sets renormalised over the same K ids
+    (the proxy's top-K). This is the forward-KL term of top-k distillation; its gradient w.r.t.
+    the student logits at the K ids is softmax_K(z) - p~_P."""
+    lp = torch.log_softmax(topk_logp_p.float(), dim=-1)
+    ls = torch.log_softmax(topk_logp_s.float(), dim=-1)
+    return (lp.exp() * (lp - ls)).sum(-1)
+
+
 def entropy_from_logp(logp: torch.Tensor) -> torch.Tensor:
     """Entropy (nats) of a full distribution given as [..., V] log-probabilities.
     One [..., V] temporary (in-place product), which matters for 150k-vocab chunks."""
