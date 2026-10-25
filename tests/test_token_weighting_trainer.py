@@ -447,17 +447,18 @@ def test_rho1_selection_is_mean_loss_over_selected_tokens(cache_dir, student, ro
     assert torch.isclose(loss, expected / num_items, atol=1e-5)
 
 
-@pytest.mark.parametrize("mode", ["uniform", "rho"])
-def test_proxy_kd_term_matches_autograd(cache_dir, student, rows, tmp_path, mode):
+@pytest.mark.parametrize("mode, ce_scale", [("uniform", 1.0), ("rho", 1.0), ("uniform", 0.0), ("rho", 0.3)])
+def test_proxy_kd_term_matches_autograd(cache_dir, student, rows, tmp_path, mode, ce_scale):
     """kd_lambda adds lambda * KL(p~_P || softmax_K(z[ids])) on content tokens with proxy statistics;
-    value and logits-gradient must match a brute-force autograd implementation."""
+    ce_scale multiplies the content CE weights (0 = pure proxy-KD, structural CE kept). Value and
+    logits-gradient must match a brute-force autograd implementation."""
     cache = ProxyCache(str(cache_dir))
     packed = _packed(rows)
     collator = ProxyAwarePackedCollator(cache, thinking_token_ids=(THINK_START, THINK_END))
     batch = collator([packed[0], packed[1]])
     num_items = torch.tensor(int((batch["labels"] != IGNORE_LABEL).sum()))
     lam = 0.7
-    config = TokenWeightingConfig(mode=mode, chunk_size=5, kd_lambda=lam)
+    config = TokenWeightingConfig(mode=mode, chunk_size=5, kd_lambda=lam, ce_scale=ce_scale)
     trainer = _trainer(student, tmp_path, config, collator)
 
     student.zero_grad()
@@ -482,6 +483,7 @@ def test_proxy_kd_term_matches_autograd(cache_dir, student, rows, tmp_path, mode
             logp_p=batch["tw_logp"][:, 1:], logp_s=-ce, rho_eps=1e-3, discord_tau=1.0,
         )
         w = finalize_weights(raw, selected=selected, structural=structural, valid=valid, structural_weight=1.0, normalize_per_pack=True)
+        w = torch.where(content, w * ce_scale, w)
         p_tilde = torch.softmax(batch["tw_topk_logp"][:, 1:], dim=-1)
     z_k = logits.gather(2, topk_ids)
     log_q = torch.log_softmax(z_k, dim=-1)
@@ -489,5 +491,7 @@ def test_proxy_kd_term_matches_autograd(cache_dir, student, rows, tmp_path, mode
     expected = ((w * ce).sum() + lam * (kd * content).sum()) / num_items
     assert torch.isclose(loss, expected, atol=1e-5)
     assert float((kd * content).sum()) > 0
+    if ce_scale == 0.0:
+        assert torch.isclose((w * ce).sum(), ce[structural].sum(), atol=1e-6)
     expected.backward()
     assert torch.allclose(student.lm_head.weight.grad, got_grad, atol=1e-6)

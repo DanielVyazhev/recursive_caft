@@ -45,6 +45,10 @@ class TokenWeightingConfig(BaseModel):
     # With mode="uniform" this is plain SFT + KD towards the proxy, the "why not distil from
     # the proxy" baseline; it combines with any weighting mode.
     kd_lambda: float = 0.0
+    # Multiplier on the (normalised) content-token CE weights; structural tokens keep weight 1.
+    # 0 with kd_lambda > 0 is pure proxy-KD: no one-hot term on the trace tokens, CE only on the
+    # structural tokens so the format is still learned.
+    ce_scale: float = 1.0
     # Control: shuffle the raw weights among the content tokens of every batch row (seeded by the
     # global step) before normalisation. Keeps the weight distribution, destroys the assignment
     # to tokens; a weighting that only helps through its spread would survive this.
@@ -53,6 +57,8 @@ class TokenWeightingConfig(BaseModel):
     @model_validator(mode="after")
     def _validate_selection(self):
         assert self.kd_lambda >= 0.0, "kd_lambda must be non-negative"
+        assert self.ce_scale >= 0.0, "ce_scale must be non-negative"
+        assert self.ce_scale > 0.0 or self.kd_lambda > 0.0, "ce_scale=0 leaves no loss on content tokens; set kd_lambda"
         if self.select_top_frac is not None:
             assert 0.0 < self.select_top_frac <= 1.0, "select_top_frac must be in (0, 1]"
         if self.mode in ("excess_loss", "student_entropy"):

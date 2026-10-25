@@ -188,7 +188,10 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
                 valid=valid,
                 structural_weight=cfg.structural_weight,
                 normalize_per_pack=cfg.normalize_per_pack,
-            ).reshape(n)
+            )
+            if cfg.ce_scale != 1.0:
+                weights = torch.where(selected & valid & ~structural, weights * cfg.ce_scale, weights)
+            weights = weights.reshape(n)
             ce = -logp_s
             loss_sum = (weights * ce).sum()
             kd_args: tuple = ()
