@@ -45,6 +45,10 @@ class TokenWeightingConfig(BaseModel):
     # With mode="uniform" this is plain SFT + KD towards the proxy, the "why not distil from
     # the proxy" baseline; it combines with any weighting mode.
     kd_lambda: float = 0.0
+    # Control: shuffle the raw weights among the content tokens of every batch row (seeded by the
+    # global step) before normalisation. Keeps the weight distribution, destroys the assignment
+    # to tokens; a weighting that only helps through its spread would survive this.
+    permute_within_row: bool = False
 
     @model_validator(mode="after")
     def _validate_selection(self):

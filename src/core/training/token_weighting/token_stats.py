@@ -114,6 +114,20 @@ def select_top_fraction(score: torch.Tensor, content: torch.Tensor, frac: float)
     return out
 
 
+def permute_within_rows(raw: torch.Tensor, content: torch.Tensor, seed: int) -> torch.Tensor:
+    """Return `raw` [B, T] with the values at content positions of every row randomly permuted
+    among themselves (deterministic for a given seed). Non-content positions are untouched."""
+    out = raw.clone()
+    generator = torch.Generator(device="cpu").manual_seed(seed)
+    for b in range(raw.shape[0]):
+        idx = content[b].nonzero(as_tuple=True)[0]
+        if idx.numel() < 2:
+            continue
+        perm = torch.randperm(idx.numel(), generator=generator).to(idx.device)
+        out[b, idx] = raw[b, idx[perm]]
+    return out
+
+
 def finalize_weights(
     raw: torch.Tensor,
     *,

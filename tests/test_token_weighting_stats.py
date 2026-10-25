@@ -186,3 +186,16 @@ def test_excess_loss_mode_requires_selection():
         TokenWeightingConfig(mode="student_entropy", proxy_cache_path="x")
     with pytest.raises(Exception):
         TokenWeightingConfig(mode="rho", proxy_cache_path="x", select_top_frac=1.5)
+
+
+def test_permute_within_rows_is_a_permutation_of_content_only():
+    from core.training.token_weighting.token_stats import permute_within_rows
+
+    raw = torch.tensor([[0.1, 0.2, 0.3, 0.4, 9.0], [0.5, 0.6, 0.0, 0.0, 0.0]])
+    content = torch.tensor([[True, True, True, True, False], [True, True, False, False, False]])
+    out = permute_within_rows(raw, content, seed=3)
+    assert out[0, 4] == 9.0 and torch.equal(out[1, 2:], raw[1, 2:])
+    assert sorted(out[0, :4].tolist()) == sorted(raw[0, :4].tolist())
+    assert sorted(out[1, :2].tolist()) == sorted(raw[1, :2].tolist())
+    assert torch.equal(out, permute_within_rows(raw, content, seed=3))
+    assert any(not torch.equal(out, permute_within_rows(raw, content, seed=s)) for s in range(1, 20))

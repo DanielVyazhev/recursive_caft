@@ -28,6 +28,7 @@ from core.training.token_weighting.token_stats import (
     entropy_from_logp,
     entropy_gain,
     finalize_weights,
+    permute_within_rows,
     raw_weights,
     reducible_fraction,
     select_top_fraction,
@@ -175,6 +176,9 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
                 discord_tau=cfg.discord_tau,
             )
             raw = raw.reshape(bsz, seq)
+            if cfg.permute_within_row:
+                step = int(self.state.global_step) if self.state is not None else 0
+                raw = permute_within_rows(raw, selected & valid & ~structural, seed=self.args.seed * 1_000_003 + step)
             if cfg.select_top_frac is not None:
                 raw = select_top_fraction(raw, selected & valid & ~structural, cfg.select_top_frac)
             weights = finalize_weights(
