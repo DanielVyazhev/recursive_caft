@@ -25,11 +25,32 @@ bf16 on one 40 GB card.
 import importlib.util
 import os
 from pathlib import Path
+from typing import override
 
-from transformers import AutoTokenizer
+from transformers import (
+    AutoTokenizer,
+    TrainerCallback,
+    TrainerControl,
+    TrainerState,
+    TrainingArguments,
+)
 
+from core.complexity_estimation.entropy.single_token_entropy_with_random_estimator import (
+    SingleTokenEntropyWithRandomEstimator,
+)
+from core.dataset_samplers.base_sampler import (
+    BaseDatasetSampler,
+    BaseDatasetSamplerConfig,
+)
+from core.dataset_samplers.random_sampler import RandomSampler
 from core.datasets.causal_dataset_adapter import CausalDatasetAdapter
-from core.datasets.mmlu.mmlu_reasoning_response_dataset import MMLUReasoningResponseDataset
+from core.datasets.merged_dataset_adapter import MergedDatasetAdapter
+from core.datasets.mmlu.mmlu_reasoning_response_dataset import (
+    MMLUReasoningResponseDataset,
+)
+from core.datasets.mmlu.mmlu_single_token_response_dataset import (
+    MMLUSingleTokenResponseDataset,
+)
 from core.datasets.qa_dataset import QADatasetConfig
 from core.datasets.qa_dataset_adapter import QADatasetAdapter
 from core.evaluation.multi_checkpoint_evaluator import (
@@ -46,11 +67,19 @@ from core.training.lora_trainer import (
     phi4_mini_lora_target_modules,
 )
 from core.training.packing_budgets import packing_budget
+from core.training.resampling_trainer import (
+    ModelGenerateConfig,
+    ResamplingTrainer,
+    ResamplingTrainerConfig,
+)
 from core.training.thinking_tokens import setup_thinking_tokens
 from core.training.token_weighting import TokenWeightingConfig
+from core.utils.datasets import add_average_column, merge_mmlu_on_question_id
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SPLITS_DIR = REPO_ROOT / "data" / "out" / "splits" / "random" / "mmlu"
+TEACHER_ENTROPY_DIR = REPO_ROOT / "data" / "out" / "single_token_entropy_normalized"
+TEST_DATASET = "test"
 ARTIFACTS_DIR = REPO_ROOT / "artifacts" / "token_weighting" / "mmlu"
 SERVER_AGENTS_DIR = Path("/mnt/data198/LLM/agents")
 SERVER_PROXY_DIR = Path("/mnt/data198/LLM/models/Qwen2.5-14B-Instruct")
@@ -69,7 +98,9 @@ DEV_DATASET = f"{TRAIN_DATASET}_{DEV_SPLIT}"
 
 PROXY_MODEL_ID = os.environ.get(
     "RECURSIVE_CAFT_PROXY_MODEL",
-    SERVER_PROXY_DIR.as_posix() if SERVER_PROXY_DIR.exists() else "Qwen/Qwen2.5-14B-Instruct",
+    SERVER_PROXY_DIR.as_posix()
+    if SERVER_PROXY_DIR.exists()
+    else "Qwen/Qwen2.5-14B-Instruct",
 )
 PROXY_NICK = Path(PROXY_MODEL_ID).name.lower()
 PROXY_TOP_K = 32
@@ -83,7 +114,9 @@ def base_model_path(model_name: str) -> str:
     if env:
         return (Path(env) / SERVER_MODEL_DIRS.get(model_name, model_name)).as_posix()
     if SERVER_AGENTS_DIR.exists():
-        return (SERVER_AGENTS_DIR / SERVER_MODEL_DIRS.get(model_name, model_name)).as_posix()
+        return (
+            SERVER_AGENTS_DIR / SERVER_MODEL_DIRS.get(model_name, model_name)
+        ).as_posix()
     return (REPO_ROOT / "artifacts" / "base_models_v0" / model_name).as_posix()
 
 
@@ -94,15 +127,32 @@ def split_path(dataset_name: str) -> str:
 def eval_attn_implementation() -> str:
     # The evaluator defaults to FlashAttention-2; fall back to SDPA where flash_attn is not
     # installed (the training arms do not need it either without packing).
-    return "flash_attention_2" if importlib.util.find_spec("flash_attn") is not None else "sdpa"
+    return (
+        "flash_attention_2"
+        if importlib.util.find_spec("flash_attn") is not None
+        else "sdpa"
+    )
 
 
-def proxy_cache_path(model_name: str, dataset_name: str = TRAIN_FIXED, proxy_nick: str = PROXY_NICK) -> str:
-    return (REPO_ROOT / "data" / "out" / "proxy_cache" / "mmlu" / proxy_nick / model_name / dataset_name).as_posix()
+def proxy_cache_path(
+    model_name: str, dataset_name: str = TRAIN_FIXED, proxy_nick: str = PROXY_NICK
+) -> str:
+    return (
+        REPO_ROOT
+        / "data"
+        / "out"
+        / "proxy_cache"
+        / "mmlu"
+        / proxy_nick
+        / model_name
+        / dataset_name
+    ).as_posix()
 
 
 def load_tokenizer(model_name: str):
-    tokenizer = AutoTokenizer.from_pretrained(base_model_path(model_name), trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        base_model_path(model_name), trust_remote_code=True
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     setup_thinking_tokens(tokenizer)
@@ -112,7 +162,9 @@ def load_tokenizer(model_name: str):
 def reasoning_adapter(tokenizer, dataset_name: str) -> CausalDatasetAdapter:
     return CausalDatasetAdapter(
         dataset=MMLUReasoningResponseDataset(
-            config=QADatasetConfig(path=split_path(dataset_name), dataset_id=f"mmlu_{dataset_name}"),
+            config=QADatasetConfig(
+                path=split_path(dataset_name), dataset_id=f"mmlu_{dataset_name}"
+            ),
             tokenizer=tokenizer,
         )
     )
@@ -148,10 +200,15 @@ def run(
             model_id=base_model_path(model_name),
             train_dataset=reasoning_adapter(tokenizer, train_dataset),
             training_args=LoRATrainingArgs(
-                num_train_epochs=save_schedule[-1], per_device_train_batch_size=1, seed=seed, data_seed=seed
+                num_train_epochs=save_schedule[-1],
+                per_device_train_batch_size=1,
+                seed=seed,
+                data_seed=seed,
             ),
             lora_training_args=lora_training_args,
-            packing=PackingConfig(budget=packing_budget(model_name)) if packing else None,
+            packing=PackingConfig(budget=packing_budget(model_name))
+            if packing
+            else None,
             save_schedule=save_schedule,
             token_weighting=token_weighting,
         ),
@@ -183,6 +240,230 @@ def run(
                 attn_implementation=eval_attn_implementation(),
             ),
             summary_filename=f"summary_reasoning_evals_{eval_split}_cap{max_thinking_tokens}.json",
+            skip_missing_checkpoints=skip_missing_checkpoints,
+        ),
+        tokenizer=tokenizer,
+    )
+    cot_evaluator.evaluate_all()
+
+
+# --- Paper-3 regime: a fresh 1024-trace draw from the whole pool every epoch -----------------
+#
+# The fixed-subset pilot above is data-limited: after ~5 epochs on the same 1024 traces every arm
+# sits on the same plateau and later epochs only measure how gracefully it overfits. The runs of
+# distillation_by_metrics instead re-select 1024 traces (+256 single-letter rows) from the full
+# train pool at the start of every epoch, and accuracy keeps rising with the number of distinct
+# traces seen. `run_resampling` is that protocol (ResamplingTrainer, RandomSampler, the same
+# merged adapter, batch 2 x 32, test split) with `token_weighting` plugged in, so an arm here is
+# directly comparable to artifacts/distillation_by_metrics/mmlu/random/qwen_3b_* when it keeps
+# the 200-epoch cosine schedule those runs used; `stop_after_epoch` ends training early
+# without changing that schedule. The proxy cache must cover the whole pool
+# (qwen_3b_proxy_pass_full.py); the single-letter rows have no cache entry and train at
+# weight 1 (strict_cache=False), which shows up as a tiny tw/missing_frac.
+
+RESAMPLING_TOTAL_EPOCHS = 200
+RESAMPLING_SAVE_SCHEDULE = [10, 20, 50]
+
+
+class StopAfterEpochCallback(TrainerCallback):
+    """Stop the run after `epoch` completed epochs, leaving the LR schedule (built from
+    num_train_epochs) untouched; the checkpoint of that epoch is saved first."""
+
+    def __init__(self, epoch: int):
+        self.epoch = epoch
+
+    @override
+    def on_epoch_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
+        assert state.epoch is not None
+        if round(state.epoch) >= self.epoch:
+            control.should_training_stop = True
+        return control
+
+
+class _ResamplingTrainerWithStop(ResamplingTrainer):
+    def __init__(self, *args, stop_after_epoch: int | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._stop_after_epoch = stop_after_epoch
+
+    @override
+    def _build_trainer(self, train_ds):
+        trainer = super()._build_trainer(train_ds)
+        if self._stop_after_epoch is not None:
+            trainer.add_callback(StopAfterEpochCallback(self._stop_after_epoch))
+        return trainer
+
+    @override
+    def _directory_is_empty(self, directory: str, expected_epochs: int) -> bool:
+        # A run stopped at stop_after_epoch is complete at that epoch, not at num_train_epochs:
+        # a rerun (e.g. for evaluation) must not resume it for one more epoch.
+        if self._stop_after_epoch is not None:
+            expected_epochs = self._stop_after_epoch
+        return super()._directory_is_empty(directory, expected_epochs)
+
+
+def teacher_entropy_dataset_path(
+    out_path: Path, train_dataset: str = TRAIN_DATASET
+) -> Path:
+    """The train pool merged with the 70B/72B single-token entropies (what the complexity runner
+    scores and the samplers draw from). Rebuilt per run directory, as in distillation_by_metrics."""
+    save_path = out_path / "teacher_entropy.parquet"
+    merge_mmlu_on_question_id(
+        main_path=split_path(train_dataset),
+        extra_paths=[
+            TEACHER_ENTROPY_DIR / "mmlu_llama_70b.parquet",
+            TEACHER_ENTROPY_DIR / "mmlu_qwen_72b.parquet",
+        ],
+        extra_columns=[
+            {"entropy_value": "llama_70b_entropy_value"},
+            {"entropy_value": "qwen_72b_entropy_value"},
+        ],
+        aggregation_function=lambda df: add_average_column(
+            df, "llama_70b_entropy_value", "qwen_72b_entropy_value", "teacher_entropy"
+        ),
+        save_path=save_path,
+    )
+    return save_path
+
+
+def resampling_adapter(
+    sampler_cls: type[BaseDatasetSampler],
+    reasoning_top_k: int = 1024,
+    single_token_top_k: int = 256,
+) -> MergedDatasetAdapter:
+    # Same two children as distillation_by_metrics.mmlu.shared.get_merged_adapter_with_data_mix:
+    # the traces, plus a small single-letter-answer set drawn by the same policy so the model keeps
+    # answering with one letter and the per-epoch entropy estimation stays measurable.
+    return MergedDatasetAdapter(
+        [
+            CausalDatasetAdapter(
+                dataset=MMLUReasoningResponseDataset(
+                    config=QADatasetConfig(
+                        path="should be overridden by SetResamplingPathCallback",
+                        dataset_id=TRAIN_DATASET,
+                    ),
+                    tokenizer=None,  # type: ignore[arg-type]  # set by override_tokenizer below
+                ),
+                dataset_sampler=sampler_cls(
+                    BaseDatasetSamplerConfig(top_k=reasoning_top_k)
+                ),
+            ),
+            CausalDatasetAdapter(
+                dataset=MMLUSingleTokenResponseDataset(
+                    config=QADatasetConfig(
+                        path="should be overridden by SetResamplingPathCallback",
+                        dataset_id="mmlu_single_token_train",
+                    ),
+                    tokenizer=None,  # type: ignore[arg-type]
+                ),
+                dataset_sampler=sampler_cls(
+                    BaseDatasetSamplerConfig(top_k=single_token_top_k)
+                ),
+            ),
+        ]
+    )
+
+
+def run_resampling(
+    model_name: str,
+    relative_out_path: str,
+    token_weighting: TokenWeightingConfig | None,
+    sampler_cls: type[BaseDatasetSampler] = RandomSampler,
+    save_schedule: list[int] | None = None,
+    total_epochs: int = RESAMPLING_TOTAL_EPOCHS,
+    stop_after_epoch: int | None = None,
+    train_dataset: str = TRAIN_DATASET,
+    max_thinking_tokens: int = MAX_THINKING_TOKENS,
+    seed: int = 42,
+    shuffle: bool = False,
+    skip_missing_checkpoints: bool = True,
+    run_evaluation: bool = True,
+    lora_training_args: LoRASpecificTrainingArgs | None = None,
+):
+    save_schedule = save_schedule or RESAMPLING_SAVE_SCHEDULE
+    if stop_after_epoch is None:
+        stop_after_epoch = save_schedule[-1]
+    assert stop_after_epoch <= total_epochs and save_schedule[-1] <= stop_after_epoch
+    if token_weighting is not None and token_weighting.needs_proxy():
+        assert not token_weighting.strict_cache, (
+            "the single-letter rows have no proxy entry; use strict_cache=False"
+        )
+
+    tokenizer = load_tokenizer(model_name)
+    out_path = ARTIFACTS_DIR / relative_out_path
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    lora_training_args = lora_training_args or LoRASpecificTrainingArgs()
+    lora_training_args.train_thinking_token_embeddings = True
+    if model_name == "phi4_mini":
+        lora_training_args.target_modules = phi4_mini_lora_target_modules
+
+    pool_path = teacher_entropy_dataset_path(out_path, train_dataset)
+    train_adapter = resampling_adapter(sampler_cls)
+    train_adapter.override_tokenizer(tokenizer)
+
+    trainer = _ResamplingTrainerWithStop(
+        config=ResamplingTrainerConfig(
+            training_args=LoRATrainingArgs(
+                num_train_epochs=total_epochs,
+                per_device_train_batch_size=2,
+                seed=seed,
+                data_seed=seed,
+            ),
+            lora_training_args=lora_training_args,
+            save_schedule=save_schedule,
+            shuffle=shuffle,
+            out_path=out_path.as_posix(),
+            model_id=base_model_path(model_name),
+            train_dataset=train_adapter,
+            complexity_evaluation_dataset=QADatasetAdapter(
+                dataset=MMLUSingleTokenResponseDataset(
+                    config=QADatasetConfig(
+                        path=pool_path.as_posix(), dataset_id="mmlu_teacher_entropy"
+                    ),
+                    tokenizer=tokenizer,
+                )
+            ),
+            complexity_estimator=SingleTokenEntropyWithRandomEstimator(),
+            complexity_estimation_runner_generation_config=ModelGenerateConfig(
+                max_new_tokens=1
+            ),
+            token_weighting=token_weighting,
+        ),
+        tokenizer=tokenizer,
+        stop_after_epoch=stop_after_epoch,
+    )
+    trainer.train()
+    trainer.unload()
+
+    if not run_evaluation:
+        return
+
+    eval_dataset_id = f"mmlu_random_test_cap{max_thinking_tokens}"
+    cot_evaluator = MultiCheckpointEvaluator(
+        config=MultiCheckpointEvaluatorConfig(
+            checkpoints_dir=out_path.as_posix(),
+            eval_dataset=QADatasetAdapter(
+                dataset=MMLUReasoningResponseDataset(
+                    config=QADatasetConfig(
+                        path=split_path(TEST_DATASET), dataset_id=eval_dataset_id
+                    ),
+                    tokenizer=tokenizer,
+                ),
+                add_thinking_start_token=True,
+            ),
+            generation=GenerationConfig(
+                max_new_tokens=max_thinking_tokens + 10,
+                max_thinking_tokens=max_thinking_tokens,
+                max_batch_size=256,
+                attn_implementation=eval_attn_implementation(),
+            ),
+            summary_filename=f"summary_reasoning_evals_cap{max_thinking_tokens}.json",
             skip_missing_checkpoints=skip_missing_checkpoints,
         ),
         tokenizer=tokenizer,
