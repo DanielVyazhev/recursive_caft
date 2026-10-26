@@ -169,8 +169,8 @@ def summarize(df: pd.DataFrame, corr_sample: int = 1_000_000, seed: int = 0) -> 
 
     return {
         "rows": int(df["row_id"].nunique()),
-        "tokens": int(len(df)),
-        "content_tokens": int(len(content)),
+        "tokens": len(df),
+        "content_tokens": len(content),
         "structural_share": float(df["structural"].mean()),
         "quantiles": quant,
         "h_p_x_kl_share": joint_table,

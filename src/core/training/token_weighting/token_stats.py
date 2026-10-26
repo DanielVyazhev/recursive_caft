@@ -18,7 +18,9 @@ import torch
 from core.training.token_weighting.config import WeightingMode
 
 
-def coarse_kl(topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+def coarse_kl(
+    topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor, eps: float = 1e-6
+) -> torch.Tensor:
     """KL(P || S) over the partition {each of the proxy's top-K tokens, the rest}.
 
     `topk_logp_p`/`topk_logp_s` are [..., K] log-probabilities of the same K token ids (the
@@ -32,11 +34,17 @@ def coarse_kl(topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor, eps: float =
     head = (p * (topk_logp_p.float() - topk_logp_s.float())).sum(-1)
     p_tail = (1.0 - p.sum(-1)).clamp_min(0.0)
     s_tail = (1.0 - topk_logp_s.float().exp().sum(-1)).clamp_min(eps)
-    tail = torch.where(p_tail > eps, p_tail * (p_tail.clamp_min(eps).log() - s_tail.log()), torch.zeros_like(p_tail))
+    tail = torch.where(
+        p_tail > eps,
+        p_tail * (p_tail.clamp_min(eps).log() - s_tail.log()),
+        torch.zeros_like(p_tail),
+    )
     return (head + tail).clamp_min(0.0)
 
 
-def topk_renormalized_kl(topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor) -> torch.Tensor:
+def topk_renormalized_kl(
+    topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor
+) -> torch.Tensor:
     """KL(p~_P || p~_S) with both [..., K] log-probability sets renormalised over the same K ids
     (the proxy's top-K). This is the forward-KL term of top-k distillation; its gradient w.r.t.
     the student logits at the K ids is softmax_K(z) - p~_P."""
@@ -53,7 +61,9 @@ def entropy_from_logp(logp: torch.Tensor) -> torch.Tensor:
     return -p.sum(-1)
 
 
-def reducible_fraction(kl: torch.Tensor, h_p: torch.Tensor, eps: float = 1e-3) -> torch.Tensor:
+def reducible_fraction(
+    kl: torch.Tensor, h_p: torch.Tensor, eps: float = 1e-3
+) -> torch.Tensor:
     """rho_t = KL_t / (H_P(t) + KL_t). 0 when the student already matches a proxy that is itself
     uncertain, 1 when the proxy is certain and the student is not."""
     return kl / (h_p + kl + eps)
@@ -64,7 +74,9 @@ def entropy_gain(h_s: torch.Tensor, h_p: torch.Tensor) -> torch.Tensor:
     return (h_s - h_p).clamp_min(0.0)
 
 
-def discord_weight(logp_s: torch.Tensor, logp_p: torch.Tensor, tau: float = 1.0) -> torch.Tensor:
+def discord_weight(
+    logp_s: torch.Tensor, logp_p: torch.Tensor, tau: float = 1.0
+) -> torch.Tensor:
     """DISCORD token weight: sigmoid(tau * log(p_S(y_t) / p_P(y_t))). Down-weights tokens the
     reference finds far more plausible than the student does."""
     return torch.sigmoid(tau * (logp_s - logp_p))
@@ -98,7 +110,21 @@ def raw_weights(
     raise ValueError(f"Unknown token weighting mode {mode!r}")
 
 
-def select_top_fraction(score: torch.Tensor, content: torch.Tensor, frac: float) -> torch.Tensor:
+def excess_sharpness_gate(
+    h_s: torch.Tensor, h_p: torch.Tensor, h0: float
+) -> torch.Tensor:
+    """EG's one-sided condition as a multiplicative gate: 1 where H_S >= H_P (the student is at
+    least as uncertain as the proxy, so a one-hot push moves it the right way), exp(-H_P / h0)
+    where the student is already sharper -- such a token is kept only to the extent the proxy is
+    decisive. h0 == 0 gives the hard sign gate max(sign(H_S - H_P), 0)."""
+    sharper = h_s < h_p
+    keep = torch.exp(-h_p / h0) if h0 > 0 else torch.zeros_like(h_p)
+    return torch.where(sharper, keep, torch.ones_like(h_p))
+
+
+def select_top_fraction(
+    score: torch.Tensor, content: torch.Tensor, frac: float
+) -> torch.Tensor:
     """Binary weights [B, T]: per row, 1 on the `frac` share of content positions with the highest
     score (at least one), 0 elsewhere. Non-content positions are never selected."""
     out = torch.zeros_like(score)
@@ -114,7 +140,9 @@ def select_top_fraction(score: torch.Tensor, content: torch.Tensor, frac: float)
     return out
 
 
-def permute_within_rows(raw: torch.Tensor, content: torch.Tensor, seed: int) -> torch.Tensor:
+def permute_within_rows(
+    raw: torch.Tensor, content: torch.Tensor, seed: int
+) -> torch.Tensor:
     """Return `raw` [B, T] with the values at content positions of every row randomly permuted
     among themselves (deterministic for a given seed). Non-content positions are untouched."""
     out = raw.clone()
@@ -136,6 +164,7 @@ def finalize_weights(
     valid: torch.Tensor,
     structural_weight: float,
     normalize_per_pack: bool,
+    max_scale: float | None = None,
 ) -> torch.Tensor:
     """Turn raw per-position weights [B, T] into the weights applied to the loss.
 
@@ -145,7 +174,8 @@ def finalize_weights(
     - with `normalize_per_pack`, the remaining (content) positions of every batch row are
       rescaled so their weights sum to their count: the content tokens keep a mean weight of
       1, exactly as in the uniform run, and only the distribution among them changes. A row
-      whose content weights sum to zero falls back to uniform.
+      whose content weights sum to zero falls back to uniform. `max_scale` caps the rescaling
+      factor, so a row with few weighted tokens loses loss mass instead of blowing them up.
     """
     content = selected & valid & ~structural
     w = torch.where(content, raw, torch.ones_like(raw))
@@ -154,7 +184,13 @@ def finalize_weights(
     if normalize_per_pack:
         n_content = content.sum(-1, keepdim=True).to(w.dtype)
         total = (w * content).sum(-1, keepdim=True)
-        scale = torch.where(total > 0, n_content / total.clamp_min(torch.finfo(w.dtype).tiny), torch.ones_like(total))
+        scale = torch.where(
+            total > 0,
+            n_content / total.clamp_min(torch.finfo(w.dtype).tiny),
+            torch.ones_like(total),
+        )
+        if max_scale is not None:
+            scale = scale.clamp(max=max_scale)
         normalized = torch.where(total > 0, w * scale, torch.ones_like(w))
         w = torch.where(content, normalized, w)
     return w

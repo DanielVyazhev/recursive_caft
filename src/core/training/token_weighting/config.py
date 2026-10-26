@@ -10,7 +10,9 @@ from pydantic import BaseModel, model_validator
 # excess_loss : score l_S - l_P (can be negative) -- Rho-1 / Token Cleaning; only meaningful as a
 #           selection score, i.e. together with select_top_frac
 # student_entropy : score H_S(t) -- SE-KD / the "80/20 rule"; selection score (top 20%)
-WeightingMode = Literal["uniform", "rho", "kl", "eg", "discord", "excess_loss", "student_entropy"]
+WeightingMode = Literal[
+    "uniform", "rho", "kl", "eg", "discord", "excess_loss", "student_entropy"
+]
 
 
 class TokenWeightingConfig(BaseModel):
@@ -49,6 +51,18 @@ class TokenWeightingConfig(BaseModel):
     # 0 with kd_lambda > 0 is pure proxy-KD: no one-hot term on the trace tokens, CE only on the
     # structural tokens so the format is still learned.
     ce_scale: float = 1.0
+    # Excess-sharpness gate: EG's one-sided condition applied to any mode. A content token keeps
+    # its raw weight where the student is at least as uncertain as the proxy (H_S >= H_P); where
+    # the student is already sharper than the proxy the weight is multiplied by exp(-H_P / h0),
+    # i.e. kept only to the extent the proxy itself is decisive (h0 = 0: the hard EG sign gate).
+    # Removes the "student confident, proxy open" corner, where KL is large but a one-hot push
+    # can only sharpen the student further.
+    eg_gate: bool = False
+    eg_gate_h0: float = 1.0
+    # Cap on the per-row normalisation factor n_content / sum(w). Once a gate or a sparse mode
+    # leaves few weighted tokens, their weights stop growing past the cap and the row's loss mass
+    # shrinks instead (EG's collapse came from this factor reaching the hundreds).
+    max_norm_scale: float | None = None
     # Control: shuffle the raw weights among the content tokens of every batch row (seeded by the
     # global step) before normalisation. Keeps the weight distribution, destroys the assignment
     # to tokens; a weighting that only helps through its spread would survive this.
@@ -58,11 +72,22 @@ class TokenWeightingConfig(BaseModel):
     def _validate_selection(self):
         assert self.kd_lambda >= 0.0, "kd_lambda must be non-negative"
         assert self.ce_scale >= 0.0, "ce_scale must be non-negative"
-        assert self.ce_scale > 0.0 or self.kd_lambda > 0.0, "ce_scale=0 leaves no loss on content tokens; set kd_lambda"
+        assert self.ce_scale > 0.0 or self.kd_lambda > 0.0, (
+            "ce_scale=0 leaves no loss on content tokens; set kd_lambda"
+        )
+        assert self.eg_gate_h0 >= 0.0, "eg_gate_h0 must be non-negative"
+        if self.max_norm_scale is not None:
+            assert self.max_norm_scale >= 1.0, (
+                "max_norm_scale below 1 would shrink every row"
+            )
         if self.select_top_frac is not None:
-            assert 0.0 < self.select_top_frac <= 1.0, "select_top_frac must be in (0, 1]"
+            assert 0.0 < self.select_top_frac <= 1.0, (
+                "select_top_frac must be in (0, 1]"
+            )
         if self.mode in ("excess_loss", "student_entropy"):
-            assert self.select_top_frac is not None, f"{self.mode} is a selection score; set select_top_frac"
+            assert self.select_top_frac is not None, (
+                f"{self.mode} is a selection score; set select_top_frac"
+            )
         return self
 
     def needs_proxy(self) -> bool:

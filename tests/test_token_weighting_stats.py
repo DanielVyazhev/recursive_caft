@@ -69,8 +69,14 @@ def test_reducible_fraction_limits():
 
 
 def test_entropy_gain_and_discord():
-    assert torch.equal(entropy_gain(torch.tensor([2.0, 0.5]), torch.tensor([1.0, 1.0])), torch.tensor([1.0, 0.0]))
-    w = discord_weight(torch.log(torch.tensor([0.2, 0.9, 0.01])), torch.log(torch.tensor([0.2, 0.1, 0.9])))
+    assert torch.equal(
+        entropy_gain(torch.tensor([2.0, 0.5]), torch.tensor([1.0, 1.0])),
+        torch.tensor([1.0, 0.0]),
+    )
+    w = discord_weight(
+        torch.log(torch.tensor([0.2, 0.9, 0.01])),
+        torch.log(torch.tensor([0.2, 0.1, 0.9])),
+    )
     assert abs(w[0] - 0.5) < 1e-6
     assert w[1] > 0.5 > w[2]
 
@@ -88,9 +94,13 @@ def test_raw_weights_dispatch():
     )
     assert torch.equal(raw_weights("uniform", **kw), torch.ones(n))
     assert torch.equal(raw_weights("kl", **kw), kw["kl"])
-    assert torch.allclose(raw_weights("rho", **kw), reducible_fraction(kw["kl"], kw["h_p"], 1e-3))
+    assert torch.allclose(
+        raw_weights("rho", **kw), reducible_fraction(kw["kl"], kw["h_p"], 1e-3)
+    )
     assert torch.allclose(raw_weights("eg", **kw), entropy_gain(kw["h_s"], kw["h_p"]))
-    assert torch.allclose(raw_weights("discord", **kw), discord_weight(kw["logp_s"], kw["logp_p"], 1.0))
+    assert torch.allclose(
+        raw_weights("discord", **kw), discord_weight(kw["logp_s"], kw["logp_p"], 1.0)
+    )
     assert torch.allclose(raw_weights("excess_loss", **kw), kw["logp_p"] - kw["logp_s"])
     assert torch.equal(raw_weights("student_entropy", **kw), kw["h_s"])
     with pytest.raises(ValueError):
@@ -99,11 +109,22 @@ def test_raw_weights_dispatch():
 
 def test_finalize_weights_masks_and_normalizes_per_row():
     raw = torch.tensor([[0.2, 0.4, 0.8, 0.0, 9.0], [0.0, 0.0, 0.0, 0.0, 0.0]])
-    selected = torch.tensor([[True, True, True, True, False], [True, True, False, False, False]])
-    structural = torch.tensor([[False, False, False, True, False], [False, False, False, False, False]])
-    valid = torch.tensor([[True, True, False, True, True], [True, True, True, True, True]])
+    selected = torch.tensor(
+        [[True, True, True, True, False], [True, True, False, False, False]]
+    )
+    structural = torch.tensor(
+        [[False, False, False, True, False], [False, False, False, False, False]]
+    )
+    valid = torch.tensor(
+        [[True, True, False, True, True], [True, True, True, True, True]]
+    )
     w = finalize_weights(
-        raw, selected=selected, structural=structural, valid=valid, structural_weight=1.0, normalize_per_pack=True
+        raw,
+        selected=selected,
+        structural=structural,
+        valid=valid,
+        structural_weight=1.0,
+        normalize_per_pack=True,
     )
     # unselected -> 0; structural and invalid stay at exactly 1; the content positions (0, 1)
     # are rescaled to a mean of 1 while keeping their ratio
@@ -116,9 +137,53 @@ def test_finalize_weights_masks_and_normalizes_per_row():
     assert torch.equal(w[1], torch.tensor([1.0, 1.0, 0.0, 0.0, 0.0]))
 
     w_raw = finalize_weights(
-        raw, selected=selected, structural=structural, valid=valid, structural_weight=1.0, normalize_per_pack=False
+        raw,
+        selected=selected,
+        structural=structural,
+        valid=valid,
+        structural_weight=1.0,
+        normalize_per_pack=False,
     )
     assert torch.equal(w_raw[0], torch.tensor([0.2, 0.4, 1.0, 1.0, 0.0]))
+
+
+def test_excess_sharpness_gate():
+    from core.training.token_weighting.token_stats import excess_sharpness_gate
+
+    h_s = torch.tensor([2.0, 0.3, 0.3, 0.1, 1.0])
+    h_p = torch.tensor([1.0, 2.0, 0.2, 0.1, 1.0])
+    hard = excess_sharpness_gate(h_s, h_p, h0=0.0)
+    # kept where H_S >= H_P (incl. equality), dropped where the student is sharper
+    assert hard.tolist() == [1.0, 0.0, 1.0, 1.0, 1.0]
+    soft = excess_sharpness_gate(h_s, h_p, h0=1.0)
+    assert soft[0] == 1.0 and soft[2] == 1.0 and soft[3] == 1.0 and soft[4] == 1.0
+    assert torch.isclose(soft[1], torch.exp(torch.tensor(-2.0)))
+    # a sharper student is kept to the extent the proxy is decisive
+    g = excess_sharpness_gate(
+        torch.tensor([0.1, 0.1]), torch.tensor([0.2, 3.0]), h0=1.0
+    )
+    assert g[0] > 0.8 > 0.1 > g[1]
+
+
+def test_finalize_weights_max_scale_caps_sparse_rows():
+    raw = torch.tensor([[0.0, 0.0, 0.0, 0.5, 0.0]])
+    selected = torch.ones_like(raw, dtype=torch.bool)
+    structural = torch.zeros_like(raw, dtype=torch.bool)
+    valid = torch.ones_like(raw, dtype=torch.bool)
+    kw = dict(
+        selected=selected,
+        structural=structural,
+        valid=valid,
+        structural_weight=1.0,
+        normalize_per_pack=True,
+    )
+    uncapped = finalize_weights(raw, **kw)
+    assert torch.isclose(
+        uncapped[0, 3], torch.tensor(5.0)
+    )  # 5 content tokens / 0.5 total
+    capped = finalize_weights(raw, max_scale=4.0, **kw)
+    assert torch.isclose(capped[0, 3], torch.tensor(2.0))  # 0.5 * 4
+    assert capped[0].sum() < selected.sum()  # the row loses loss mass instead
 
 
 def test_row_key_is_deterministic_and_content_bound():
@@ -134,7 +199,13 @@ def _tokenized_rows(lengths: list[int], prefix: int = 2) -> Dataset:
     rows = []
     for i, n in enumerate(lengths):
         ids = [100 + i] * n
-        rows.append({"input_ids": ids, "labels": [IGNORE_LABEL] * prefix + ids[prefix:], "row_id": str(i)})
+        rows.append(
+            {
+                "input_ids": ids,
+                "labels": [IGNORE_LABEL] * prefix + ids[prefix:],
+                "row_id": str(i),
+            }
+        )
     return Dataset.from_list(rows)
 
 
@@ -144,7 +215,13 @@ def test_pack_dataset_members_are_opt_in_and_aligned():
     assert set(plain.column_names) == {"input_ids", "labels", "position_ids"}
 
     packed = pack_dataset(ds, budget=8, pad_token_id=0, with_members=True)
-    assert set(packed.column_names) == {"input_ids", "labels", "position_ids", "member_keys", "member_lengths"}
+    assert set(packed.column_names) == {
+        "input_ids",
+        "labels",
+        "position_ids",
+        "member_keys",
+        "member_lengths",
+    }
     keys_by_row = {row_key(ids): ids for ids in ds["input_ids"]}
     seen = 0
     for block in packed:
@@ -162,8 +239,15 @@ def test_pack_dataset_members_are_opt_in_and_aligned():
 def test_select_top_fraction_per_row():
     from core.training.token_weighting.token_stats import select_top_fraction
 
-    score = torch.tensor([[0.1, 0.9, 0.5, 0.7, 0.3, 9.0], [0.2, 0.1, 0.0, 0.0, 0.0, 0.0]])
-    content = torch.tensor([[True, True, True, True, True, False], [True, True, False, False, False, False]])
+    score = torch.tensor(
+        [[0.1, 0.9, 0.5, 0.7, 0.3, 9.0], [0.2, 0.1, 0.0, 0.0, 0.0, 0.0]]
+    )
+    content = torch.tensor(
+        [
+            [True, True, True, True, True, False],
+            [True, True, False, False, False, False],
+        ]
+    )
     w = select_top_fraction(score, content, 0.4)
     # row 0: 5 content tokens -> ceil(2.0) = 2 kept: scores 0.9 and 0.7; the non-content 9.0 is never kept
     assert w[0].tolist() == [0.0, 1.0, 0.0, 1.0, 0.0, 0.0]
@@ -172,7 +256,14 @@ def test_select_top_fraction_per_row():
     assert select_top_fraction(score, content, 1.0)[0].sum() == 5
     # negative scores (excess loss) rank fine
     neg = -score
-    assert select_top_fraction(neg, content, 0.4)[0].tolist() == [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    assert select_top_fraction(neg, content, 0.4)[0].tolist() == [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+    ]
 
 
 def test_excess_loss_mode_requires_selection():
@@ -180,7 +271,9 @@ def test_excess_loss_mode_requires_selection():
 
     with pytest.raises(Exception):
         TokenWeightingConfig(mode="excess_loss", proxy_cache_path="x")
-    cfg = TokenWeightingConfig(mode="excess_loss", proxy_cache_path="x", select_top_frac=0.6)
+    cfg = TokenWeightingConfig(
+        mode="excess_loss", proxy_cache_path="x", select_top_frac=0.6
+    )
     assert cfg.select_top_frac == 0.6
     with pytest.raises(Exception):
         TokenWeightingConfig(mode="student_entropy", proxy_cache_path="x")
@@ -192,10 +285,15 @@ def test_permute_within_rows_is_a_permutation_of_content_only():
     from core.training.token_weighting.token_stats import permute_within_rows
 
     raw = torch.tensor([[0.1, 0.2, 0.3, 0.4, 9.0], [0.5, 0.6, 0.0, 0.0, 0.0]])
-    content = torch.tensor([[True, True, True, True, False], [True, True, False, False, False]])
+    content = torch.tensor(
+        [[True, True, True, True, False], [True, True, False, False, False]]
+    )
     out = permute_within_rows(raw, content, seed=3)
     assert out[0, 4] == 9.0 and torch.equal(out[1, 2:], raw[1, 2:])
     assert sorted(out[0, :4].tolist()) == sorted(raw[0, :4].tolist())
     assert sorted(out[1, :2].tolist()) == sorted(raw[1, :2].tolist())
     assert torch.equal(out, permute_within_rows(raw, content, seed=3))
-    assert any(not torch.equal(out, permute_within_rows(raw, content, seed=s)) for s in range(1, 20))
+    assert any(
+        not torch.equal(out, permute_within_rows(raw, content, seed=s))
+        for s in range(1, 20)
+    )
