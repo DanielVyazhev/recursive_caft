@@ -3,7 +3,7 @@ Needs the proxy cache from qwen_3b_proxy_pass.py. Single process, one GPU.
 
     python qwen_3b_diagnostics.py                      # untrained student -> diagnostics/qwen_3b/
     python qwen_3b_diagnostics.py <checkpoint dir>     # a training checkpoint (LoRA + think rows)
-                                                       # -> diagnostics/qwen_3b/<arm>__<checkpoint>/
+                                                       # -> diagnostics/qwen_3b/<arm>__<run>__<checkpoint>/
 """
 
 import json
@@ -37,7 +37,8 @@ def main():
     out_dir = (
         OUT_DIR
         if checkpoint is None
-        else OUT_DIR / f"{checkpoint.parent.parent.name}__{checkpoint.name}"
+        else OUT_DIR
+        / f"{checkpoint.parent.parent.name}__{checkpoint.parent.name}__{checkpoint.name}"
     )
 
     think_start, think_end = new_token_ids(tokenizer)
