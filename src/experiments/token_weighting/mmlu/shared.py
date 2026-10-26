@@ -469,3 +469,44 @@ def run_resampling(
         tokenizer=tokenizer,
     )
     cot_evaluator.evaluate_all()
+
+
+def load_student(
+    model_name: str, checkpoint_dir: str | Path | None = None, torch_dtype=None
+):
+    """The student for diagnostics: the base model, or a training checkpoint (LoRA adapter plus
+    the trained <think>/</think> embedding rows, loaded the way the evaluator loads them)."""
+    import torch
+    from transformers import AutoModelForCausalLM
+
+    from core.utils.device import DEVICE
+
+    torch_dtype = torch_dtype or torch.bfloat16
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model_path(model_name), trust_remote_code=True, torch_dtype=torch_dtype
+    ).to(DEVICE)
+    if checkpoint_dir is None:
+        return model
+
+    from peft import PeftModel
+
+    from core.training.callbacks.save_thinking_token_rows import ROWS_FILENAME
+
+    checkpoint_dir = Path(checkpoint_dir)
+    rows_path = checkpoint_dir / ROWS_FILENAME
+    if rows_path.exists():
+        payload = torch.load(rows_path, map_location="cpu", weights_only=True)
+        ids = torch.tensor(payload["new_ids"], dtype=torch.long)
+        with torch.no_grad():
+            in_w = model.get_input_embeddings().weight
+            in_w.data[ids.to(in_w.device)] = payload["input_rows"].to(
+                dtype=in_w.dtype, device=in_w.device
+            )
+            if "output_rows" in payload:
+                out_layer = model.get_output_embeddings()
+                assert out_layer is not None
+                out_w = out_layer.weight
+                out_w.data[ids.to(out_w.device)] = payload["output_rows"].to(
+                    dtype=out_w.dtype, device=out_w.device
+                )
+    return PeftModel.from_pretrained(model, checkpoint_dir.as_posix()).eval()

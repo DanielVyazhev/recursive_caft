@@ -11,7 +11,11 @@ TRAIN_MINUS_DEV once a per-epoch re-selection arm needs the whole pool cached.
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from core.training.thinking_tokens import mean_init_new_rows, new_token_ids, setup_thinking_tokens
+from core.training.thinking_tokens import (
+    mean_init_new_rows,
+    new_token_ids,
+    setup_thinking_tokens,
+)
 from core.training.token_weighting.proxy_cache import build_proxy_cache
 from core.utils.device import DEVICE_MAP
 from core.utils.logger import logger
