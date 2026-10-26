@@ -28,7 +28,9 @@ from core.training.packed_data_collator import PackedSequenceCollator
 from core.training.token_weighting.proxy_cache import ProxyCache
 
 
-def structural_mask(input_ids: torch.Tensor, labels: torch.Tensor, thinking_token_ids: tuple[int, int]) -> torch.Tensor:
+def structural_mask(
+    input_ids: torch.Tensor, labels: torch.Tensor, thinking_token_ids: tuple[int, int]
+) -> torch.Tensor:
     """Labeled positions of one document that carry trace structure rather than content:
     the <think> token, the </think> token and everything after it (answer, end-of-turn)."""
     think_start, think_end = thinking_token_ids
@@ -72,7 +74,12 @@ class _ProxyTensors:
 class _ProxyAttacher:
     """Shared document-level fill used by both collators."""
 
-    def __init__(self, cache: ProxyCache | None, thinking_token_ids: tuple[int, int], strict: bool):
+    def __init__(
+        self,
+        cache: ProxyCache | None,
+        thinking_token_ids: tuple[int, int],
+        strict: bool,
+    ):
         self.cache = cache
         self.thinking_token_ids = thinking_token_ids
         self.strict = strict
@@ -80,9 +87,19 @@ class _ProxyAttacher:
         self.missing_members = 0
         self.seen_members = 0
 
-    def fill(self, out: _ProxyTensors, b: int, start: int, doc_ids: torch.Tensor, doc_labels: torch.Tensor, key: int) -> None:
+    def fill(
+        self,
+        out: _ProxyTensors,
+        b: int,
+        start: int,
+        doc_ids: torch.Tensor,
+        doc_labels: torch.Tensor,
+        key: int,
+    ) -> None:
         length = doc_ids.numel()
-        out.structural[b, start : start + length] = structural_mask(doc_ids, doc_labels, self.thinking_token_ids)
+        out.structural[b, start : start + length] = structural_mask(
+            doc_ids, doc_labels, self.thinking_token_ids
+        )
         self.seen_members += 1
         entry = self.cache.lookup(key) if self.cache is not None else None
         if entry is None:
@@ -92,13 +109,17 @@ class _ProxyAttacher:
             return
         labeled = (doc_labels != IGNORE_LABEL).nonzero(as_tuple=True)[0]
         _, n = entry
-        assert n == labeled.numel(), f"proxy cache entry has {n} tokens but the document has {labeled.numel()} labeled tokens"
+        assert n == labeled.numel(), (
+            f"proxy cache entry has {n} tokens but the document has {labeled.numel()} labeled tokens"
+        )
         sl = self.cache.slice(key)
         pos = labeled + start
         out.entropy[b, pos] = torch.as_tensor(np.array(sl["entropy"], dtype=np.float32))
         out.logp[b, pos] = torch.as_tensor(np.array(sl["logp"], dtype=np.float32))
         out.topk_ids[b, pos] = torch.as_tensor(np.array(sl["topk_ids"], dtype=np.int64))
-        out.topk_logp[b, pos] = torch.as_tensor(np.array(sl["topk_logp"], dtype=np.float32))
+        out.topk_logp[b, pos] = torch.as_tensor(
+            np.array(sl["topk_logp"], dtype=np.float32)
+        )
         out.valid[b, pos] = True
 
 
@@ -116,7 +137,10 @@ class ProxyAwarePaddedCollator:
     ):
         self.tokenizer = tokenizer
         self.base = DataCollatorForTokenClassification(
-            tokenizer=tokenizer, padding=True, pad_to_multiple_of=pad_to_multiple_of, return_tensors="pt"
+            tokenizer=tokenizer,
+            padding=True,
+            pad_to_multiple_of=pad_to_multiple_of,
+            return_tensors="pt",
         )
         self.attacher = _ProxyAttacher(cache, thinking_token_ids, strict)
 
@@ -125,7 +149,10 @@ class ProxyAwarePaddedCollator:
         return self.attacher.missing_members
 
     def __call__(self, features: list[dict]) -> dict[str, torch.Tensor]:
-        model_features = [{k: f[k] for k in ("input_ids", "attention_mask", "labels") if k in f} for f in features]
+        model_features = [
+            {k: f[k] for k in ("input_ids", "attention_mask", "labels") if k in f}
+            for f in features
+        ]
         batch = self.base(model_features)
         bsz, seq = batch["labels"].shape
         out = _ProxyTensors.empty(bsz, seq, self.attacher.top_k)
@@ -134,7 +161,9 @@ class ProxyAwarePaddedCollator:
             doc_ids = torch.as_tensor(feature["input_ids"], dtype=torch.long)
             doc_labels = torch.as_tensor(feature["labels"], dtype=torch.long)
             start = seq - doc_ids.numel() if left else 0
-            self.attacher.fill(out, b, start, doc_ids, doc_labels, row_key(doc_ids.tolist()))
+            self.attacher.fill(
+                out, b, start, doc_ids, doc_labels, row_key(doc_ids.tolist())
+            )
         batch.update(out.as_batch())
         return batch
 
@@ -170,7 +199,9 @@ class ProxyAwarePackedCollator(PackedSequenceCollator):
             start = 0
             for key, length in zip(_as_list(keys), _as_list(lengths)):
                 end = start + length
-                self.attacher.fill(out, b, start, input_ids[b, start:end], labels[b, start:end], key)
+                self.attacher.fill(
+                    out, b, start, input_ids[b, start:end], labels[b, start:end], key
+                )
                 start = end
         batch.update(out.as_batch())
         return batch

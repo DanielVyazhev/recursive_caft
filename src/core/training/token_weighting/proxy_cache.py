@@ -60,12 +60,21 @@ class ProxyCacheWriter:
         self.path.mkdir(parents=True, exist_ok=True)
         self.top_k = top_k
         self.vocab_size = vocab_size
-        offsets = np.concatenate([[0], np.cumsum(lengths)[:-1]]).astype(np.int64) if lengths else np.zeros(0, np.int64)
+        offsets = (
+            np.concatenate([[0], np.cumsum(lengths)[:-1]]).astype(np.int64)
+            if lengths
+            else np.zeros(0, np.int64)
+        )
         self.offsets = offsets.tolist()
         self.lengths = list(lengths)
         self.num_tokens = int(sum(lengths))
 
-        index = {"keys": list(keys), "offsets": self.offsets, "lengths": self.lengths, "row_ids": list(row_ids)}
+        index = {
+            "keys": list(keys),
+            "offsets": self.offsets,
+            "lengths": self.lengths,
+            "row_ids": list(row_ids),
+        }
         full_meta = {
             "top_k": top_k,
             "vocab_size": vocab_size,
@@ -77,10 +86,14 @@ class ProxyCacheWriter:
         meta_path = self.path / META_FILE
         if index_path.exists():
             existing = json.loads(index_path.read_text())
-            assert existing == index, f"Existing cache at {self.path} was built for a different dataset"
+            assert existing == index, (
+                f"Existing cache at {self.path} was built for a different dataset"
+            )
             existing_meta = json.loads(meta_path.read_text())
             for k in ("top_k", "vocab_size", "num_rows", "num_tokens"):
-                assert existing_meta[k] == full_meta[k], f"Existing cache meta mismatch on {k}"
+                assert existing_meta[k] == full_meta[k], (
+                    f"Existing cache meta mismatch on {k}"
+                )
         else:
             index_path.write_text(json.dumps(index))
             meta_path.write_text(json.dumps(full_meta, indent=2))
@@ -91,13 +104,21 @@ class ProxyCacheWriter:
             file = self.path / f"{name}.npy"
             if file.exists():
                 arr = np.load(file, mmap_mode="r+")
-                assert arr.shape == shape and arr.dtype == np.dtype(dtype), f"{file} has shape {arr.shape}/{arr.dtype}"
+                assert arr.shape == shape and arr.dtype == np.dtype(dtype), (
+                    f"{file} has shape {arr.shape}/{arr.dtype}"
+                )
             else:
-                arr = np.lib.format.open_memmap(file, mode="w+", dtype=dtype, shape=shape)
+                arr = np.lib.format.open_memmap(
+                    file, mode="w+", dtype=dtype, shape=shape
+                )
             self.arrays[name] = arr
 
         progress_path = self.path / PROGRESS_FILE
-        self.rows_done = json.loads(progress_path.read_text())["rows_done"] if progress_path.exists() else 0
+        self.rows_done = (
+            json.loads(progress_path.read_text())["rows_done"]
+            if progress_path.exists()
+            else 0
+        )
 
     def write_row(
         self,
@@ -109,7 +130,9 @@ class ProxyCacheWriter:
     ) -> None:
         n = self.lengths[row_index]
         off = self.offsets[row_index]
-        assert entropy.shape == (n,) and logp.shape == (n,), f"row {row_index}: expected {n} entries"
+        assert entropy.shape == (n,) and logp.shape == (n,), (
+            f"row {row_index}: expected {n} entries"
+        )
         assert topk_ids.shape == (n, self.top_k) and topk_logp.shape == (n, self.top_k)
         self.arrays["entropy"][off : off + n] = entropy
         self.arrays["logp"][off : off + n] = logp
@@ -138,7 +161,11 @@ class ProxyCache:
         meta = json.loads((self.path / META_FILE).read_text())
         index = json.loads((self.path / INDEX_FILE).read_text())
         progress_path = self.path / PROGRESS_FILE
-        rows_done = json.loads(progress_path.read_text())["rows_done"] if progress_path.exists() else 0
+        rows_done = (
+            json.loads(progress_path.read_text())["rows_done"]
+            if progress_path.exists()
+            else 0
+        )
         assert rows_done == meta["num_rows"], (
             f"Proxy cache at {self.path} is incomplete: {rows_done}/{meta['num_rows']} rows done"
         )
@@ -146,7 +173,8 @@ class ProxyCache:
         self.top_k: int = meta["top_k"]
         self.vocab_size: int = meta["vocab_size"]
         self._index: dict[int, tuple[int, int]] = {
-            int(k): (int(off), int(n)) for k, off, n in zip(index["keys"], index["offsets"], index["lengths"])
+            int(k): (int(off), int(n))
+            for k, off, n in zip(index["keys"], index["offsets"], index["lengths"])
         }
         self._arrays: dict[str, np.ndarray] | None = None
 
@@ -162,7 +190,10 @@ class ProxyCache:
     @property
     def arrays(self) -> dict[str, np.ndarray]:
         if self._arrays is None:
-            self._arrays = {name: np.load(self.path / f"{name}.npy", mmap_mode="r") for name in ARRAY_SPECS}
+            self._arrays = {
+                name: np.load(self.path / f"{name}.npy", mmap_mode="r")
+                for name in ARRAY_SPECS
+            }
         return self._arrays
 
     def slice(self, key: int) -> dict[str, np.ndarray]:
@@ -202,32 +233,49 @@ def build_proxy_cache(
     keys = [row_key(ids) for ids in dataset["input_ids"]]
     lengths = [labeled_count(labels) for labels in dataset["labels"]]
     row_ids = [str(r) for r in dataset["row_id"]]
-    writer = ProxyCacheWriter(path, keys, lengths, row_ids, top_k=top_k, vocab_size=vocab_size, meta=meta)
+    writer = ProxyCacheWriter(
+        path, keys, lengths, row_ids, top_k=top_k, vocab_size=vocab_size, meta=meta
+    )
     if writer.rows_done:
         logger.info(f"Proxy cache: resuming at row {writer.rows_done}/{len(dataset)}")
 
     device = next(model.parameters()).device
-    for i in tqdm(range(writer.rows_done, len(dataset)), desc="proxy pass", initial=writer.rows_done, total=len(dataset)):
+    for i in tqdm(
+        range(writer.rows_done, len(dataset)),
+        desc="proxy pass",
+        initial=writer.rows_done,
+        total=len(dataset),
+    ):
         row = dataset[i]
         input_ids = torch.tensor(row["input_ids"], dtype=torch.long)
         labels = torch.tensor(row["labels"], dtype=torch.long)
         target_pos = (labels != IGNORE_LABEL).nonzero(as_tuple=True)[0]
         assert target_pos.numel() == lengths[i]
-        assert target_pos.numel() == 0 or int(target_pos.min()) >= 1, "a labeled token must have a predecessor"
+        assert target_pos.numel() == 0 or int(target_pos.min()) >= 1, (
+            "a labeled token must have a predecessor"
+        )
         if target_pos.numel() == 0:
             continue
         targets = input_ids[target_pos]
         # Kept on CPU: works whether the model is on one device or sharded with device_map.
         logit_pos = target_pos - 1
 
-        out = model(input_ids=input_ids[None].to(device), logits_to_keep=logit_pos, use_cache=False)
+        out = model(
+            input_ids=input_ids[None].to(device),
+            logits_to_keep=logit_pos,
+            use_cache=False,
+        )
         logits = out.logits[0]  # [n, V'] on the lm_head device
         assert logits.shape[0] == targets.numel()
-        assert logits.shape[1] >= vocab_size, f"model vocab {logits.shape[1]} < requested {vocab_size}"
+        assert logits.shape[1] >= vocab_size, (
+            f"model vocab {logits.shape[1]} < requested {vocab_size}"
+        )
 
         ent_parts, logp_parts, ids_parts, tlp_parts = [], [], [], []
         for a in range(0, logits.shape[0], chunk_size):
-            lp = torch.log_softmax(logits[a : a + chunk_size, :vocab_size].float(), dim=-1)
+            lp = torch.log_softmax(
+                logits[a : a + chunk_size, :vocab_size].float(), dim=-1
+            )
             y = targets[a : a + chunk_size].to(lp.device)
             ent_parts.append(entropy_from_logp(lp).cpu())
             logp_parts.append(lp.gather(1, y[:, None]).squeeze(1).cpu())
@@ -248,5 +296,7 @@ def build_proxy_cache(
             writer.mark_done(i + 1)
 
     writer.close()
-    logger.info(f"Proxy cache complete: {len(dataset)} rows, {writer.num_tokens} tokens at {path}")
+    logger.info(
+        f"Proxy cache complete: {len(dataset)} rows, {writer.num_tokens} tokens at {path}"
+    )
     return ProxyCache(path)

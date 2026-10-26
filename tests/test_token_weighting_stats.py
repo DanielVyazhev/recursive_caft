@@ -297,3 +297,34 @@ def test_permute_within_rows_is_a_permutation_of_content_only():
         not torch.equal(out, permute_within_rows(raw, content, seed=s))
         for s in range(1, 20)
     )
+
+
+def test_collision_fraction_properties():
+    from core.training.token_weighting.token_stats import (
+        coarse_collisions,
+        collision_fraction,
+    )
+
+    v = 16
+    lp_p = _random_logp(6, v, 7, temperature=0.7)
+    # full support: coarse collisions equal the exact inner products
+    top_lp, top_ids = lp_p.topk(v, dim=-1)
+    for lp_s in (_random_logp(6, v, 8), lp_p.clone()):
+        pp, ps = coarse_collisions(top_lp, lp_s.gather(1, top_ids))
+        assert torch.allclose(pp, (lp_p.exp() ** 2).sum(-1), atol=1e-6)
+        assert torch.allclose(ps, (lp_p.exp() * lp_s.exp()).sum(-1), atol=1e-6)
+    # student == proxy -> zero; student one-hot on the proxy mode -> zero (sum p^2 <= max p)
+    pp, ps = coarse_collisions(top_lp, lp_p.gather(1, top_ids))
+    assert (collision_fraction(pp, ps) < 1e-6).all()
+    onehot = torch.full((6, v), -30.0)
+    onehot[torch.arange(6), lp_p.argmax(-1)] = 0.0
+    pp, ps = coarse_collisions(top_lp, onehot.gather(1, top_ids))
+    assert (collision_fraction(pp, ps) < 1e-6).all()
+    # a diffuse student under a peaked proxy -> close to 1
+    peaked = torch.full((1, v), -30.0)
+    peaked[0, 3] = 0.0
+    top_lp, top_ids = peaked.topk(4, dim=-1)
+    pp, ps = coarse_collisions(
+        top_lp, torch.full((1, 4), -float(torch.log(torch.tensor(float(v)))))
+    )
+    assert collision_fraction(pp, ps)[0] > 0.9

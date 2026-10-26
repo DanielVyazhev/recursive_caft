@@ -42,6 +42,32 @@ def coarse_kl(
     return (head + tail).clamp_min(0.0)
 
 
+def coarse_collisions(
+    topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """(<P,P>, <P,S>) over the partition {each of the proxy's top-K tokens, the rest}: the
+    probability that two proxy samples coincide and that a proxy sample coincides with a student
+    sample. <P,P> = exp(-H_2(P)) is the proxy's collision (Renyi-2) probability. The tail is one
+    bucket, as in coarse_kl, which slightly overstates both terms when the tail mass is not tiny."""
+    p = topk_logp_p.float().exp()
+    s = topk_logp_s.float().exp()
+    p_tail = (1.0 - p.sum(-1)).clamp_min(0.0)
+    s_tail = (1.0 - s.sum(-1)).clamp_min(0.0)
+    pp = (p * p).sum(-1) + p_tail * p_tail
+    ps = (p * s).sum(-1) + p_tail * s_tail
+    return pp, ps
+
+
+def collision_fraction(
+    pp: torch.Tensor, ps: torch.Tensor, eps: float = 1e-6
+) -> torch.Tensor:
+    """rho_2 = (1 - <P,S> / <P,P>)^+: the share of the proxy's self-agreement the student has not
+    reached. Up to normalisation it is the expected first-order decrease of CE(P, S) from a one-hot
+    step on a proxy sample, E_{y~P}[p_P(y) - p_S(y)]; it is 0 for any student at least as
+    concentrated on the proxy's mode as the proxy itself (since sum p^2 <= max p)."""
+    return (1.0 - ps / pp.clamp_min(eps)).clamp_min(0.0)
+
+
 def topk_renormalized_kl(
     topk_logp_p: torch.Tensor, topk_logp_s: torch.Tensor
 ) -> torch.Tensor:
