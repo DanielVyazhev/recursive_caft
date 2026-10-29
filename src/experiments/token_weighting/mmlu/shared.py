@@ -384,7 +384,11 @@ def run_resampling(
     skip_missing_checkpoints: bool = True,
     run_evaluation: bool = True,
     lora_training_args: LoRASpecificTrainingArgs | None = None,
+    use_teacher_entropy: bool = False,
 ):
+    """`use_teacher_entropy` merges the Llama-70B/Qwen-72B single-token entropies into the pool
+    (data/out/single_token_entropy_normalized), which only the entropy-gain samplers read; the
+    random re-draw scores rows by `random_value` alone and draws straight from the train parquet."""
     save_schedule = save_schedule or RESAMPLING_SAVE_SCHEDULE
     if stop_after_epoch is None:
         stop_after_epoch = save_schedule[-1]
@@ -403,7 +407,11 @@ def run_resampling(
     if model_name == "phi4_mini":
         lora_training_args.target_modules = phi4_mini_lora_target_modules
 
-    pool_path = teacher_entropy_dataset_path(out_path, train_dataset)
+    pool_path = (
+        teacher_entropy_dataset_path(out_path, train_dataset)
+        if use_teacher_entropy
+        else Path(split_path(train_dataset))
+    )
     train_adapter = resampling_adapter(sampler_cls)
     train_adapter.override_tokenizer(tokenizer)
 
