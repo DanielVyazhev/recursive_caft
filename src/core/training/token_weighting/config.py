@@ -10,8 +10,21 @@ from pydantic import BaseModel, model_validator
 # excess_loss : score l_S - l_P (can be negative) -- Rho-1 / Token Cleaning; only meaningful as a
 #           selection score, i.e. together with select_top_frac
 # student_entropy : score H_S(t) -- SE-KD / the "80/20 rule"; selection score (top 20%)
+# shrink  : not a weight but a per-token target, q_t = (1 - a_t) onehot(y_t) + a_t p~_P: CE weight
+#           1 - a_t on the trace token plus KD weight a_t towards the proxy's top-K distribution,
+#           a_t = H_P / (H_P + b_t) (see the shrink_* fields)
 WeightingMode = Literal[
-    "uniform", "rho", "kl", "eg", "discord", "excess_loss", "student_entropy"
+    "uniform", "rho", "kl", "eg", "discord", "excess_loss", "student_entropy", "shrink"
+]
+
+# calibrated : a_t = H_P / (H_P + b_t)                        the method
+# student    : a_t = H_S / (H_S + b_t)                        control: the student's own entropy
+# const      : a_t = shrink_alpha_const                        control: the same KD mass everywhere
+# bg_entropy : a_t = H_P / log |V|                             Bridge-Garden, entropy variant
+# bg_conf    : a_t = 1 - max_v p_P(v)                          Bridge-Garden, confidence variant
+# eopd       : a_t = 1[H_P > shrink_eopd_threshold]            EOPD's hard entropy switch, off-policy
+ShrinkAlphaRule = Literal[
+    "calibrated", "student", "const", "bg_entropy", "bg_conf", "eopd"
 ]
 
 
@@ -67,9 +80,44 @@ class TokenWeightingConfig(BaseModel):
     # global step) before normalisation. Keeps the weight distribution, destroys the assignment
     # to tokens; a weighting that only helps through its spread would survive this.
     permute_within_row: bool = False
+    # mode="shrink" only. b_t is the proxy's estimated bias at the token, in nats, i.e. the price
+    # of replacing the one-hot trace token by the proxy's distribution. Its base is the trace's mean
+    # excess surprise of the proxy on the trace tokens, mean_t [l_P(y_t) - H_P(t)] over the content
+    # tokens (floored at shrink_b_floor; shrink_b replaces it by a constant). With shrink_gate the
+    # token's own excess surprise (l_P(y_t) - H_P(t) - shrink_tau)^+ is taken when larger: a token
+    # the proxy did not see coming is learned from the trace, not from the proxy. The CE/KD split is
+    # per token, so normalize_per_pack must be off; kd_lambda, ce_scale, eg_gate and selection do
+    # not apply. permute_within_row shuffles a_t among the content tokens of a row (control).
+    shrink_alpha_rule: ShrinkAlphaRule = "calibrated"
+    shrink_gate: bool = True
+    shrink_b: float | None = None
+    shrink_b_floor: float = 0.05
+    shrink_tau: float = 0.0
+    shrink_alpha_const: float | None = None
+    shrink_eopd_threshold: float = 0.8
 
     @model_validator(mode="after")
     def _validate_selection(self):
+        if self.mode == "shrink":
+            assert not self.normalize_per_pack, (
+                "shrink sets the CE/KD split per token; set normalize_per_pack=False"
+            )
+            assert self.kd_lambda == 0.0 and self.ce_scale == 1.0, (
+                "shrink owns the CE and KD weights; leave kd_lambda=0 and ce_scale=1"
+            )
+            assert not self.eg_gate and self.select_top_frac is None, (
+                "eg_gate and select_top_frac do not combine with shrink"
+            )
+            assert self.shrink_b_floor > 0.0, "shrink_b_floor must be positive"
+            assert self.shrink_b is None or self.shrink_b > 0.0, (
+                "shrink_b must be positive"
+            )
+            assert self.shrink_tau >= 0.0, "shrink_tau must be non-negative"
+            if self.shrink_alpha_rule == "const":
+                assert (
+                    self.shrink_alpha_const is not None
+                    and 0.0 <= self.shrink_alpha_const <= 1.0
+                ), "shrink_alpha_rule='const' needs shrink_alpha_const in [0, 1]"
         assert self.kd_lambda >= 0.0, "kd_lambda must be non-negative"
         assert self.ce_scale >= 0.0, "ce_scale must be non-negative"
         assert self.ce_scale > 0.0 or self.kd_lambda > 0.0, (

@@ -15,7 +15,7 @@ import math
 
 import torch
 
-from core.training.token_weighting.config import WeightingMode
+from core.training.token_weighting.config import ShrinkAlphaRule, WeightingMode
 
 
 def coarse_kl(
@@ -146,6 +146,83 @@ def excess_sharpness_gate(
     sharper = h_s < h_p
     keep = torch.exp(-h_p / h0) if h0 > 0 else torch.zeros_like(h_p)
     return torch.where(sharper, keep, torch.ones_like(h_p))
+
+
+def excess_surprise(logp_p: torch.Tensor, h_p: torch.Tensor) -> torch.Tensor:
+    """l_P(y_t) - H_P(t): how much more the proxy is surprised by the trace token than it expects
+    to be at this position. Its mean over the teacher's tokens is CE(T, P) - H_P = KL(T || P) +
+    (H_T - H_P), the proxy's divergence from the teacher measured without teacher logits."""
+    return -logp_p - h_p
+
+
+def shrink_bias(
+    excess: torch.Tensor,
+    trace_b: torch.Tensor,
+    *,
+    floor: float,
+    gate: bool,
+    tau: float = 0.0,
+    fixed_b: float | None = None,
+) -> torch.Tensor:
+    """b_t, the proxy's estimated bias at the token (nats): the trace-level mean excess surprise
+    (floored), or `fixed_b`; with `gate`, at least the token's own excess surprise above `tau`."""
+    base = (
+        torch.full_like(excess, fixed_b)
+        if fixed_b is not None
+        else trace_b.clamp_min(floor)
+    )
+    if not gate:
+        return base
+    return torch.maximum(base, (excess - tau).clamp_min(0.0))
+
+
+def shrink_alpha(h: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """a_t = H / (H + b): the share of the target taken from the proxy's distribution. 0 where the
+    reference is certain (nothing to average over), -> 1 where the position is open and the proxy
+    is trusted (b small), -> 0 again where the proxy's bias dwarfs the spread."""
+    return (h / (h + b).clamp_min(1e-6)).clamp(0.0, 1.0)
+
+
+def shrink_mixing(
+    rule: ShrinkAlphaRule,
+    *,
+    h_p: torch.Tensor,
+    h_s: torch.Tensor,
+    logp_p: torch.Tensor,
+    topk_logp_p: torch.Tensor,
+    trace_b: torch.Tensor,
+    vocab_size: int,
+    gate: bool,
+    floor: float,
+    tau: float,
+    fixed_b: float | None,
+    alpha_const: float | None,
+    eopd_threshold: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """(a_t, b_t) for every position under one of the ShrinkAlphaRule rules. b_t is reported for
+    all rules (logging) but only enters `calibrated` and `student`."""
+    b = shrink_bias(
+        excess_surprise(logp_p, h_p),
+        trace_b,
+        floor=floor,
+        gate=gate,
+        tau=tau,
+        fixed_b=fixed_b,
+    )
+    if rule == "calibrated":
+        return shrink_alpha(h_p, b), b
+    if rule == "student":
+        return shrink_alpha(h_s, b), b
+    if rule == "const":
+        assert alpha_const is not None
+        return torch.full_like(h_p, alpha_const), b
+    if rule == "bg_entropy":
+        return (h_p / math.log(vocab_size)).clamp(0.0, 1.0), b
+    if rule == "bg_conf":
+        return (1.0 - topk_logp_p.float().max(-1).values.exp()).clamp(0.0, 1.0), b
+    if rule == "eopd":
+        return (h_p > eopd_threshold).to(h_p.dtype), b
+    raise ValueError(f"Unknown shrink alpha rule {rule!r}")
 
 
 def select_top_fraction(

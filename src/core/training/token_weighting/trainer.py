@@ -13,6 +13,11 @@ then assembled in fp32 over chunks of positions:
 The result is divided by HF's `num_items_in_batch` (labeled tokens in the accumulation
 chunk), matching the token-normalized loss the stock trainer computes for `uniform`
 weights. Weights are detached: they steer the loss but carry no gradient.
+
+`mode="shrink"` uses the same two terms with per-token coefficients instead of a weight:
+CE weight 1 - a_t and KD weight a_t (token_stats.shrink_mixing), so the gradient at a content
+token is softmax(z_t) - [(1 - a_t) onehot(y_t) + a_t p~_P] -- a one-hot target shrunk towards
+the proxy's distribution by the share a_t.
 """
 
 from typing import override
@@ -33,6 +38,7 @@ from core.training.token_weighting.token_stats import (
     raw_weights,
     reducible_fraction,
     select_top_fraction,
+    shrink_mixing,
     topk_renormalized_kl,
 )
 from core.utils.logger import logger
@@ -174,55 +180,87 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
             selected.reshape(n),
             cfg.chunk_size,
         )
+        content = selected & valid & ~structural
+        step = int(self.state.global_step) if self.state is not None else 0
+        permute_seed = self.args.seed * 1_000_003 + step
         with torch.no_grad():
             kl = coarse_kl(topk_logp_p.reshape(n, k), topk_logp_s)
-            raw = raw_weights(
-                cfg.mode,
-                kl=kl,
-                h_p=h_p.reshape(n),
-                h_s=h_s,
-                logp_p=logp_p.reshape(n),
-                logp_s=logp_s,
-                rho_eps=cfg.rho_eps,
-                discord_tau=cfg.discord_tau,
-            )
             gate = None
-            if cfg.eg_gate:
-                gate = excess_sharpness_gate(h_s, h_p.reshape(n), cfg.eg_gate_h0)
-                raw = raw * gate
-            raw = raw.reshape(bsz, seq)
-            if cfg.permute_within_row:
-                step = int(self.state.global_step) if self.state is not None else 0
-                raw = permute_within_rows(
+            alpha = None
+            shrink_b = None
+            kd_weights = None
+            if cfg.mode == "shrink":
+                # Per-token target (1 - a_t) onehot(y_t) + a_t p~_P: CE weight 1 - a_t, KD weight a_t
+                # on the content tokens; structural / uncached tokens keep the plain CE.
+                trace_b = _shift_left(tw["tw_trace_b"])
+                alpha, shrink_b = shrink_mixing(
+                    cfg.shrink_alpha_rule,
+                    h_p=h_p.reshape(n),
+                    h_s=h_s,
+                    logp_p=logp_p.reshape(n),
+                    topk_logp_p=topk_logp_p.reshape(n, k),
+                    trace_b=trace_b.reshape(n),
+                    vocab_size=vocab,
+                    gate=cfg.shrink_gate,
+                    floor=cfg.shrink_b_floor,
+                    tau=cfg.shrink_tau,
+                    fixed_b=cfg.shrink_b,
+                    alpha_const=cfg.shrink_alpha_const,
+                    eopd_threshold=cfg.shrink_eopd_threshold,
+                )
+                alpha = torch.where(
+                    content.reshape(n), alpha, torch.zeros_like(alpha)
+                ).reshape(bsz, seq)
+                if cfg.permute_within_row:
+                    alpha = permute_within_rows(alpha, content, seed=permute_seed)
+                weights = finalize_weights(
+                    1.0 - alpha,
+                    selected=selected,
+                    structural=structural,
+                    valid=valid,
+                    structural_weight=cfg.structural_weight,
+                    normalize_per_pack=False,
+                )
+                alpha = alpha.reshape(n)
+                kd_weights = alpha
+            else:
+                raw = raw_weights(
+                    cfg.mode,
+                    kl=kl,
+                    h_p=h_p.reshape(n),
+                    h_s=h_s,
+                    logp_p=logp_p.reshape(n),
+                    logp_s=logp_s,
+                    rho_eps=cfg.rho_eps,
+                    discord_tau=cfg.discord_tau,
+                )
+                if cfg.eg_gate:
+                    gate = excess_sharpness_gate(h_s, h_p.reshape(n), cfg.eg_gate_h0)
+                    raw = raw * gate
+                raw = raw.reshape(bsz, seq)
+                if cfg.permute_within_row:
+                    raw = permute_within_rows(raw, content, seed=permute_seed)
+                if cfg.select_top_frac is not None:
+                    raw = select_top_fraction(raw, content, cfg.select_top_frac)
+                weights = finalize_weights(
                     raw,
-                    selected & valid & ~structural,
-                    seed=self.args.seed * 1_000_003 + step,
+                    selected=selected,
+                    structural=structural,
+                    valid=valid,
+                    structural_weight=cfg.structural_weight,
+                    normalize_per_pack=cfg.normalize_per_pack,
+                    max_scale=cfg.max_norm_scale,
                 )
-            if cfg.select_top_frac is not None:
-                raw = select_top_fraction(
-                    raw, selected & valid & ~structural, cfg.select_top_frac
-                )
-            weights = finalize_weights(
-                raw,
-                selected=selected,
-                structural=structural,
-                valid=valid,
-                structural_weight=cfg.structural_weight,
-                normalize_per_pack=cfg.normalize_per_pack,
-                max_scale=cfg.max_norm_scale,
-            )
-            if cfg.ce_scale != 1.0:
-                weights = torch.where(
-                    selected & valid & ~structural, weights * cfg.ce_scale, weights
-                )
+                if cfg.ce_scale != 1.0:
+                    weights = torch.where(content, weights * cfg.ce_scale, weights)
+                if cfg.kd_lambda > 0.0:
+                    kd_weights = content.reshape(n).to(torch.float32) * cfg.kd_lambda
             weights = weights.reshape(n)
             ce = -logp_s
             loss_sum = (weights * ce).sum()
             kd_args: tuple = ()
             kd_value = None
-            if cfg.kd_lambda > 0.0:
-                kd_mask = (selected & valid & ~structural).reshape(n)
-                kd_weights = kd_mask.to(torch.float32) * cfg.kd_lambda
+            if kd_weights is not None:
                 topk_logp_p_flat = topk_logp_p.reshape(n, k)
                 kd_value = topk_renormalized_kl(topk_logp_p_flat, topk_logp_s)
                 loss_sum = loss_sum + (kd_weights * kd_value).sum()
@@ -243,6 +281,8 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
                 structural=structural.reshape(n),
                 kd=kd_value,
                 gate=gate,
+                alpha=alpha,
+                shrink_b=shrink_b,
             )
 
         loss = _WeightedCrossEntropy.apply(
@@ -276,6 +316,8 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
         structural,
         kd=None,
         gate=None,
+        alpha=None,
+        shrink_b=None,
     ) -> None:
         # Everything stays on the device: a .item()/float() here would sync the GPU on every
         # micro-step (64 per update) and serialise the collator with the model.
@@ -300,6 +342,10 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
             values["kd"] = kd
         if gate is not None:
             values["gate"] = gate
+        if alpha is not None:
+            values["alpha"] = alpha
+        if shrink_b is not None:
+            values["b"] = shrink_b
         content_f = content.to(kl.dtype)
         sums = {name: (value * content_f).sum() for name, value in values.items()}
         sums["weight_structural"] = (weights * structural_sel.to(kl.dtype)).sum()
@@ -333,6 +379,8 @@ class WeightedTokenLossTrainer(Seq2SeqTrainer):
                     "weight",
                     "kd",
                     "gate",
+                    "alpha",
+                    "b",
                 ):
                     if name in sums:
                         logs[f"tw/{name}"] = round(sums[name] / count, 4)

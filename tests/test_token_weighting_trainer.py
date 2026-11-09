@@ -736,3 +736,135 @@ def test_proxy_kd_term_matches_autograd(
         assert torch.isclose((w * ce).sum(), ce[structural].sum(), atol=1e-6)
     expected.backward()
     assert torch.allclose(student.lm_head.weight.grad, got_grad, atol=1e-6)
+
+
+def test_collator_trace_b_is_mean_excess_over_content_tokens(cache_dir, rows):
+    """tw_trace_b carries, on every position of a packed member, the mean of -log p_P(y) - H_P over
+    that member's content tokens (structural tokens excluded); rows without a cache entry get 0."""
+    cache = ProxyCache(str(cache_dir))
+    packed = _packed(rows)
+    collator = ProxyAwarePackedCollator(
+        cache, thinking_token_ids=(THINK_START, THINK_END)
+    )
+    batch = collator([packed[0]])
+    trace_b = batch["tw_trace_b"][0]
+    valid, structural = batch["tw_valid"][0], batch["tw_structural"][0]
+    start = 0
+    checked = 0
+    for key, length in zip(packed[0]["member_keys"], packed[0]["member_lengths"]):
+        span = slice(start, start + length)
+        content = valid[span] & ~structural[span]
+        if bool(content.any()):
+            expected = (-batch["tw_logp"][0][span] - batch["tw_entropy"][0][span])[
+                content
+            ].mean()
+            assert torch.allclose(trace_b[span], expected.expand(length), atol=1e-6)
+            checked += 1
+        start += length
+    assert checked >= 2
+    assert not torch.allclose(trace_b[trace_b != 0], trace_b[trace_b != 0].mean())
+    lenient = ProxyAwarePackedCollator(
+        None, thinking_token_ids=(THINK_START, THINK_END), strict=False
+    )
+    assert not lenient([packed[0]])["tw_trace_b"].any()
+
+
+@pytest.mark.parametrize(
+    "rule, gate, fixed_b, permute",
+    [
+        ("calibrated", True, None, False),
+        ("calibrated", False, 0.131, False),
+        ("calibrated", True, None, True),
+        ("const", True, None, False),
+        ("bg_conf", True, None, False),
+    ],
+)
+def test_shrink_loss_equals_brute_force(
+    cache_dir, student, rows, tmp_path, rule, gate, fixed_b, permute
+):
+    """mode=shrink: loss = sum_content (1 - a_t) CE_t + a_t KL(p~_P || softmax_K(z[ids])) + sum_structural CE_t,
+    no normalisation, with a_t from token_stats.shrink_mixing; value and logits gradient match autograd."""
+    from core.training.token_weighting.token_stats import (
+        permute_within_rows,
+        shrink_mixing,
+    )
+
+    cache = ProxyCache(str(cache_dir))
+    packed = _packed(rows)
+    collator = ProxyAwarePackedCollator(
+        cache, thinking_token_ids=(THINK_START, THINK_END)
+    )
+    batch = collator([packed[0], packed[1]])
+    num_items = torch.tensor(int((batch["labels"] != IGNORE_LABEL).sum()))
+    config = TokenWeightingConfig(
+        mode="shrink",
+        chunk_size=5,
+        normalize_per_pack=False,
+        shrink_alpha_rule=rule,
+        shrink_gate=gate,
+        shrink_b=fixed_b,
+        shrink_b_floor=0.05,
+        shrink_alpha_const=0.6,
+        permute_within_row=permute,
+    )
+    trainer = _trainer(student, tmp_path, config, collator)
+
+    student.zero_grad()
+    loss = trainer.compute_loss(student, dict(batch), num_items_in_batch=num_items)
+    loss.backward()
+    got_grad = student.lm_head.weight.grad.clone()
+
+    student.zero_grad()
+    logits = (
+        student(input_ids=batch["input_ids"], position_ids=batch["position_ids"])
+        .logits[:, :-1]
+        .float()
+    )
+    lp = torch.log_softmax(logits, dim=-1)
+    labels = batch["labels"][:, 1:]
+    selected = labels != IGNORE_LABEL
+    structural = batch["tw_structural"][:, 1:] & selected
+    valid = batch["tw_valid"][:, 1:] & selected
+    content = selected & valid & ~structural
+    ce = -lp.gather(2, labels.clamp_min(0)[..., None]).squeeze(-1)
+    with torch.no_grad():
+        h_p = batch["tw_entropy"][:, 1:]
+        alpha, b = shrink_mixing(
+            rule,
+            h_p=h_p,
+            h_s=-(lp.exp() * lp).sum(-1),
+            logp_p=batch["tw_logp"][:, 1:],
+            topk_logp_p=batch["tw_topk_logp"][:, 1:],
+            trace_b=batch["tw_trace_b"][:, 1:],
+            vocab_size=VOCAB,
+            gate=gate,
+            floor=0.05,
+            tau=0.0,
+            fixed_b=fixed_b,
+            alpha_const=0.6,
+            eopd_threshold=0.8,
+        )
+        alpha = torch.where(content, alpha, torch.zeros_like(alpha))
+        if permute:
+            step = int(trainer.state.global_step) if trainer.state is not None else 0
+            alpha = permute_within_rows(
+                alpha, content, seed=trainer.args.seed * 1_000_003 + step
+            )
+        p_tilde = torch.softmax(batch["tw_topk_logp"][:, 1:], dim=-1)
+    topk_ids = batch["tw_topk_ids"][:, 1:]
+    log_q = torch.log_softmax(logits.gather(2, topk_ids), dim=-1)
+    kd = (p_tilde * (torch.log(p_tilde.clamp_min(1e-30)) - log_q)).sum(-1)
+    expected = (
+        ((1.0 - alpha) * ce * content).sum() + (alpha * kd).sum() + ce[structural].sum()
+    ) / num_items
+    assert torch.isclose(loss, expected, atol=1e-5)
+    assert 0.0 < float(alpha[content].mean()) < 1.0
+    if rule == "calibrated" and gate and fixed_b is None:
+        # a token the proxy did not expect gets a bias equal to its own excess surprise
+        excess = -batch["tw_logp"][:, 1:] - h_p
+        assert (b[content] >= (excess[content]).clamp_min(0.0) - 1e-6).all()
+    expected.backward()
+    assert torch.allclose(student.lm_head.weight.grad, got_grad, atol=1e-6)
+    logs: dict[str, float] = {"loss": 1.0}
+    trainer.log(logs)
+    assert {"tw/alpha", "tw/b", "tw/kd"} <= set(logs)

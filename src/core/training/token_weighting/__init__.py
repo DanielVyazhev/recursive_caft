@@ -10,8 +10,20 @@ token level and turned into a reducible-fraction weight:
 The proxy is run once, teacher-forced over the traces (proxy_cache); the student side is
 recomputed from the training forward pass at every step (trainer). Modes `kl`, `eg` and
 `discord` are ablations / the external baseline on the same machinery.
+
+Mode `shrink` changes the target instead of the weight: on every content token the one-hot
+trace token is mixed with the proxy's distribution, q_t = (1 - a_t) onehot(y_t) + a_t p~_P,
+a_t = H_P / (H_P + b_t), where b_t is the proxy's estimated bias at the token (its excess
+surprise on the trace, per trace and, gated, per token). Where the proxy is certain the
+target is the trace token; where the position is open and the proxy expected the trace token
+the student learns the spread; where the trace did something the proxy did not expect the
+token is learned from the trace.
 """
 
-from core.training.token_weighting.config import TokenWeightingConfig, WeightingMode
+from core.training.token_weighting.config import (
+    ShrinkAlphaRule,
+    TokenWeightingConfig,
+    WeightingMode,
+)
 
-__all__ = ["TokenWeightingConfig", "WeightingMode"]
+__all__ = ["ShrinkAlphaRule", "TokenWeightingConfig", "WeightingMode"]

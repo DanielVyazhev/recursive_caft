@@ -10,6 +10,9 @@ earlier). The trainer shifts them together with the labels.
     tw_topk_logp  float32 [B, T, K]  their proxy log-probs
     tw_valid      bool    [B, T]     proxy statistics present (labeled position of a cached row)
     tw_structural bool    [B, T]     <think>, </think> and every labeled token after </think>
+    tw_trace_b    float32 [B, T]     the document's mean excess surprise of the proxy on its
+                                     content tokens, mean [-log p_P(y) - H_P] (same value on every
+                                     position of the document; 0 without cache entry)
 
 `ProxyAwarePaddedCollator` is the non-packed case (one document per row, padded on the
 tokenizer's side); `ProxyAwarePackedCollator` reads the block layout `pack_dataset(...,
@@ -48,6 +51,7 @@ class _ProxyTensors:
     topk_logp: torch.Tensor
     valid: torch.Tensor
     structural: torch.Tensor
+    trace_b: torch.Tensor
 
     @classmethod
     def empty(cls, bsz: int, seq: int, top_k: int) -> "_ProxyTensors":
@@ -58,6 +62,7 @@ class _ProxyTensors:
             topk_logp=torch.zeros(bsz, seq, top_k, dtype=torch.float32),
             valid=torch.zeros(bsz, seq, dtype=torch.bool),
             structural=torch.zeros(bsz, seq, dtype=torch.bool),
+            trace_b=torch.zeros(bsz, seq, dtype=torch.float32),
         )
 
     def as_batch(self) -> dict[str, torch.Tensor]:
@@ -68,6 +73,7 @@ class _ProxyTensors:
             "tw_topk_logp": self.topk_logp,
             "tw_valid": self.valid,
             "tw_structural": self.structural,
+            "tw_trace_b": self.trace_b,
         }
 
 
@@ -97,9 +103,8 @@ class _ProxyAttacher:
         key: int,
     ) -> None:
         length = doc_ids.numel()
-        out.structural[b, start : start + length] = structural_mask(
-            doc_ids, doc_labels, self.thinking_token_ids
-        )
+        structural = structural_mask(doc_ids, doc_labels, self.thinking_token_ids)
+        out.structural[b, start : start + length] = structural
         self.seen_members += 1
         entry = self.cache.lookup(key) if self.cache is not None else None
         if entry is None:
@@ -114,13 +119,19 @@ class _ProxyAttacher:
         )
         sl = self.cache.slice(key)
         pos = labeled + start
-        out.entropy[b, pos] = torch.as_tensor(np.array(sl["entropy"], dtype=np.float32))
-        out.logp[b, pos] = torch.as_tensor(np.array(sl["logp"], dtype=np.float32))
+        entropy = torch.as_tensor(np.array(sl["entropy"], dtype=np.float32))
+        logp = torch.as_tensor(np.array(sl["logp"], dtype=np.float32))
+        out.entropy[b, pos] = entropy
+        out.logp[b, pos] = logp
         out.topk_ids[b, pos] = torch.as_tensor(np.array(sl["topk_ids"], dtype=np.int64))
         out.topk_logp[b, pos] = torch.as_tensor(
             np.array(sl["topk_logp"], dtype=np.float32)
         )
         out.valid[b, pos] = True
+        content = ~structural[labeled]
+        if bool(content.any()):
+            excess = -logp[content] - entropy[content]
+            out.trace_b[b, start : start + length] = excess.mean()
 
 
 class ProxyAwarePaddedCollator:

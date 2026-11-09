@@ -328,3 +328,111 @@ def test_collision_fraction_properties():
         top_lp, torch.full((1, 4), -float(torch.log(torch.tensor(float(v)))))
     )
     assert collision_fraction(pp, ps)[0] > 0.9
+
+
+def test_shrink_bias_and_alpha():
+    from core.training.token_weighting.token_stats import (
+        excess_surprise,
+        shrink_alpha,
+        shrink_bias,
+    )
+
+    h_p = torch.tensor([0.0, 2.0, 2.0, 1.5, 0.01])
+    logp_p = -(
+        h_p + torch.tensor([0.0, -0.5, 3.0, 8.0, 40.0])
+    )  # excess 0, -0.5, 3, 8, 40
+    excess = excess_surprise(logp_p, h_p)
+    assert torch.allclose(excess, torch.tensor([0.0, -0.5, 3.0, 8.0, 40.0]))
+    trace_b = torch.full_like(h_p, 0.2)
+    # gate: the trace mean where the token was expected, the token's own excess where not
+    b = shrink_bias(excess, trace_b, floor=0.05, gate=True)
+    assert torch.allclose(b, torch.tensor([0.2, 0.2, 3.0, 8.0, 40.0]))
+    # tau shifts the per-token part, the floor protects a trace with no or negative mean excess
+    b_tau = shrink_bias(
+        excess, torch.full_like(h_p, -0.1), floor=0.05, gate=True, tau=2.0
+    )
+    assert torch.allclose(b_tau, torch.tensor([0.05, 0.05, 1.0, 6.0, 38.0]))
+    # no gate: the base only, a fixed constant when given
+    assert torch.allclose(shrink_bias(excess, trace_b, floor=0.05, gate=False), trace_b)
+    assert torch.allclose(
+        shrink_bias(excess, trace_b, floor=0.05, gate=False, fixed_b=0.131),
+        torch.full_like(h_p, 0.131),
+    )
+    alpha = shrink_alpha(h_p, b)
+    # certain proxy -> 0; open and expected -> high; open and unexpected -> low
+    assert alpha[0] == 0.0
+    assert alpha[1] > 0.9
+    assert alpha[2] == pytest.approx(2.0 / 5.0)
+    assert alpha[4] < 0.001
+    assert ((alpha >= 0) & (alpha <= 1)).all()
+
+
+def test_shrink_mixing_rules():
+    from core.training.token_weighting.token_stats import shrink_mixing
+
+    v = 16
+    lp_p = _random_logp(5, v, 11)
+    top_lp, _ = lp_p.topk(4, dim=-1)
+    h_p = -(lp_p.exp() * lp_p).sum(-1)
+    h_s = h_p * 2.0
+    logp_p = -(h_p + 0.1)
+    common = {
+        "h_p": h_p,
+        "h_s": h_s,
+        "logp_p": logp_p,
+        "topk_logp_p": top_lp,
+        "trace_b": torch.full_like(h_p, 0.3),
+        "vocab_size": v,
+        "gate": True,
+        "floor": 0.05,
+        "tau": 0.0,
+        "fixed_b": None,
+        "alpha_const": 0.6,
+        "eopd_threshold": float(h_p.median()),
+    }
+    a_cal, b = shrink_mixing("calibrated", **common)
+    assert torch.allclose(a_cal, h_p / (h_p + b))
+    a_stu, _ = shrink_mixing("student", **common)
+    assert torch.allclose(a_stu, h_s / (h_s + b))
+    assert (a_stu >= a_cal).all()
+    a_const, _ = shrink_mixing("const", **common)
+    assert torch.equal(a_const, torch.full_like(h_p, 0.6))
+    a_bg, _ = shrink_mixing("bg_entropy", **common)
+    assert torch.allclose(a_bg, h_p / torch.log(torch.tensor(float(v))))
+    a_conf, _ = shrink_mixing("bg_conf", **common)
+    assert torch.allclose(a_conf, 1.0 - lp_p.exp().max(-1).values, atol=1e-6)
+    a_eopd, _ = shrink_mixing("eopd", **common)
+    assert set(a_eopd.tolist()) <= {0.0, 1.0}
+    assert torch.equal(a_eopd, (h_p > common["eopd_threshold"]).float())
+    with pytest.raises(ValueError):
+        shrink_mixing("nope", **common)  # type: ignore[arg-type]
+
+
+def test_shrink_config_validation():
+    from pydantic import ValidationError
+
+    from core.training.token_weighting.config import TokenWeightingConfig
+
+    cfg = TokenWeightingConfig(
+        mode="shrink", proxy_cache_path="x", normalize_per_pack=False
+    )
+    assert (
+        cfg.needs_proxy() and cfg.shrink_gate and cfg.shrink_alpha_rule == "calibrated"
+    )
+    with pytest.raises(ValidationError):
+        TokenWeightingConfig(mode="shrink", proxy_cache_path="x")  # normalisation on
+    with pytest.raises(ValidationError):
+        TokenWeightingConfig(
+            mode="shrink", proxy_cache_path="x", normalize_per_pack=False, kd_lambda=1.0
+        )
+    with pytest.raises(ValidationError):
+        TokenWeightingConfig(
+            mode="shrink",
+            proxy_cache_path="x",
+            normalize_per_pack=False,
+            shrink_alpha_rule="const",
+        )
+    with pytest.raises(ValidationError):
+        TokenWeightingConfig(
+            mode="shrink", proxy_cache_path="x", normalize_per_pack=False, shrink_b=0.0
+        )
